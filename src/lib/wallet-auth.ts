@@ -172,19 +172,31 @@ export async function loginWithWallet(
 export async function completeWalletSignup(input: {
   signupToken: string
   address: string
-  email: string
-  password: string
-  displayName: string
-  mobile: string
   referralCode: string
+  email?: string
+  password?: string
+  displayName?: string
+  mobile?: string
 }) {
   if (!isFirebaseReady()) {
     throw new Error('Firebase is not configured')
   }
+  if (!input.referralCode?.trim()) {
+    throw new Error('Referral code is required')
+  }
+  const payload = {
+    signupToken: input.signupToken,
+    address: input.address,
+    referralCode: input.referralCode.trim(),
+    ...(input.email?.trim() ? { email: input.email.trim() } : {}),
+    ...(input.password ? { password: input.password } : {}),
+    ...(input.displayName?.trim() ? { displayName: input.displayName.trim() } : {}),
+    ...(input.mobile?.trim() ? { mobile: input.mobile.trim() } : {}),
+  }
   const result = await callFunction<
-    typeof input,
+    typeof payload,
     { customToken: string; uid: string; address: string; ok: true }
-  >('completeWalletSignup', input)
+  >('completeWalletSignup', payload)
   await signInWithCustomToken(getFirebaseAuth(), result.customToken)
   clearWalletSignupSession()
   return result

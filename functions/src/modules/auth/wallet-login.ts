@@ -112,7 +112,8 @@ export const verifyWalletLogin = onCall(CALLABLE_OPTS, async (request) => {
     if (!byWallet.empty) {
       const uid = byWallet.docs[0]!.id;
       const profile = byWallet.docs[0]!.data() as UserProfile;
-      const needsProfile = !profile.mobile || !profile.referredBy;
+      // Referral is mandatory — block dashboard until sponsor is set.
+      const needsProfile = !profile.referredBy;
       const customToken = await auth.createCustomToken(uid, {
         walletAddress: address,
         loginMethod: 'wallet',
@@ -162,19 +163,105 @@ export const verifyWalletLogin = onCall(CALLABLE_OPTS, async (request) => {
   }
 });
 
-const completeWalletSignupSchema = z.object({
-  signupToken: z.string().min(16).max(128),
-  address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-  email: z.string().email(),
-  password: z.string().min(8).max(128),
-  displayName: z.string().min(2).max(80),
-  mobile: z
-    .string()
-    .min(8)
-    .max(20)
-    .regex(/^[+0-9][0-9\s\-()]{7,19}$/),
-  referralCode: z.string().min(4).max(32),
-});
+const optionalEmail = z
+  .string()
+  .trim()
+  .optional()
+  .transform((v) => (v && v.length > 0 ? v : undefined));
+const optionalPassword = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.length > 0 ? v : undefined));
+
+const completeWalletSignupSchema = z
+  .object({
+    signupToken: z.string().min(16).max(128),
+    address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    /** Required — wallet signup cannot complete without a sponsor. */
+    referralCode: z.string().min(4).max(32),
+    email: optionalEmail,
+    password: optionalPassword,
+    displayName: z
+      .string()
+      .trim()
+      .max(80)
+      .optional()
+      .transform((v) => (v && v.length > 0 ? v : undefined)),
+    mobile: z
+      .string()
+      .trim()
+      .max(20)
+      .optional()
+      .transform((v) => (v && v.length > 0 ? v : undefined)),
+  })
+  .superRefine((data, ctx) => {
+    const hasEmail = Boolean(data.email);
+    const hasPassword = Boolean(data.password);
+    if (hasEmail !== hasPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Email and password must both be provided, or both skipped',
+        path: hasEmail ? ['password'] : ['email'],
+      });
+    }
+    if (data.email) {
+      const emailCheck = z.string().email().safeParse(data.email);
+      if (!emailCheck.success) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Enter a valid email',
+          path: ['email'],
+        });
+      }
+    }
+    if (data.password) {
+      if (data.password.length < 8) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Password must be at least 8 characters',
+          path: ['password'],
+        });
+      }
+    }
+    if (data.mobile) {
+      const mobileOk = /^[+0-9][0-9\s\-()]{7,19}$/.test(data.mobile);
+      if (!mobileOk || data.mobile.length < 8) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Enter a valid mobile number',
+          path: ['mobile'],
+        });
+      }
+    }
+    if (data.displayName && data.displayName.length < 2) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Name must be at least 2 characters',
+        path: ['displayName'],
+      });
+    }
+  });
+
+async function assertReferralCodeExists(code: string): Promise<string> {
+  const db = getDb();
+  const normalized = code.trim().toUpperCase();
+  let snap = await db
+    .collection(Collections.users)
+    .where('referralCode', '==', normalized)
+    .limit(1)
+    .get();
+  if (snap.empty && code.trim() !== normalized) {
+    snap = await db
+      .collection(Collections.users)
+      .where('referralCode', '==', code.trim())
+      .limit(1)
+      .get();
+  }
+  if (snap.empty) {
+    throw new AppError('not-found', 'Referral code not found');
+  }
+  return (snap.docs[0]!.data().referralCode as string) || normalized;
+}
 
 /** Finish signup after wallet was verified and is not already claimed. */
 export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
@@ -190,6 +277,10 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
 
     const address = normalizeWalletAddress(parsed.data.address);
     const db = getDb();
+
+    // Validate referral before creating any Auth/Firestore user.
+    const referralCode = await assertReferralCodeExists(parsed.data.referralCode);
+
     const sessionRef = db
       .collection(Collections.config)
       .doc(`walletSignup_${parsed.data.signupToken}`);
@@ -216,16 +307,33 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
       );
     }
 
+    const displayName =
+      parsed.data.displayName?.trim() ||
+      `Wallet ${address.slice(0, 6)}…${address.slice(-4)}`;
+    const mobile = parsed.data.mobile
+      ? parsed.data.mobile.replace(/\s+/g, ' ').trim()
+      : null;
+    const email = parsed.data.email?.trim().toLowerCase() || null;
+    const password = parsed.data.password;
+
     const auth = getAuth();
     let uid: string;
     try {
-      const created = await auth.createUser({
-        email: parsed.data.email.trim().toLowerCase(),
-        password: parsed.data.password,
-        displayName: parsed.data.displayName.trim(),
-        emailVerified: false,
-      });
-      uid = created.uid;
+      if (email && password) {
+        const created = await auth.createUser({
+          email,
+          password,
+          displayName,
+          emailVerified: false,
+        });
+        uid = created.uid;
+      } else {
+        // Wallet-only account — sign-in is via wallet signature + custom token.
+        const created = await auth.createUser({
+          displayName,
+        });
+        uid = created.uid;
+      }
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       if (code === 'auth/email-already-exists') {
@@ -245,13 +353,12 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
       await new Promise((r) => setTimeout(r, 400));
     }
 
-    const mobile = parsed.data.mobile.replace(/\s+/g, ' ').trim();
     if (!ready) {
-      const referralCode = generateReferralCode(uid);
+      const ownReferralCode = generateReferralCode(uid);
       const profile: UserProfile = {
         uid,
-        email: parsed.data.email.trim().toLowerCase(),
-        displayName: parsed.data.displayName.trim(),
+        email,
+        displayName,
         photoURL: null,
         mobile,
         walletAddress: address,
@@ -260,7 +367,7 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
         preferences: {},
         status: 'active',
         kycStatus: 'none',
-        referralCode,
+        referralCode: ownReferralCode,
         referredBy: null,
         binaryParentId: null,
         binarySide: null,
@@ -279,16 +386,34 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
       await userRef.set(profile, { merge: true });
       await createDefaultWallets(db, uid);
     } else {
-      await userRef.update({
-        mobile,
-        displayName: parsed.data.displayName.trim(),
+      const patch: Record<string, unknown> = {
+        displayName,
         walletAddress: address,
         withdrawalAddress: address,
         updatedAt: FieldValue.serverTimestamp(),
-      });
+      };
+      if (email) patch.email = email;
+      if (mobile) patch.mobile = mobile;
+      await userRef.update(patch);
     }
 
-    await applyCodeForUserExport(uid, parsed.data.referralCode);
+    try {
+      await applyCodeForUserExport(uid, referralCode);
+    } catch (err) {
+      // Do not leave a usable session without a sponsor.
+      try {
+        await auth.deleteUser(uid);
+      } catch {
+        /* best effort */
+      }
+      try {
+        await userRef.delete();
+      } catch {
+        /* best effort */
+      }
+      throw err;
+    }
+
     await sessionRef.delete();
 
     const customToken = await auth.createCustomToken(uid, {
@@ -296,7 +421,11 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
       loginMethod: 'wallet',
     });
 
-    log.info('wallet_signup_completed', { uid, address });
+    log.info('wallet_signup_completed', {
+      uid,
+      address,
+      withEmail: Boolean(email),
+    });
     return {
       customToken,
       uid,

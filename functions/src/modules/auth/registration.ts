@@ -18,15 +18,18 @@ const finalizeSchema = z.object({
   referralCode: z.string().min(4).max(32),
   mobile: z
     .string()
-    .min(8, 'Mobile number required')
     .max(20)
-    .regex(/^[+0-9][0-9\s\-()]{7,19}$/, 'Enter a valid mobile number'),
-  displayName: z.string().min(2).max(80).optional(),
+    .optional()
+    .or(z.literal(''))
+    .refine((v) => !v || v.trim() === '' || /^[+0-9][0-9\s\-()]{7,19}$/.test(v), {
+      message: 'Enter a valid mobile number',
+    }),
+  displayName: z.string().max(80).optional().or(z.literal('')),
   walletAddress: bep20,
 });
 
 /**
- * After email/password or wallet signup: set mobile, optional wallet, mandatory referral.
+ * After email/password or wallet signup: mandatory referral; mobile/wallet optional.
  */
 export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
   try {
@@ -36,7 +39,8 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
       throw new AppError('invalid-argument', parsed.error.issues[0]?.message ?? 'Invalid input');
     }
 
-    const { referralCode, mobile, displayName } = parsed.data;
+    const { referralCode, displayName } = parsed.data;
+    const mobileRaw = parsed.data.mobile?.trim() || '';
     const walletRaw = parsed.data.walletAddress?.trim() || '';
     const walletAddress = walletRaw ? walletRaw.toLowerCase() : null;
 
@@ -62,16 +66,18 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
     }
 
     const patch: Record<string, unknown> = {
-      mobile: mobile.replace(/\s+/g, ' ').trim(),
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (displayName) patch.displayName = displayName.trim();
+    if (mobileRaw) patch.mobile = mobileRaw.replace(/\s+/g, ' ').trim();
+    if (displayName?.trim()) patch.displayName = displayName.trim();
     if (walletAddress) {
       patch.walletAddress = walletAddress;
       patch.withdrawalAddress = walletAddress;
     }
 
-    await ref.update(patch);
+    if (Object.keys(patch).length > 1) {
+      await ref.update(patch);
+    }
 
     const profile = (await ref.get()).data()!;
     let referrerId: string;
@@ -91,7 +97,7 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
     return {
       ok: true as const,
       referrerId,
-      mobile: patch.mobile as string,
+      mobile: (patch.mobile as string | undefined) ?? (profile.mobile as string | null) ?? null,
       walletAddress,
     };
   } catch (err) {

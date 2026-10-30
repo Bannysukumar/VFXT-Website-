@@ -26,17 +26,22 @@ export async function lookupReferralCode(code: string) {
 
 export async function finalizeRegistration(input: {
   referralCode: string
-  mobile: string
+  mobile?: string
   displayName?: string
   walletAddress?: string
 }) {
   return callFunction<
-    typeof input,
-    { ok: true; referrerId: string; mobile: string; walletAddress: string | null }
+    {
+      referralCode: string
+      mobile?: string
+      displayName?: string
+      walletAddress?: string
+    },
+    { ok: true; referrerId: string; mobile: string | null; walletAddress: string | null }
   >('finalizeRegistration', {
     referralCode: input.referralCode,
-    mobile: input.mobile,
-    displayName: input.displayName,
+    ...(input.mobile?.trim() ? { mobile: input.mobile.trim() } : {}),
+    ...(input.displayName?.trim() ? { displayName: input.displayName.trim() } : {}),
     walletAddress: input.walletAddress || '',
   })
 }

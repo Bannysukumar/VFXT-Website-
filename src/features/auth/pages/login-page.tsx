@@ -116,16 +116,16 @@ export function LoginPage() {
 
   const onCompleteProfile = completeForm.handleSubmit(async (values) => {
     if (!uplinerName) {
-      toast.error('Enter a valid referral code')
+      toast.error('A valid referral code is required')
       return
     }
     try {
       await finalizeRegistration({
         referralCode: values.referralCode,
-        mobile: values.mobile,
-        displayName: values.displayName,
+        mobile: values.mobile?.trim() || undefined,
+        displayName: values.displayName?.trim() || undefined,
       })
-      toast.success('Profile completed')
+      toast.success('Referral linked — welcome')
       navigate(await resolvePostLoginPath(from), { replace: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not finish signup')
@@ -135,8 +135,8 @@ export function LoginPage() {
   if (needsProfile) {
     return (
       <AuthLayout
-        title="Finish wallet signup"
-        description="Referral code and mobile are required for new wallet accounts."
+        title="Referral required"
+        description="Enter a valid referral code to access your dashboard. Name and mobile are optional."
         footer={
           <>
             Prefer email? <Link to="/auth/register">Create an email account</Link>
@@ -145,7 +145,9 @@ export function LoginPage() {
       >
         <form className="space-y-5" onSubmit={onCompleteProfile} noValidate>
           <div className="space-y-2">
-            <Label htmlFor="referralCode">Referral code</Label>
+            <Label htmlFor="referralCode">
+              Referral code <span className="text-danger">*</span>
+            </Label>
             <Input
               id="referralCode"
               className="font-mono uppercase"
@@ -161,16 +163,18 @@ export function LoginPage() {
               </p>
             ) : referralCode?.trim().length >= 4 ? (
               <p className="text-xs text-danger">Referral code not found</p>
-            ) : null}
+            ) : (
+              <p className="text-xs text-ink-muted">You cannot continue without a sponsor code.</p>
+            )}
             <FieldError message={completeForm.formState.errors.referralCode?.message} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="displayName">Full name</Label>
+            <Label htmlFor="displayName">Full name (optional)</Label>
             <Input id="displayName" {...completeForm.register('displayName')} />
             <FieldError message={completeForm.formState.errors.displayName?.message} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="mobile">Mobile number</Label>
+            <Label htmlFor="mobile">Mobile number (optional)</Label>
             <Input id="mobile" type="tel" {...completeForm.register('mobile')} />
             <FieldError message={completeForm.formState.errors.mobile?.message} />
           </div>

@@ -65,6 +65,7 @@ const mapWithdrawal = (id: string, data: DocumentData): WithdrawalRequest => ({
   destination: data.destination ?? '',
   idempotencyKey: data.idempotencyKey ?? '',
   note: data.note,
+  txHash: typeof data.txHash === 'string' ? data.txHash : null,
   reviewedBy: data.reviewedBy,
   reviewedAt: data.reviewedAt ? toIsoDate(data.reviewedAt) : undefined,
   createdAt: toIsoDate(data.createdAt),

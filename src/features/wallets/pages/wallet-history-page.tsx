@@ -10,11 +10,19 @@ import { LoadingState } from '@/components/shared/loading-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { StatusBadge } from '@/components/shared/status-badge'
+import { BscTxLink } from '@/components/shared/bsc-tx-link'
 import { useAuth } from '@/features/auth/auth-context'
 import { formatMinor } from '@/lib/money'
 import { WALLET_META, type WalletKind } from '@/lib/plan'
 import { cn } from '@/lib/utils'
 import { fetchUserLedger, fetchUserWallets, walletDocId } from '@/services/wallet-service'
+import { fetchMyWithdrawals } from '@/services/records-service'
+
+function txHashFromMetadata(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== 'object') return null
+  const tx = (metadata as Record<string, unknown>).txHash
+  return typeof tx === 'string' && tx.trim() ? tx.trim() : null
+}
 
 const OUTGOING_TYPES = new Set([
   'withdrawal_debit',
@@ -60,6 +68,12 @@ export function WalletHistoryPage() {
     enabled: Boolean(userId && walletId && meta),
   })
 
+  const withdrawalsQuery = useQuery({
+    queryKey: ['my-withdrawals', userId],
+    queryFn: () => fetchMyWithdrawals(userId, 50),
+    enabled: Boolean(userId && kind === 'withdrawal'),
+  })
+
   const wallet = useMemo(
     () => (walletsQuery.data ?? []).find((w) => w.id === walletId || w.kind === kind),
     [walletsQuery.data, walletId, kind],
@@ -88,6 +102,7 @@ export function WalletHistoryPage() {
 
   const rows = ledgerQuery.data ?? []
   const scale = wallet?.scale ?? (meta.currency === 'VFXT' ? 0 : 2)
+  const withdrawalRows = withdrawalsQuery.data ?? []
 
   return (
     <div className="space-y-6">
@@ -111,6 +126,70 @@ export function WalletHistoryPage() {
           </p>
         </div>
       </div>
+
+      {kind === 'withdrawal' ? (
+        <Card className="overflow-hidden">
+          <CardHeader>
+            <CardTitle className="font-sans text-lg">On-chain withdrawals</CardTitle>
+            <CardDescription>
+              Successful sends include a BscScan link for the transaction hash.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0">
+            {withdrawalsQuery.isLoading ? (
+              <div className="p-6 text-sm text-ink-muted">Loading withdrawals…</div>
+            ) : withdrawalRows.length === 0 ? (
+              <div className="p-6">
+                <EmptyState
+                  icon={Receipt}
+                  title="No withdrawals yet"
+                  description="Completed USDT sends will appear here with BscScan links."
+                  action={
+                    <Button asChild size="sm">
+                      <Link to="/app/withdrawals">Withdraw</Link>
+                    </Button>
+                  }
+                />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <THead>
+                    <tr>
+                      <TH>When</TH>
+                      <TH>Destination</TH>
+                      <TH>Status</TH>
+                      <TH>Tx hash</TH>
+                      <TH className="text-right">Amount</TH>
+                    </tr>
+                  </THead>
+                  <TBody>
+                    {withdrawalRows.map((w) => (
+                      <TR key={w.id}>
+                        <TD className="whitespace-nowrap text-ink-muted">
+                          {format(new Date(w.createdAt), 'MMM d, yyyy · p')}
+                        </TD>
+                        <TD className="max-w-[140px] truncate font-mono text-xs">
+                          {w.destination || '—'}
+                        </TD>
+                        <TD>
+                          <StatusBadge status={w.status} />
+                        </TD>
+                        <TD>
+                          <BscTxLink txHash={w.txHash} compact />
+                        </TD>
+                        <TD className="tabular text-right font-semibold">
+                          {formatMinor(w.amountMinor, { scale: 2, currency: 'USD' })}
+                        </TD>
+                      </TR>
+                    ))}
+                  </TBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -143,6 +222,7 @@ export function WalletHistoryPage() {
                     <TH>Transaction</TH>
                     <TH>Date</TH>
                     <TH>Status</TH>
+                    <TH>Tx hash</TH>
                     <TH className="text-right">Amount</TH>
                     <TH className="text-right">Balance after</TH>
                   </tr>
@@ -150,6 +230,7 @@ export function WalletHistoryPage() {
                 <TBody>
                   {rows.map((entry) => {
                     const out = isOutgoing(entry)
+                    const txHash = txHashFromMetadata(entry.metadata)
                     return (
                       <TR key={entry.id}>
                         <TD>
@@ -188,6 +269,9 @@ export function WalletHistoryPage() {
                               (entry.direction === 'debit' ? 'completed' : 'completed')
                             }
                           />
+                        </TD>
+                        <TD>
+                          <BscTxLink txHash={txHash} compact />
                         </TD>
                         <TD
                           className={cn(

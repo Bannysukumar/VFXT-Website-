@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FieldError } from '@/components/shared/page-header'
-import { registerSchema, type RegisterValues } from '@/features/auth/schemas'
+import { walletSignupSchema, type WalletSignupValues } from '@/features/auth/schemas'
 import { lookupReferralCode } from '@/services/auth-service'
 import {
   clearWalletSignupSession,
@@ -28,20 +28,21 @@ export function WalletRegisterPage() {
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
 
-  const form = useForm<RegisterValues>({
-    resolver: zodResolver(registerSchema),
+  const form = useForm<WalletSignupValues>({
+    resolver: zodResolver(walletSignupSchema),
     defaultValues: {
       displayName: '',
-      email: '',
       mobile: '',
       referralCode: params.get('ref') ?? '',
-      walletAddress: address,
+      email: '',
       password: '',
       confirmPassword: '',
+      includeCredentials: false,
     },
   })
   const { errors, isSubmitting } = form.formState
   const referralCode = form.watch('referralCode')
+  const includeCredentials = form.watch('includeCredentials')
 
   useEffect(() => {
     if (!address || !signupToken) {
@@ -49,10 +50,6 @@ export function WalletRegisterPage() {
       navigate('/auth/login', { replace: true })
     }
   }, [address, signupToken, navigate])
-
-  useEffect(() => {
-    if (address) form.setValue('walletAddress', address)
-  }, [address, form])
 
   useEffect(() => {
     const code = referralCode?.trim()
@@ -88,7 +85,7 @@ export function WalletRegisterPage() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     if (!uplinerName) {
-      toast.error('Enter a valid referral code')
+      toast.error('A valid referral code is required to sign up')
       return
     }
     if (!signupToken || !address) {
@@ -100,13 +97,13 @@ export function WalletRegisterPage() {
       await completeWalletSignup({
         signupToken,
         address,
-        email: values.email,
-        password: values.password,
-        displayName: values.displayName,
-        mobile: values.mobile,
         referralCode: values.referralCode,
+        displayName: values.displayName?.trim() || undefined,
+        mobile: values.mobile?.trim() || undefined,
+        email: values.includeCredentials ? values.email?.trim() : undefined,
+        password: values.includeCredentials ? values.password : undefined,
       })
-      toast.success('Account created and wallet linked')
+      toast.success('Wallet account created')
       navigate('/app', { replace: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Signup failed')
@@ -116,7 +113,7 @@ export function WalletRegisterPage() {
   return (
     <AuthLayout
       title="Complete wallet signup"
-      description="Your wallet was verified. Fill in your details to create and link this account."
+      description="Referral code is required. Email and password are optional — you can skip them and sign in with this wallet later."
       footer={
         <>
           Wrong wallet?{' '}
@@ -143,42 +140,13 @@ export function WalletRegisterPage() {
 
       <form className="space-y-5" onSubmit={onSubmit} noValidate>
         <div className="space-y-2">
-          <Label htmlFor="displayName">Full name</Label>
-          <Input
-            id="displayName"
-            autoComplete="name"
-            aria-invalid={Boolean(errors.displayName)}
-            {...form.register('displayName')}
-          />
-          <FieldError message={errors.displayName?.message} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            aria-invalid={Boolean(errors.email)}
-            {...form.register('email')}
-          />
-          <FieldError message={errors.email?.message} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="mobile">Mobile</Label>
-          <Input
-            id="mobile"
-            autoComplete="tel"
-            placeholder="+91…"
-            aria-invalid={Boolean(errors.mobile)}
-            {...form.register('mobile')}
-          />
-          <FieldError message={errors.mobile?.message} />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="referralCode">Referral code</Label>
+          <Label htmlFor="referralCode">
+            Referral code <span className="text-danger">*</span>
+          </Label>
           <Input
             id="referralCode"
-            aria-invalid={Boolean(errors.referralCode)}
+            className="font-mono uppercase"
+            aria-invalid={Boolean(errors.referralCode) || Boolean(lookupError)}
             {...form.register('referralCode')}
           />
           {lookingUp ? (
@@ -191,32 +159,103 @@ export function WalletRegisterPage() {
             </p>
           ) : lookupError ? (
             <p className="text-xs text-danger">{lookupError}</p>
-          ) : null}
+          ) : (
+            <p className="text-xs text-ink-muted">You cannot create an account without a sponsor code.</p>
+          )}
           <FieldError message={errors.referralCode?.message} />
         </div>
+
         <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <PasswordInput
-            id="password"
-            autoComplete="new-password"
-            aria-invalid={Boolean(errors.password)}
-            {...form.register('password')}
+          <Label htmlFor="displayName">Full name (optional)</Label>
+          <Input
+            id="displayName"
+            autoComplete="name"
+            aria-invalid={Boolean(errors.displayName)}
+            {...form.register('displayName')}
           />
-          <FieldError message={errors.password?.message} />
+          <FieldError message={errors.displayName?.message} />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="confirmPassword">Confirm password</Label>
-          <PasswordInput
-            id="confirmPassword"
-            autoComplete="new-password"
-            aria-invalid={Boolean(errors.confirmPassword)}
-            {...form.register('confirmPassword')}
+          <Label htmlFor="mobile">Mobile (optional)</Label>
+          <Input
+            id="mobile"
+            autoComplete="tel"
+            placeholder="+91…"
+            aria-invalid={Boolean(errors.mobile)}
+            {...form.register('mobile')}
           />
-          <FieldError message={errors.confirmPassword?.message} />
+          <FieldError message={errors.mobile?.message} />
         </div>
-        <Button type="submit" className="w-full" disabled={isSubmitting}>
+
+        <div className="rounded-xl border border-line bg-canvas/60 p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-medium">Email &amp; password</p>
+              <p className="text-xs text-ink-muted">Optional — skip to use wallet-only login.</p>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant={includeCredentials ? 'secondary' : 'outline'}
+              onClick={() => {
+                const next = !includeCredentials
+                form.setValue('includeCredentials', next, { shouldValidate: true })
+                if (!next) {
+                  form.setValue('email', '')
+                  form.setValue('password', '')
+                  form.setValue('confirmPassword', '')
+                  void form.clearErrors(['email', 'password', 'confirmPassword'])
+                }
+              }}
+            >
+              {includeCredentials ? 'Skip email & password' : 'Add email & password'}
+            </Button>
+          </div>
+
+          {includeCredentials ? (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  aria-invalid={Boolean(errors.email)}
+                  {...form.register('email')}
+                />
+                <FieldError message={errors.email?.message} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <PasswordInput
+                  id="password"
+                  autoComplete="new-password"
+                  aria-invalid={Boolean(errors.password)}
+                  {...form.register('password')}
+                />
+                <FieldError message={errors.password?.message} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm password</Label>
+                <PasswordInput
+                  id="confirmPassword"
+                  autoComplete="new-password"
+                  aria-invalid={Boolean(errors.confirmPassword)}
+                  {...form.register('confirmPassword')}
+                />
+                <FieldError message={errors.confirmPassword?.message} />
+              </div>
+            </>
+          ) : null}
+        </div>
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isSubmitting || !uplinerName}
+        >
           {isSubmitting ? <Loader2 className="animate-spin" /> : null}
-          Create account & link wallet
+          {includeCredentials ? 'Create account & link wallet' : 'Sign up with wallet'}
         </Button>
         <p className="text-center text-xs text-ink-muted">
           Prefer email only? <Link to="/auth/register">Register without wallet</Link>

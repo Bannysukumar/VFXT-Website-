@@ -4,10 +4,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { StatusBadge } from '@/components/shared/status-badge'
 import { SkeletonRows } from '@/components/shared/stat-card'
+import { BscTxLink } from '@/components/shared/bsc-tx-link'
 import { formatMinor } from '@/lib/money'
 import type { DepositRequest, WithdrawalRequest } from '@/types/models'
 
-type Row = (DepositRequest | WithdrawalRequest) & { destination?: string }
+type Row = (DepositRequest | WithdrawalRequest) & {
+  destination?: string
+  txHash?: string | null
+  providerRef?: string
+}
 
 export function RequestHistory({
   title,
@@ -45,45 +50,53 @@ export function RequestHistory({
             <p className="text-xs text-ink-muted">Your submitted requests will be listed here.</p>
           </div>
         ) : (
-          <Table>
-            <THead>
-              <tr>
-                <TH>Request</TH>
-                <TH>{kind === 'deposit' ? 'Note' : 'Destination'}</TH>
-                <TH>Status</TH>
-                <TH className="text-right">Amount</TH>
-              </tr>
-            </THead>
-            <TBody>
-              {rows.map((row) => (
-                <TR key={row.id}>
-                  <TD>
-                    <div className="flex items-center gap-3">
-                      <span className="grid size-9 place-items-center rounded-xl bg-panel-elevated text-ink-muted">
-                        <Icon className="size-4" />
-                      </span>
-                      <div>
-                        <p className="font-medium">{format(new Date(row.createdAt), 'MMM d, yyyy')}</p>
-                        <p className="font-mono text-[11px] text-ink-subtle">{row.id.slice(0, 12)}</p>
+          <div className="overflow-x-auto">
+            <Table>
+              <THead>
+                <tr>
+                  <TH>Request</TH>
+                  <TH>{kind === 'deposit' ? 'Note' : 'Destination'}</TH>
+                  <TH>Status</TH>
+                  {kind === 'withdrawal' ? <TH>Tx hash</TH> : null}
+                  <TH className="text-right">Amount</TH>
+                </tr>
+              </THead>
+              <TBody>
+                {rows.map((row) => (
+                  <TR key={row.id}>
+                    <TD>
+                      <div className="flex items-center gap-3">
+                        <span className="grid size-9 place-items-center rounded-xl bg-panel-elevated text-ink-muted">
+                          <Icon className="size-4" />
+                        </span>
+                        <div>
+                          <p className="font-medium">{format(new Date(row.createdAt), 'MMM d, yyyy')}</p>
+                          <p className="font-mono text-[11px] text-ink-subtle">{row.id.slice(0, 12)}</p>
+                        </div>
                       </div>
-                    </div>
-                  </TD>
-                  <TD className="max-w-56 truncate text-ink-muted">
-                    {(kind === 'withdrawal' ? row.destination : row.note) || '—'}
-                  </TD>
-                  <TD>
-                    <StatusBadge status={row.status} />
-                  </TD>
-                  <TD className="tabular text-right font-semibold">
-                    {formatMinor(row.amountMinor, {
-                      scale: 2,
-                      currency: row.currency === 'USD' ? 'USD' : undefined,
-                    })}
-                  </TD>
-                </TR>
-              ))}
-            </TBody>
-          </Table>
+                    </TD>
+                    <TD className="max-w-56 truncate text-ink-muted">
+                      {(kind === 'withdrawal' ? row.destination : row.note) || '—'}
+                    </TD>
+                    <TD>
+                      <StatusBadge status={row.status} />
+                    </TD>
+                    {kind === 'withdrawal' ? (
+                      <TD>
+                        <BscTxLink txHash={row.txHash} compact />
+                      </TD>
+                    ) : null}
+                    <TD className="tabular text-right font-semibold">
+                      {formatMinor(row.amountMinor, {
+                        scale: 2,
+                        currency: row.currency === 'USD' ? 'USD' : undefined,
+                      })}
+                    </TD>
+                  </TR>
+                ))}
+              </TBody>
+            </Table>
+          </div>
         )}
       </CardContent>
     </Card>

@@ -119,6 +119,8 @@ export interface WithdrawalRequest {
   destination: string
   idempotencyKey: string
   note?: string
+  /** On-chain BSC tx hash when the USDT send completed. */
+  txHash?: string | null
   reviewedBy?: string
   reviewedAt?: string
   createdAt: string

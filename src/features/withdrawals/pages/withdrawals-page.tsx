@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { FieldError, PageHeader } from '@/components/shared/page-header'
 import { AmountInputPrefix, ProcessSteps, SummaryRow } from '@/components/shared/process-steps'
 import { RequestHistory } from '@/components/shared/request-history'
+import { bscScanTxUrl } from '@/components/shared/bsc-tx-link'
 import { useAuth } from '@/features/auth/auth-context'
 import { formatMinor, parseToMinor } from '@/lib/money'
 import { images } from '@/lib/media'
@@ -89,7 +90,14 @@ export function WithdrawalsPage() {
     onSuccess: async (res) => {
       const data = res as { status?: string; txHash?: string | null }
       if (data.status === 'completed' && data.txHash) {
-        toast.success('USDT sent on BSC', { description: `Tx ${data.txHash.slice(0, 12)}…` })
+        const hash = data.txHash
+        toast.success('USDT sent on BSC', {
+          description: `${hash.slice(0, 12)}… · Open BscScan`,
+          action: {
+            label: 'BscScan',
+            onClick: () => window.open(bscScanTxUrl(hash), '_blank', 'noopener,noreferrer'),
+          },
+        })
       } else {
         toast.success('Withdrawal queued', {
           description: 'Hot wallet not ready — waiting for admin / funds.',
@@ -99,6 +107,7 @@ export function WithdrawalsPage() {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['wallets'] }),
         queryClient.invalidateQueries({ queryKey: ['my-withdrawals'] }),
+        queryClient.invalidateQueries({ queryKey: ['ledger'] }),
       ])
     },
     onError: (error: Error) => toast.error(error.message),
