@@ -18,7 +18,6 @@ import {
 import { assertPositiveMinor } from '../../lib/money';
 import { requireAuth } from '../../lib/permissions';
 import { WalletDoc } from '../../types/models';
-import { creditAvailable, debitAvailable } from './ledger';
 import { DEFAULT_WALLETS, walletDocId } from './types';
 
 /**
@@ -191,31 +190,39 @@ export const transferBetweenWallets = onCall(
           `${fromWalletId}->${toWalletId}`,
         );
 
-        await debitAvailable(tx, db, {
-          userId: ctx.uid,
-          walletId: fromWalletId,
-          type: 'wallet_transfer',
-          amountMinor,
-          currency: fromCurrency,
-          referenceType: 'wallet_transfer',
-          referenceId: key,
-          description: `Transfer ${fromKind} → ${toKind}`,
-          createdBy: ctx.uid,
-          metadata: { fromKind, toKind, creditAmount },
-        });
-
-        await creditAvailable(tx, db, {
-          userId: ctx.uid,
-          walletId: toWalletId,
-          type: 'wallet_transfer',
-          amountMinor: creditAmount,
-          currency: toCurrency,
-          referenceType: 'wallet_transfer',
-          referenceId: key,
-          description: `Transfer ${fromKind} → ${toKind}`,
-          createdBy: ctx.uid,
-          metadata: { fromKind, toKind, debitAmount: amountMinor },
-        });
+        const { applyLedgerEntries } = await import('./ledger');
+        await applyLedgerEntries(tx, db, [
+          {
+            userId: ctx.uid,
+            walletId: fromWalletId,
+            type: 'wallet_transfer',
+            direction: 'debit',
+            amountMinor,
+            availableDelta: -amountMinor,
+            reservedDelta: 0,
+            currency: fromCurrency,
+            referenceType: 'wallet_transfer',
+            referenceId: key,
+            description: `Transfer ${fromKind} → ${toKind}`,
+            createdBy: ctx.uid,
+            metadata: { fromKind, toKind, creditAmount },
+          },
+          {
+            userId: ctx.uid,
+            walletId: toWalletId,
+            type: 'wallet_transfer',
+            direction: 'credit',
+            amountMinor: creditAmount,
+            availableDelta: creditAmount,
+            reservedDelta: 0,
+            currency: toCurrency,
+            referenceType: 'wallet_transfer',
+            referenceId: key,
+            description: `Transfer ${fromKind} → ${toKind}`,
+            createdBy: ctx.uid,
+            metadata: { fromKind, toKind, debitAmount: amountMinor },
+          },
+        ]);
       });
 
       return { ok: true as const };

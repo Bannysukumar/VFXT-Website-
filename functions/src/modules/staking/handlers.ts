@@ -167,33 +167,40 @@ async function handleCreateStakingPosition(
       positionId,
     );
 
-    // Debit fund wallet (stake source).
-    await debitAvailable(tx, db, {
-      userId: ctx.uid,
-      walletId: walletDocId(ctx.uid, 'fund'),
-      type: 'stake',
-      amountMinor,
-      currency: 'USD',
-      referenceType: 'staking_position',
-      referenceId: positionId,
-      description: `Stake ${planId}`,
-      createdBy: ctx.uid,
-      metadata: { planId },
-    });
-
-    // Track locked principal on staking wallet.
-    await creditAvailable(tx, db, {
-      userId: ctx.uid,
-      walletId: walletDocId(ctx.uid, 'staking'),
-      type: 'stake',
-      amountMinor,
-      currency: 'USD',
-      referenceType: 'staking_position',
-      referenceId: positionId,
-      description: `Staking principal locked (${planId})`,
-      createdBy: ctx.uid,
-      metadata: { planId },
-    });
+    // Debit fund + credit staking in one batch (all wallet reads before writes).
+    const { applyLedgerEntries } = await import('../wallets/ledger');
+    await applyLedgerEntries(tx, db, [
+      {
+        userId: ctx.uid,
+        walletId: walletDocId(ctx.uid, 'fund'),
+        type: 'stake',
+        direction: 'debit',
+        amountMinor,
+        availableDelta: -amountMinor,
+        reservedDelta: 0,
+        currency: 'USD',
+        referenceType: 'staking_position',
+        referenceId: positionId,
+        description: `Stake ${planId}`,
+        createdBy: ctx.uid,
+        metadata: { planId },
+      },
+      {
+        userId: ctx.uid,
+        walletId: walletDocId(ctx.uid, 'staking'),
+        type: 'stake',
+        direction: 'credit',
+        amountMinor,
+        availableDelta: amountMinor,
+        reservedDelta: 0,
+        currency: 'USD',
+        referenceType: 'staking_position',
+        referenceId: positionId,
+        description: `Staking principal locked (${planId})`,
+        createdBy: ctx.uid,
+        metadata: { planId },
+      },
+    ]);
 
     const position: StakingPosition = {
       positionId,

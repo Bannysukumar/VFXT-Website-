@@ -18,7 +18,6 @@ import { log } from '../../lib/logger';
 import { DepositRequest } from '../../types/models';
 import { walletDocId } from '../wallets/types';
 import { ensureUserWallets } from '../wallets/handlers';
-import { creditAvailable } from '../wallets/ledger';
 import { createNotification } from '../notifications/handlers';
 import { writeAuditLog } from '../audit/handlers';
 import { gateEmailVerifiedForFinance } from '../auth/helpers';
@@ -235,30 +234,38 @@ async function handleApproveDeposit(
 
     // Always credit fund wallet (legacy deposit.walletId ignored on approve).
     const fundWalletId = walletDocId(deposit.userId, 'fund');
-    const credit = await creditAvailable(tx, db, {
-      userId: deposit.userId,
-      walletId: fundWalletId,
-      type: 'deposit_credit',
-      amountMinor: deposit.amountMinor,
-      currency: 'USD',
-      referenceType: 'deposit',
-      referenceId: depositId,
-      description: `Deposit approved (${deposit.method})`,
-      createdBy: ctx.uid,
-      metadata: {
-        method: deposit.method,
-        vfxtTokens,
-        tokensPerUsd: tokenFx.tokensPerUsd,
+    const { applyLedgerEntries } = await import('../wallets/ledger');
+    type LedgerMutation = Parameters<typeof applyLedgerEntries>[2][number];
+    const mutations: LedgerMutation[] = [
+      {
+        userId: deposit.userId,
+        walletId: fundWalletId,
+        type: 'deposit_credit',
+        direction: 'credit',
+        amountMinor: deposit.amountMinor,
+        availableDelta: deposit.amountMinor,
+        reservedDelta: 0,
+        currency: 'USD',
+        referenceType: 'deposit',
+        referenceId: depositId,
+        description: `Deposit approved (${deposit.method})`,
+        createdBy: ctx.uid,
+        metadata: {
+          method: deposit.method,
+          vfxtTokens,
+          tokensPerUsd: tokenFx.tokensPerUsd,
+        },
       },
-    });
-    entryId = credit.entryId;
-
+    ];
     if (vfxtTokens > 0) {
-      await creditAvailable(tx, db, {
+      mutations.push({
         userId: deposit.userId,
         walletId: walletDocId(deposit.userId, 'vfxt'),
         type: 'deposit_credit',
+        direction: 'credit',
         amountMinor: vfxtTokens,
+        availableDelta: vfxtTokens,
+        reservedDelta: 0,
         currency: 'VFXT',
         referenceType: 'deposit',
         referenceId: depositId,
@@ -270,6 +277,8 @@ async function handleApproveDeposit(
         },
       });
     }
+    const credits = await applyLedgerEntries(tx, db, mutations);
+    entryId = credits[0]?.entryId ?? '';
 
     tx.update(depositRef, {
       status: 'approved',
