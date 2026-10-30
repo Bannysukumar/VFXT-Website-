@@ -100,7 +100,7 @@ export function ProfilePage() {
         <AlertTitle>Auto-withdraw</AlertTitle>
         <AlertDescription>
           After your first successful withdrawal, the platform may auto-submit future withdrawals to
-          your saved address when your balance meets the minimum — if auto-withdraw is enabled by
+          your saved address when your balance meets the minimum, if auto-withdraw is enabled by
           admins.
         </AlertDescription>
       </Alert>

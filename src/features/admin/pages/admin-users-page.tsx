@@ -560,7 +560,7 @@ export function AdminUsersPage() {
                               <Copy className="size-3 opacity-40" />
                             </button>
                           ) : (
-                            <span className="text-ink-subtle">—</span>
+                            <span className="text-ink-subtle">None</span>
                           )}
                         </TD>
                         <TD>
@@ -587,7 +587,7 @@ export function AdminUsersPage() {
                               </p>
                             </div>
                           ) : (
-                            <span className="text-ink-subtle">—</span>
+                            <span className="text-ink-subtle">None</span>
                           )}
                         </TD>
                         <TD>

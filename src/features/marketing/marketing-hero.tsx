@@ -12,7 +12,6 @@ const ease = [0.22, 1, 0.36, 1] as const
 
 /** Dark, full-bleed page hero with a looping video (or still image) behind it. */
 export function MarketingHero({
-  eyebrow,
   title,
   description,
   video,
@@ -21,7 +20,8 @@ export function MarketingHero({
   aside,
   rotate,
 }: {
-  eyebrow: string
+  /** Kept for call-site compatibility; not rendered (Floor 9: no eyebrows). */
+  eyebrow?: string
   title: ReactNode
   /** Words typed and cycled in a gradient after the title. */
   rotate?: string[]
@@ -49,20 +49,11 @@ export function MarketingHero({
         )}
       >
         <div>
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease }}
-            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-accent-bright backdrop-blur"
-          >
-            <span className="size-1.5 rounded-full bg-accent-bright" />
-            {eyebrow}
-          </motion.p>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.05, ease }}
-            className="mt-5 max-w-3xl text-4xl font-bold leading-[1.08] text-balance text-white sm:text-5xl lg:text-6xl"
+            className="max-w-3xl text-4xl font-bold leading-[1.05] text-balance text-white sm:text-5xl lg:text-6xl"
           >
             {typeof title === 'string' && !rotate ? <TypeText text={title} speed={38} delay={350} /> : title}
             {rotate ? (
@@ -105,14 +96,14 @@ export function MarketingHero({
 }
 
 export function SectionHeading({
-  eyebrow,
   title,
   description,
   align = 'center',
   className,
   inverted = false,
 }: {
-  eyebrow: string
+  /** Kept for call-site compatibility; Hallmark drops eyebrows (Floor 9), so it is not rendered. */
+  eyebrow?: string
   title: ReactNode
   description?: ReactNode
   align?: 'center' | 'left'
@@ -123,17 +114,9 @@ export function SectionHeading({
     <Reveal
       className={cn(align === 'center' ? 'mx-auto max-w-2xl text-center' : 'max-w-2xl', className)}
     >
-      <p
-        className={cn(
-          'text-sm font-semibold uppercase tracking-wider',
-          inverted ? 'text-accent-bright' : 'text-accent',
-        )}
-      >
-        {eyebrow}
-      </p>
       <h2
         className={cn(
-          'mt-3 text-3xl font-bold text-balance sm:text-4xl lg:text-[44px] lg:leading-[1.1]',
+          'text-3xl font-bold text-balance sm:text-4xl lg:text-[44px] lg:leading-[1.1]',
           inverted && 'text-white',
         )}
       >
@@ -206,7 +189,7 @@ export function Faq({ items }: { items: { q: string; a: string }[] }) {
               {item.q}
               <span
                 className={cn(
-                  'grid size-7 shrink-0 place-items-center rounded-full transition-all duration-300',
+                  'grid size-7 shrink-0 place-items-center rounded-full transition-[transform,background-color,border-color,color] duration-300',
                   isOpen ? 'rotate-45 bg-accent text-white' : 'bg-panel-elevated text-ink-muted',
                 )}
               >

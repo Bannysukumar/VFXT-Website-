@@ -85,7 +85,7 @@ export function AuthLayout({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.5, ease }}
           >
-            <h1 className="text-3xl font-bold">
+            <h1 className="text-4xl font-bold">
               <TypeText text={title} speed={40} delay={300} />
             </h1>
             <p className="mt-2 text-ink-muted">{description}</p>

@@ -46,14 +46,13 @@ function TokenCoin() {
       <div className="absolute inset-10 animate-spin-slow rounded-full border border-accent-bright/30 [animation-direction:reverse]" />
       {[0, 90, 180, 270].map((deg) => (
         <div key={deg} className="absolute inset-0 animate-spin-slow" style={{ rotate: `${deg}deg` }}>
-          <span className="absolute left-1/2 top-0 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-bright shadow-[0_0_16px_#34d399]" />
+          <span className="absolute left-1/2 top-0 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-accent-bright" />
         </div>
       ))}
-      <div className="absolute inset-20 rounded-full bg-accent/40 blur-3xl" />
       <motion.div
         animate={{ rotateY: [0, 360] }}
         transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
-        className="relative grid size-40 place-items-center rounded-full bg-gradient-to-br from-accent-bright via-accent to-accent-strong shadow-[0_0_80px_rgb(52_211_153/0.45),inset_0_2px_0_rgb(255_255_255/0.4)] sm:size-48"
+        className="relative grid size-40 place-items-center rounded-full bg-gradient-to-br from-accent-bright via-accent to-accent-strong ring-1 ring-white/30 shadow-lift sm:size-48"
         style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="grid size-[85%] place-items-center rounded-full border-2 border-white/30 bg-gradient-to-br from-accent to-accent-strong">
@@ -78,13 +77,12 @@ function TokenDetails() {
     <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
       <Card className="overflow-hidden">
         <div className="relative overflow-hidden bg-brand p-6 text-white">
-          <div className="absolute -right-10 -top-10 size-40 rounded-full bg-accent/40 blur-3xl" />
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
               <LogoMark className="size-11 ring-1 ring-white/15 rounded-lg" />
               <div>
                 <p className="font-display text-lg font-bold">Virtual FX Trades</p>
-                <p className="text-sm text-white/60">{env.VITE_VFXT_TOKEN_SYMBOL} · ERC-20</p>
+                <p className="text-sm text-white/60">{env.VITE_VFXT_TOKEN_SYMBOL}, ERC-20</p>
               </div>
             </div>
             <Badge variant={enabled ? 'success' : 'warning'} className="border-white/10 bg-white/10 text-white">
@@ -170,13 +168,13 @@ function Utilities({ compact = false }: { compact?: boolean }) {
         <Reveal
           key={title}
           delay={i * 0.06}
-          className="group rounded-2xl border border-line bg-panel p-6 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
+          className="group rounded-2xl border border-line bg-panel p-6 shadow-card transition-[transform,background-color,border-color,color] duration-300 hover:-translate-y-1 hover:shadow-lift"
         >
           <div className="flex items-center justify-between">
             <span className="grid size-11 place-items-center rounded-xl bg-accent-soft text-accent transition-colors group-hover:bg-accent group-hover:text-white">
               <Icon className="size-5" />
             </span>
-            <span className="rounded-full bg-panel-elevated px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+            <span className="rounded-full bg-panel-elevated px-2.5 py-0.5 text-[11px] font-semibold text-ink-muted">
               Planned
             </span>
           </div>

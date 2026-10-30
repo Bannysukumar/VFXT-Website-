@@ -237,8 +237,8 @@ export function DepositsPage() {
               <p className="text-ink-muted">
                 {active.amountUsdt} USDT credited
                 {openedWallet ? ` via ${openedWallet}` : ''}. Fund Wallet updated and{' '}
-                {usdCentsToVfxtTokens(active.amountMinor, tokensPerUsd).toLocaleString()} VFXT added
-                — you can stake now.
+                {usdCentsToVfxtTokens(active.amountMinor, tokensPerUsd).toLocaleString()} VFXT added.
+                You can stake now.
               </p>
             </div>
             <Button size="lg" onClick={() => setActive(null)}>
@@ -256,7 +256,7 @@ export function DepositsPage() {
               <Badge variant="warning">Waiting for payment</Badge>
             </div>
             <CardDescription>
-              Network: {active.network} · Send exactly {active.amountUsdt} USDT (unique amount)
+              Network: {active.network}, Send exactly {active.amountUsdt} USDT (unique amount)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-8">
@@ -277,7 +277,7 @@ export function DepositsPage() {
                     type="button"
                     onClick={() => handleOpenWallet(wallet.id)}
                     className={cn(
-                      'flex flex-col items-center gap-2 rounded-2xl border border-line bg-panel-elevated p-4 text-center transition-all',
+                      'flex flex-col items-center gap-2 rounded-2xl border border-line bg-panel-elevated p-4 text-center transition-[transform,background-color,border-color,color]',
                       'hover:border-accent/50 hover:shadow-sm active:scale-[0.98]',
                       openedWallet === wallet.name && 'border-accent ring-2 ring-accent/20',
                     )}
@@ -415,7 +415,7 @@ export function DepositsPage() {
                   </div>
                   <FieldError message={form.formState.errors.amount?.message} />
                   <p className="text-xs text-ink-muted">
-                    Min deposit ${(minDepositCents / 100).toFixed(2)} · You receive ≈{' '}
+                    Min deposit ${(minDepositCents / 100).toFixed(2)}, you receive ≈{' '}
                     <span className="font-semibold text-ink">
                       {previewTokens.toLocaleString()} VFXT
                     </span>{' '}
@@ -429,7 +429,7 @@ export function DepositsPage() {
                         type="button"
                         onClick={() => form.setValue('amount', value, { shouldValidate: true })}
                         className={cn(
-                          'tabular rounded-lg border py-2 text-sm font-semibold transition-all',
+                          'tabular rounded-lg border py-2 text-sm font-semibold transition-[transform,background-color,border-color,color]',
                           amount === value
                             ? 'border-accent bg-accent-soft text-accent'
                             : 'border-line-strong text-ink-muted hover:border-accent/50 hover:text-ink',

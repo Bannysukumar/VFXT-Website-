@@ -128,8 +128,7 @@ function FlowColumn({ title, steps, icon: Icon }: { title: string; steps: typeof
 function BalanceModel() {
   return (
     <Reveal className="relative overflow-hidden rounded-3xl bg-brand p-8 text-white shadow-lift sm:p-10">
-      <div className="absolute -right-20 -top-20 size-72 rounded-full bg-accent/30 blur-3xl" />
-      <p className="relative text-sm font-semibold uppercase tracking-wider text-accent-bright">Example wallet</p>
+      <p className="relative text-sm font-semiboldr text-accent-bright">Example wallet</p>
       <div className="relative mt-6 space-y-6">
         {[
           { label: 'Available', value: '$4,000.00', pct: 80, color: 'bg-accent-bright', note: 'Spendable and withdrawable' },
@@ -252,7 +251,7 @@ export function SecurityPage() {
                     <h3 className="text-lg">{title}</h3>
                     <span
                       className={cn(
-                        'rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide',
+                        'rounded-full px-2.5 py-0.5 text-[11px] font-semibold',
                         i === 0 ? 'bg-warning/10 text-warning' : 'bg-accent-soft text-accent',
                       )}
                     >
@@ -274,7 +273,7 @@ export function SecurityPage() {
             <SectionHeading
               align="left"
               eyebrow="How balances work"
-              title="Available, reserved, and exact to the cent"
+              title="How balances work"
               description="Each wallet has two numbers. Available is what you can use; reserved is held for withdrawals in progress. Both are stored as whole integers of the smallest unit — never as floating-point numbers that can drift."
             />
             <Reveal delay={0.1}>
@@ -323,8 +322,8 @@ export function SecurityPage() {
           <Reveal delay={0.1} className="mt-14 overflow-x-auto rounded-3xl border border-white/10 bg-white/[0.04] backdrop-blur">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
-                <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-white/50">
-                  <th className="px-6 py-4 font-medium">Action</th>
+                <tr className="border-b border-white/10 text-left text-xs text-white/50">
+                  <th className="sticky left-0 z-10 bg-brand px-6 py-4 font-medium">Action</th>
                   {roles.map((role) => (
                     <th key={role} className="px-4 py-4 text-center font-medium">
                       {role}
@@ -342,7 +341,7 @@ export function SecurityPage() {
                     transition={{ delay: 0.2 + i * 0.06 }}
                     className="transition-colors hover:bg-white/[0.04]"
                   >
-                    <td className="px-6 py-4 font-medium text-white">{row.action}</td>
+                    <td className="sticky left-0 z-10 max-w-40 bg-brand px-6 py-4 font-medium text-white sm:max-w-none">{row.action}</td>
                     {roles.map((role) => (
                       <td key={role} className="px-4 py-4 text-center">
                         {row.allowed.includes(role) ? (
@@ -368,7 +367,7 @@ export function SecurityPage() {
               <span className="size-2.5 rounded-full bg-danger/60" />
               <span className="size-2.5 rounded-full bg-warning/60" />
               <span className="size-2.5 rounded-full bg-accent/60" />
-              <span className="ml-3 font-mono text-xs text-ink-muted">auditLogs / example entry</span>
+              <span className="ml-3 text-xs text-ink-muted">auditLogs, example entry</span>
             </div>
             <pre className="overflow-x-auto p-6 font-mono text-[13px] leading-relaxed text-ink">
               {`{

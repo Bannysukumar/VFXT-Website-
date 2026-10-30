@@ -27,7 +27,7 @@ export function ComingSoon({
       className="relative isolate grid overflow-hidden rounded-3xl bg-brand text-white shadow-lift lg:grid-cols-[1.1fr_1fr]"
     >
       <div className="relative z-10 p-8 sm:p-12">
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-highlight">
+        <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semiboldr text-highlight">
           <span className="size-1.5 animate-pulse rounded-full bg-highlight" />
           Coming soon
         </span>

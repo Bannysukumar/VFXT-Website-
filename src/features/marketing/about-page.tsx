@@ -105,13 +105,13 @@ export function AboutPage() {
       {/* Values */}
       <section className="border-y border-line bg-panel">
         <div className="container-page py-24 sm:py-32">
-          <SectionHeading eyebrow="What we value" title="Principles that shape every release" />
+          <SectionHeading eyebrow="What we value" title="What we value" />
           <div className="mt-16 grid gap-6 md:grid-cols-3">
             {values.map(({ icon: Icon, title, body }, i) => (
               <Reveal
                 key={title}
                 delay={i * 0.08}
-                className="group relative overflow-hidden rounded-3xl border border-line bg-canvas p-8 transition-all duration-300 hover:-translate-y-1 hover:bg-panel hover:shadow-lift"
+                className="group relative overflow-hidden rounded-3xl border border-line bg-canvas p-8 transition-[transform,background-color,border-color,color] duration-300 hover:-translate-y-1 hover:bg-panel hover:shadow-lift"
               >
                 <span className="absolute -right-4 -top-6 font-display text-[120px] font-extrabold leading-none text-line/70">
                   0{i + 1}
@@ -154,7 +154,7 @@ export function AboutPage() {
           <img src={images.blockchain} alt="" className="absolute inset-0 size-full object-cover opacity-20" />
           <div className="absolute inset-0 bg-gradient-to-br from-brand via-brand/90 to-brand/70" />
           <div className="relative">
-            <p className="text-sm font-semibold uppercase tracking-wider text-accent-bright">Delivery progress</p>
+            <p className="text-sm font-semiboldr text-accent-bright">Delivery progress</p>
             <h3 className="mt-3 text-2xl text-white">Shipped in deliberate phases</h3>
             <ol className="relative mt-8 space-y-6 before:absolute before:bottom-2 before:left-[11px] before:top-2 before:w-px before:bg-white/15">
               {milestones.map((m) => (
@@ -166,7 +166,7 @@ export function AboutPage() {
                   )}
                   <span className={m.done ? 'text-white' : 'text-white/50'}>{m.title}</span>
                   {!m.done ? (
-                    <span className="ml-auto rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white/70">
+                    <span className="ml-auto rounded-full bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/70">
                       Next
                     </span>
                   ) : null}

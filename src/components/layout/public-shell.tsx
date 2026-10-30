@@ -216,7 +216,7 @@ export function PublicShell() {
           </div>
           {footerColumnsResolved.map((column) => (
             <div key={column.title}>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+              <p className="text-xs font-semiboldr text-white/40">
                 {column.title}
               </p>
               <ul className="mt-3 space-y-0.5">

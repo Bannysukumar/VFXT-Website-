@@ -69,10 +69,10 @@ export function SupportPublicPage() {
             <Reveal key={title} delay={i * 0.08}>
               <Link
                 to={to}
-                className="group flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-panel shadow-lift transition-all duration-300 hover:-translate-y-1.5 hover:border-accent/40"
+                className="group flex h-full flex-col overflow-hidden rounded-3xl border border-line bg-panel shadow-lift transition-[transform,background-color,border-color,color] duration-300 hover:-translate-y-1.5 hover:border-accent/40"
               >
                 <div className="relative h-40 overflow-hidden">
-                  <img src={image} alt="" loading="lazy" className="size-full object-cover transition-transform duration-700 group-hover:scale-110" />
+                  <img src={image} alt="" loading="lazy" className="size-full object-cover" />
                   <div className="absolute inset-0 bg-gradient-to-t from-brand/70 to-transparent" />
                   <span className="absolute bottom-4 left-5 grid size-11 place-items-center rounded-xl bg-panel text-accent shadow-lift">
                     <Icon className="size-5" />
@@ -110,7 +110,7 @@ export function SupportPublicPage() {
             <SectionHeading
               align="left"
               eyebrow="Ticket workflow"
-              title="Real people, clear status"
+              title="Ticket workflow"
               description="Tickets are routed to dedicated support admins. You can follow each one from open to resolved inside your dashboard."
             />
             <Reveal delay={0.1} className="mt-8 grid gap-4 sm:grid-cols-3">

@@ -53,7 +53,7 @@ export function AdminAuditPage() {
               <TBody>
                 {rows.map((row) => (
                   <TR key={row.id}>
-                    <TD className="whitespace-nowrap text-ink-muted">{format(new Date(row.createdAt), 'MMM d, yyyy · HH:mm:ss')}</TD>
+                    <TD className="whitespace-nowrap text-ink-muted">{format(new Date(row.createdAt), 'MMM d, yyyy, HH:mm:ss')}</TD>
                     <TD>
                       <Badge variant={actionTone(row.action)} className="font-mono text-[11px]">
                         {row.action}

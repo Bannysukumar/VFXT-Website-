@@ -85,7 +85,7 @@ export function SupportPage() {
       <section className="relative isolate overflow-hidden rounded-3xl bg-brand p-8 text-white">
         <img src={images.supportDesk} alt="" className="absolute inset-0 -z-10 size-full object-cover opacity-35" />
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-brand via-brand/90 to-brand/30" />
-        <p className="text-xs font-semibold uppercase tracking-wider text-accent-bright">Support centre</p>
+        <p className="text-xs font-semiboldr text-accent-bright">Support centre</p>
         <h1 className="mt-2 text-3xl font-bold text-white">
           <TypeText text="How can we help?" speed={45} delay={250} />
         </h1>
@@ -183,7 +183,7 @@ export function SupportPage() {
                   <div className="min-w-0">
                     <p className="truncate font-medium">{ticket.subject}</p>
                     <p className="text-xs capitalize text-ink-muted">
-                      {ticket.category} · updated {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
+                      {ticket.category}, updated {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
                     </p>
                   </div>
                   <Badge variant={ticketTone[ticket.status]} className="capitalize">

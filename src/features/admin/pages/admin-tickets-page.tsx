@@ -108,7 +108,7 @@ export function AdminTicketsPage() {
                       <div className="min-w-0">
                         <p className="truncate font-semibold">{ticket.subject}</p>
                         <p className="text-xs capitalize text-ink-muted">
-                          {ticket.category} · updated {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
+                          {ticket.category}, updated {formatDistanceToNow(new Date(ticket.updatedAt), { addSuffix: true })}
                         </p>
                       </div>
                       <ChevronDown className={cn('ml-auto size-4 shrink-0 text-ink-subtle transition-transform', isOpen && 'rotate-180')} />
@@ -144,7 +144,7 @@ export function AdminTicketsPage() {
                         <div className="space-y-3 p-5">
                           <p className="whitespace-pre-wrap text-sm leading-relaxed">{ticket.body}</p>
                           <p className="flex items-center gap-2 text-xs text-ink-muted">
-                            User <IdCell id={ticket.userId} label="User ID" /> · Ticket <IdCell id={ticket.id} label="Ticket ID" />
+                            User <IdCell id={ticket.userId} label="User ID" />, Ticket <IdCell id={ticket.id} label="Ticket ID" />
                           </p>
                         </div>
                       </motion.div>

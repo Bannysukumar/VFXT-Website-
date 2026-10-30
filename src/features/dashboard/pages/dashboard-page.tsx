@@ -174,7 +174,7 @@ export function DashboardPage() {
               >
                 <span
                   className={cn(
-                    'grid size-12 place-items-center rounded-2xl border transition-all duration-200 group-hover:-translate-y-0.5 sm:size-14',
+                    'grid size-12 place-items-center rounded-2xl border transition-[transform,background-color,border-color,color] duration-200 group-hover:-translate-y-0.5 sm:size-14',
                     isPrimary
                       ? 'border-transparent bg-accent text-white shadow-lg shadow-accent/30'
                       : 'border-white/15 bg-white/10 backdrop-blur group-hover:bg-white/20',
@@ -232,8 +232,8 @@ export function DashboardPage() {
               {referralLink}
             </p>
             <p className="mt-2 text-xs text-ink-subtle">
-              Code <span className="font-mono font-semibold text-ink">{referralCode}</span> — required
-              when someone registers.
+              Code <span className="font-mono font-semibold text-ink">{referralCode}</span> (required
+              when someone registers).
             </p>
           </CardContent>
         </Card>
@@ -296,23 +296,23 @@ export function DashboardPage() {
                 <AreaChart data={chartData} margin={{ left: -8, right: 8, top: 8 }}>
                   <defs>
                     <linearGradient id="avail" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#0e9f6e" stopOpacity={0.3} />
-                      <stop offset="100%" stopColor="#0e9f6e" stopOpacity={0} />
+                      <stop offset="0%" style={{ stopColor: 'var(--color-accent)' }} stopOpacity={0.3} />
+                      <stop offset="100%" style={{ stopColor: 'var(--color-accent)' }} stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e9e5" vertical={false} />
-                  <XAxis dataKey="label" stroke="#8a9a93" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#8a9a93" fontSize={12} tickLine={false} axisLine={false} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-rule)" vertical={false} />
+                  <XAxis dataKey="label" stroke="var(--color-subtle)" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="var(--color-subtle)" fontSize={12} tickLine={false} axisLine={false} />
                   <Tooltip
-                    cursor={{ stroke: '#0e9f6e', strokeDasharray: '4 4' }}
+                    cursor={{ stroke: 'var(--color-accent)', strokeDasharray: '4 4' }}
                     contentStyle={{
                       borderRadius: 12,
-                      border: '1px solid #e2e9e5',
-                      boxShadow: '0 12px 32px -12px rgb(10 25 21 / 0.25)',
+                      border: '1px solid var(--color-rule)',
+                      boxShadow: 'var(--shadow-float)',
                       fontSize: 13,
                     }}
                   />
-                  <Area type="monotone" dataKey="available" stroke="#0e9f6e" fill="url(#avail)" strokeWidth={2.5} animationDuration={900} />
+                  <Area type="monotone" dataKey="available" stroke="var(--color-accent)" fill="url(#avail)" strokeWidth={2.5} animationDuration={900} />
                 </AreaChart>
               </ResponsiveContainer>
             )}
@@ -359,7 +359,7 @@ export function DashboardPage() {
               </Button>
             ) : (
               <p className="mt-3 rounded-lg bg-accent-soft p-3 text-center text-sm font-medium text-accent">
-                You're all set — account fully configured
+                You’re all set: account fully configured
               </p>
             )}
           </CardContent>
@@ -414,7 +414,7 @@ export function DashboardPage() {
                             <span className="font-medium capitalize">{entry.type.replaceAll('_', ' ')}</span>
                           </div>
                         </TD>
-                        <TD className="text-ink-muted">{format(new Date(entry.createdAt), 'MMM d, yyyy · p')}</TD>
+                        <TD className="text-ink-muted">{format(new Date(entry.createdAt), 'MMM d, yyyy, p')}</TD>
                         <TD>
                           <StatusBadge status={entry.status ?? 'completed'} />
                         </TD>
@@ -466,7 +466,7 @@ export function DashboardPage() {
                           {formatMinor(item.amountMinor, { scale, currency: item.currency === 'USD' ? 'USD' : undefined })}
                         </p>
                         <p className="text-xs text-ink-muted">
-                          {item.kind} · {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
+                          {item.kind}, {formatDistanceToNow(new Date(item.createdAt), { addSuffix: true })}
                         </p>
                       </div>
                     </div>

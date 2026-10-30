@@ -136,7 +136,7 @@ export function WalletRegisterPage() {
       <div className="mb-4 flex items-start gap-3 rounded-xl border border-line bg-canvas px-3 py-3 text-sm">
         <Wallet className="mt-0.5 size-4 shrink-0 text-brand" />
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Linked wallet</p>
+          <p className="text-xs font-medium text-ink-muted">Linked wallet</p>
           <p className="mt-0.5 break-all font-mono text-xs font-semibold">{address || '—'}</p>
         </div>
       </div>
@@ -194,7 +194,7 @@ export function WalletRegisterPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-medium">Email &amp; password</p>
-              <p className="text-xs text-ink-muted">Optional — skip to use wallet-only login.</p>
+              <p className="text-xs text-ink-muted">Optional. Skip it to use wallet-only login.</p>
             </div>
             <Button
               type="button"

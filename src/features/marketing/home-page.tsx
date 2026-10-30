@@ -73,8 +73,7 @@ function HeroPreview() {
 
   return (
     <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-      <div className="absolute -inset-8 rounded-[2.5rem] bg-accent-bright/25 blur-3xl" aria-hidden />
-      <div className="relative animate-float-slow rounded-2xl border border-white/15 bg-white/[0.07] p-2 shadow-2xl backdrop-blur-xl">
+      <div className="relative animate-float-slow rounded-2xl bg-white/[0.07] p-2 shadow-2xl backdrop-blur-xl">
         <div className="rounded-xl bg-panel p-5 text-ink">
           <div className="flex items-center justify-between">
             <div>
@@ -89,11 +88,11 @@ function HeroPreview() {
               USD wallet
             </span>
           </div>
-          <svg viewBox="0 0 300 100" className="mt-4 h-28 w-full" preserveAspectRatio="none">
+          <svg viewBox="0 0 300 100" className="mt-4 h-28 w-full" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="hero-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#0e9f6e" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#0e9f6e" stopOpacity="0" />
+                <stop offset="0%" style={{ stopColor: 'var(--color-accent)' }} stopOpacity="0.28" />
+                <stop offset="100%" style={{ stopColor: 'var(--color-accent)' }} stopOpacity="0" />
               </linearGradient>
             </defs>
             <motion.path
@@ -106,7 +105,7 @@ function HeroPreview() {
             <motion.path
               d={`M ${path}`}
               fill="none"
-              stroke="#0e9f6e"
+              stroke="var(--color-accent)"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -161,7 +160,7 @@ function HeroPreview() {
         </span>
         <div>
           <p className="text-xs font-semibold">Ledger write confirmed</p>
-          <p className="text-[11px] text-ink-muted">Atomic · idempotent</p>
+          <p className="text-[11px] text-ink-muted">Atomic and idempotent</p>
         </div>
       </motion.div>
       <motion.div
@@ -185,7 +184,7 @@ export function HomePage() {
         <VideoBackground
           src={videos.forexBoard}
           poster={images.tradingChartDark}
-          overlayClassName="bg-[radial-gradient(ellipse_at_top_right,rgb(14_159_110/0.35),transparent_55%),linear-gradient(100deg,rgb(10_25_21/0.97)_20%,rgb(10_25_21/0.8)_60%,rgb(10_25_21/0.6))]"
+          overlayClassName="bg-gradient-to-r from-brand from-20% via-brand/85 to-brand/60"
         />
         <div className="bg-grid absolute inset-0 [mask-image:radial-gradient(ellipse_at_top_left,black_20%,transparent_70%)]" />
         <div className="container-page relative grid min-h-[min(100dvh,960px)] items-center gap-16 pb-24 pt-32 lg:grid-cols-[1.1fr_1fr] lg:pt-28">
@@ -218,7 +217,7 @@ export function HomePage() {
               transition={{ delay: 0.18, duration: 0.7, ease }}
             >
               Verified deposits, controlled withdrawals, and an audited ledger where every balance
-              is server-authoritative — with VFXT token rails ready when the network is.
+              is server-authoritative, with VFXT token rails ready when the network is.
             </motion.p>
             <motion.div
               className="mt-10 flex flex-wrap items-center gap-3"
@@ -309,7 +308,7 @@ export function HomePage() {
               src={images.laptopChart}
               alt="Trading chart on a laptop"
               loading="lazy"
-              className="absolute inset-0 size-full object-cover opacity-50 transition-transform duration-[1.5s] ease-out group-hover:scale-105"
+              className="absolute inset-0 size-full object-cover opacity-50"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-transparent" />
             <div className="relative flex h-full flex-col justify-end p-8 sm:p-10">
@@ -340,7 +339,7 @@ export function HomePage() {
             <Reveal
               key={title}
               delay={0.08 * (i + 1)}
-              className="group flex flex-col rounded-3xl border border-line bg-panel p-8 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
+              className="group flex flex-col rounded-3xl border border-line bg-panel p-8 shadow-card transition-[transform,background-color,border-color,color] duration-300 hover:-translate-y-1 hover:shadow-lift"
             >
               <span className="grid size-12 place-items-center rounded-xl bg-accent-soft text-accent transition-colors duration-300 group-hover:bg-accent group-hover:text-white">
                 <Icon className="size-6" />
@@ -364,7 +363,7 @@ export function HomePage() {
             <Reveal
               key={title}
               delay={0.08 * i}
-              className="group flex flex-col rounded-3xl border border-line bg-panel p-8 shadow-card transition-all duration-300 hover:-translate-y-1 hover:shadow-lift"
+              className="group flex flex-col rounded-3xl border border-line bg-panel p-8 shadow-card transition-[transform,background-color,border-color,color] duration-300 hover:-translate-y-1 hover:shadow-lift"
             >
               <span className="grid size-12 place-items-center rounded-xl bg-accent-soft text-accent transition-colors duration-300 group-hover:bg-accent group-hover:text-white">
                 <Icon className="size-6" />
@@ -381,7 +380,7 @@ export function HomePage() {
               src={images.phoneMarkets}
               alt="Markets app on a phone"
               loading="lazy"
-              className="absolute -bottom-10 -right-10 w-2/3 rotate-6 rounded-2xl opacity-40 shadow-2xl transition-transform duration-700 group-hover:-translate-y-2 group-hover:rotate-3"
+              className="absolute -bottom-10 -right-10 w-2/3 rotate-6 rounded-2xl opacity-40 shadow-2xl"
             />
             <div className="relative flex h-full flex-col p-8">
               <span className="grid size-12 place-items-center rounded-xl bg-white/15 backdrop-blur">
@@ -457,7 +456,7 @@ export function HomePage() {
       <section id="how-it-works" className="container-page scroll-mt-20 py-24 sm:py-32">
         <SectionHeading
           eyebrow="How it works"
-          title="Up and running in three steps"
+          title="How it works"
           description="From sign-up to your first withdrawal, every step is guided and verified."
         />
         <div className="mt-16 grid gap-6 md:grid-cols-3">
@@ -468,7 +467,7 @@ export function HomePage() {
                   src={step.image}
                   alt=""
                   loading="lazy"
-                  className="size-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="size-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-brand/70 to-transparent" />
                 <span className="absolute left-5 top-5 grid size-11 place-items-center rounded-full bg-panel font-display text-base font-bold text-ink shadow-lift">
@@ -495,7 +494,7 @@ export function HomePage() {
               align="left"
               inverted
               eyebrow="Security"
-              title="Integrity designed into every layer"
+              title="Security"
               description="Authorization rules, Cloud Functions, and App Check work together so no client can change a balance it should not."
             />
             <Reveal delay={0.1}>
@@ -543,7 +542,7 @@ export function HomePage() {
           <SectionHeading
             align="left"
             eyebrow="FAQ"
-            title="Questions, answered"
+            title="Frequently asked questions"
             description="Can't find what you're looking for? Our support team is one ticket away."
           />
           <Reveal delay={0.1}>

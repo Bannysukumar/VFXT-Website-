@@ -1,0 +1,87 @@
+/* Hallmark tokens · brand: VFXT (emerald on ink, lime signal; Plus Jakarta Sans over Inter).
+ * Tailwind's own size names (--text-xs … --text-3xl) and eases are left at Tailwind's values:
+ * this is a restyle, and pages outside it must not move. */
+@theme static {
+  --text-md: 1rem;
+  --text-display-s: clamp(2.25rem, 4vw + 0.5rem, 3.75rem);
+  --text-display: clamp(2.75rem, 5vw + 1rem, 5.25rem);
+  --text-section: clamp(2rem, 2.5vw + 1rem, 3.5rem);
+  --text-title: clamp(1.25rem, 0.75vw + 0.875rem, 1.625rem);
+  --text-lead: clamp(1.125rem, 0.35vw + 1rem, 1.375rem);
+  --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Surfaces, lightest to deepest */
+  --color-paper: oklch(97.7% 0.003 165);
+  --color-paper-2: oklch(96.2% 0.006 165);
+  --color-paper-3: oklch(92.7% 0.01 162);
+  --color-surface: oklch(100% 0 0);
+
+  /* Ink and its steps: every step clears 4.5:1 on paper and surface */
+  --color-ink: oklch(20.5% 0.024 172);
+  --color-ink-2: oklch(28.5% 0.04 172);
+  --color-muted: oklch(49.5% 0.024 160);
+  --color-subtle: oklch(55% 0.02 162);
+  --color-rule: oklch(92.7% 0.01 162);
+  --color-rule-strong: oklch(87.5% 0.013 162);
+  /* Form field edges: 3:1 against surface and paper */
+  --color-field: oklch(64% 0.015 162);
+
+  /* The brand signal. accent carries text and white labels (5:1); accent-bright only on ink */
+  --color-accent: oklch(52.5% 0.11 162);
+  --color-accent-hover: oklch(46% 0.1 162);
+  --color-accent-bright: oklch(78% 0.15 163);
+  --color-accent-wash: oklch(96% 0.025 163);
+  --color-accent-ink: oklch(99% 0.005 165);
+  --color-signal: oklch(91% 0.17 125);
+  --color-focus: oklch(60% 0.13 162);
+
+  /* States */
+  --color-error: oklch(52% 0.18 25);
+  --color-caution: oklch(52% 0.11 65);
+  --color-success: oklch(52.5% 0.11 162);
+  --color-notice: oklch(53% 0.17 260);
+
+  --font-display: 'Plus Jakarta Sans', 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-outlier: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-card: 14px;
+  --radius-control: 10px;
+  --radius-pill: 999px;
+  --shadow-card: none;
+  --shadow-float: 0 1px 2px oklch(20.5% 0.024 172 / 0.06), 0 18px 40px -16px oklch(20.5% 0.024 172 / 0.28);
+  --tracking-display: -0.025em;
+}
+:root {
+  --display-weight: 800;
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 40px;
+  --space-2xl: 64px;
+  --space-3xl: 96px;
+  --space-4xl: 144px;
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+  --container: 1280px;
+  --gutter: 32px;
+  --gap-columns: 32px;
+  --section-gap-s: 120px;
+  --section-gap: 144px;
+  --section-gap-l: 176px;
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+  --rule-hair: 1px;
+}
+@media (max-width: 60rem) { :root { --gutter: 24px; --section-gap-s: 80px; --section-gap: 96px; --section-gap-l: 120px; } }
+@media (max-width: 40rem) { :root { --gutter: 16px; --section-gap-s: 56px; --section-gap: 72px; --section-gap-l: 96px; --gap-columns: 16px; } }

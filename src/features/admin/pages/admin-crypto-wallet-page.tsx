@@ -266,7 +266,7 @@ export function AdminCryptoWalletPage() {
             Set / rotate private key
           </CardTitle>
           <CardDescription>
-            Network: BSC · Token: USDT ({data.tokenAddress}). Export the hex key from MetaMask
+            Network: BSC, Token: USDT ({data.tokenAddress}). Export the hex key from MetaMask
             (Account details → Show private key), then paste once into the first box — it splits
             automatically. Do not use a seed phrase.
           </CardDescription>
@@ -339,7 +339,7 @@ export function AdminCryptoWalletPage() {
                 <div className="overflow-x-auto rounded-xl border border-line">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-line bg-canvas text-left text-xs uppercase tracking-wide text-ink-muted">
+                      <tr className="border-b border-line bg-canvas text-left text-xs text-ink-muted">
                         <th className="px-4 py-3">Label</th>
                         <th className="px-4 py-3">Address</th>
                         <th className="px-4 py-3">Enabled</th>

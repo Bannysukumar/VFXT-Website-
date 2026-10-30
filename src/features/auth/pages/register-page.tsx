@@ -198,7 +198,7 @@ export function RegisterPage() {
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-line" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase tracking-wide">
+        <div className="relative flex justify-center text-xs">
           <span className="bg-panel px-3 text-ink-subtle">or email</span>
         </div>
       </div>

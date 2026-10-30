@@ -92,7 +92,7 @@ export function WithdrawalsPage() {
       if (data.status === 'completed' && data.txHash) {
         const hash = data.txHash
         toast.success('USDT sent on BSC', {
-          description: `${hash.slice(0, 12)}… · Open BscScan`,
+          description: `${hash.slice(0, 12)}…, open BscScan`,
           action: {
             label: 'BscScan',
             onClick: () => window.open(bscScanTxUrl(hash), '_blank', 'noopener,noreferrer'),
@@ -126,12 +126,12 @@ export function WithdrawalsPage() {
           <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
             <div>
               <CardTitle>Send to wallet</CardTitle>
-              <CardDescription>Debits your Withdrawal Wallet · USDT BEP-20 on BSC.</CardDescription>
+              <CardDescription>Debits your Withdrawal Wallet in USDT (BEP-20 on BSC).</CardDescription>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-3.5 py-2">
               <Wallet className="size-4 text-accent" />
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-subtle">Available</p>
+                <p className="text-[11px] font-medium text-ink-subtle">Available</p>
                 <p className="tabular text-sm font-bold">{wallets.isLoading ? '…' : usdMoney(available)}</p>
               </div>
             </div>
@@ -161,7 +161,7 @@ export function WithdrawalsPage() {
                         { shouldValidate: true },
                       )
                     }
-                    className="absolute inset-y-3 right-3 rounded-lg bg-accent-soft px-3 text-xs font-bold uppercase tracking-wide text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-50"
+                    className="absolute inset-y-3 right-3 rounded-lg bg-accent-soft px-3 text-xs font-bold text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-50"
                   >
                     Max
                   </button>
@@ -170,7 +170,7 @@ export function WithdrawalsPage() {
                 <p className="text-xs text-ink-muted">
                   Min withdraw ${(minWithdrawCents / 100).toFixed(2)}
                   {commissionBps > 0
-                    ? ` · Fee ${(commissionBps / 100).toFixed(2)}%`
+                    ? `, fee ${(commissionBps / 100).toFixed(2)}%`
                     : ''}
                 </p>
                 {exceeds ? (

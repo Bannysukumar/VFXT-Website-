@@ -111,16 +111,16 @@ function MapIllustration({ company, addressLines }: { company: string; addressLi
     <div className="relative min-h-80 overflow-hidden bg-brand">
       <div className="bg-grid absolute inset-0 opacity-60" />
       <svg viewBox="0 0 800 420" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 size-full" aria-hidden>
-        <rect x="250" y="150" width="120" height="44" rx="6" fill="rgb(255 255 255 / 0.04)" />
-        <rect x="430" y="235" width="90" height="50" rx="6" fill="rgb(255 255 255 / 0.04)" />
-        <rect x="60" y="150" width="90" height="56" rx="6" fill="rgb(52 211 153 / 0.08)" />
-        <rect x="620" y="140" width="140" height="56" rx="6" fill="rgb(255 255 255 / 0.04)" />
+        <rect x="250" y="150" width="120" height="44" rx="6" className="fill-white/5" />
+        <rect x="430" y="235" width="90" height="50" rx="6" className="fill-white/5" />
+        <rect x="60" y="150" width="90" height="56" rx="6" className="fill-accent-bright/10" />
+        <rect x="620" y="140" width="140" height="56" rx="6" className="fill-white/5" />
         {roads.map((d, i) => (
           <motion.path
             key={d}
             d={d}
             fill="none"
-            stroke={i === 4 ? 'rgb(52 211 153 / 0.45)' : 'rgb(255 255 255 / 0.14)'}
+            className={i === 4 ? 'stroke-accent-bright/45' : 'stroke-white/15'}
             strokeWidth={i === 4 ? 3 : 10}
             strokeLinecap="round"
             initial={{ pathLength: 0 }}
@@ -132,7 +132,7 @@ function MapIllustration({ company, addressLines }: { company: string; addressLi
         <motion.path
           d="M120 360 C 220 330, 300 260, 400 215"
           fill="none"
-          stroke="#c6f56f"
+          stroke="var(--color-signal)"
           strokeWidth="3"
           strokeDasharray="8 8"
           initial={{ pathLength: 0 }}
@@ -143,7 +143,7 @@ function MapIllustration({ company, addressLines }: { company: string; addressLi
       </svg>
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full">
         <div className="relative flex animate-float flex-col items-center">
-          <span className="grid size-14 place-items-center rounded-full rounded-br-none bg-accent text-white shadow-[0_10px_30px_rgb(14_159_110/0.55)] [transform:rotate(45deg)]">
+          <span className="grid size-14 place-items-center rounded-full rounded-br-none bg-accent text-white shadow-lift [transform:rotate(45deg)]">
             <MapPin className="size-6 [transform:rotate(-45deg)]" />
           </span>
         </div>
@@ -209,7 +209,7 @@ export function ContactPage() {
       <MarketingHero
         eyebrow="Contact"
         title="Talk to the VFXT team"
-        description="Questions about your account, a deposit, or how the platform works? Choose the channel that fits — or send us a message directly."
+        description="Questions about your account, a deposit, or how the platform works? Choose the channel that fits, or send us a message directly."
         video={videos.analystRealtime}
         poster={images.officeTalk}
       />
@@ -221,7 +221,7 @@ export function ContactPage() {
             <Reveal key={title} delay={i * 0.08}>
               <Link
                 to={to}
-                className="group flex h-full flex-col rounded-3xl border border-line bg-panel p-7 shadow-lift transition-all duration-300 hover:-translate-y-1.5 hover:border-accent/40"
+                className="group flex h-full flex-col rounded-3xl border border-line bg-panel p-7 shadow-lift transition-[transform,background-color,border-color,color] duration-300 hover:-translate-y-1.5 hover:border-accent/40"
               >
                 <span className="grid size-12 place-items-center rounded-xl bg-accent-soft text-accent transition-colors group-hover:bg-accent group-hover:text-white">
                   <Icon className="size-5" />
@@ -255,7 +255,7 @@ export function ContactPage() {
             <SectionHeading
               align="left"
               eyebrow="Send a message"
-              title="We read every message"
+              title="Send a message"
               description="Never include your password, full card numbers, or private keys. We will never ask for them."
             />
             <Reveal delay={0.1} className="mt-10 space-y-4">
@@ -290,8 +290,8 @@ export function ContactPage() {
                   <Mail className="size-5 text-accent" />
                   <p className="mt-3 text-sm font-semibold">Email</p>
                   {supportEmail ? (
-                    <a href={`mailto:${supportEmail}`} className="break-all text-sm text-accent hover:underline">
-                      {supportEmail}
+                    <a href={`mailto:${supportEmail}`} className="text-sm text-accent hover:underline">
+                      {supportEmail.split('@')[0]}@<wbr />{supportEmail.split('@')[1]}
                     </a>
                   ) : (
                     <p className="text-sm text-ink-muted">Use in-app tickets</p>
@@ -408,7 +408,7 @@ export function ContactPage() {
       <section className="container-page py-24">
         <SectionHeading
           eyebrow="Our office"
-          title="Where to find us"
+          title="Our office"
           description="All account matters are handled online, but you can reach our team at the address below."
         />
         <Reveal delay={0.1} className="mt-14 grid overflow-hidden rounded-3xl border border-line bg-panel shadow-lift lg:grid-cols-[1fr_1.3fr]">
@@ -416,7 +416,7 @@ export function ContactPage() {
             <span className="grid size-12 place-items-center rounded-xl bg-brand text-accent-bright">
               <Building2 className="size-6" />
             </span>
-            <p className="mt-6 text-xs font-semibold uppercase tracking-wider text-accent">{officeLocation.label}</p>
+            <p className="mt-6 text-xs font-semiboldr text-accent">{officeLocation.label}</p>
             <h3 className="mt-1 text-2xl">{companyName}</h3>
             <address className="mt-5 flex gap-3 not-italic leading-relaxed text-ink-muted">
               <MapPin className="mt-1 size-5 shrink-0 text-accent" />

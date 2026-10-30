@@ -97,7 +97,7 @@ function LegalPage({ doc }: { doc: LegalDoc }) {
         {/* Table of contents */}
         <aside className="hidden lg:block">
           <nav className="sticky top-36 space-y-1" aria-label="On this page">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-subtle">On this page</p>
+            <p className="mb-3 text-xs font-semiboldr text-ink-subtle">On this page</p>
             {doc.sections.map((section, i) => (
               <a
                 key={section.id}
@@ -156,7 +156,7 @@ function LegalPage({ doc }: { doc: LegalDoc }) {
                     </span>
                     {section.heading}
                   </h2>
-                  <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-ink-muted">
+                  <div className="mt-4 max-w-[68ch] space-y-4 text-[15px] leading-relaxed text-ink-muted">
                     {section.paragraphs?.map((p) => <p key={p}>{p}</p>)}
                     {section.bullets ? (
                       <ul className="space-y-2.5">

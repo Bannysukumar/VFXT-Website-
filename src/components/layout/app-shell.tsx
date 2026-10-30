@@ -282,7 +282,7 @@ function NavSectionBlock({
           className="mb-1.5 flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left transition-colors hover:bg-white/[0.04]"
         >
           <History className="size-3 text-white/30" aria-hidden />
-          <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+          <span className="flex-1 text-[11px] font-semibold text-white/40">
             {section.title}
           </span>
           <ChevronDown
@@ -293,7 +293,7 @@ function NavSectionBlock({
           />
         </button>
       ) : (
-        <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+        <p className="mb-1.5 px-3 text-[11px] font-semibold text-white/40">
           {section.title}
         </p>
       )}
@@ -313,7 +313,7 @@ function NavSectionBlock({
               className={({ isActive }) =>
                 cn(
                   'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white',
-                  isActive && 'bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]',
+                  isActive && 'bg-white/[0.12] text-white ring-1 ring-inset ring-white/5',
                   item.disabled && 'pointer-events-none opacity-40',
                 )
               }
@@ -339,7 +339,7 @@ function NavSectionBlock({
                   </span>
                   <span className="truncate">{item.label}</span>
                   {item.disabled ? (
-                    <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                    <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold">
                       Soon
                     </span>
                   ) : null}
@@ -394,18 +394,16 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-accent/20 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-16 -right-10 size-56 rounded-full bg-highlight/10 blur-3xl" />
 
         <div className="relative flex h-[4.25rem] items-center justify-between border-b border-white/[0.08] px-5">
           <Link to={homePath} aria-label="VFXT dashboard" className="flex items-center gap-2.5">
             <Logo inverted />
             {variant === 'admin' ? (
-              <span className="rounded-md bg-highlight/95 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">
+              <span className="rounded-md bg-highlight/95 px-1.5 py-0.5 text-[10px] font-boldr text-brand">
                 Admin
               </span>
             ) : (
-              <span className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35 sm:inline">
+              <span className="hidden text-[10px] font-semibold text-white/35 sm:inline">
                 Member
               </span>
             )}
@@ -442,7 +440,7 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
               <img
                 src={images.cryptoDesk.replace(/w=\d+/, 'w=500')}
                 alt=""
-                className="absolute inset-0 size-full object-cover opacity-35 transition-transform duration-700 group-hover:scale-105"
+                className="absolute inset-0 size-full object-cover opacity-35"
               />
               <div className="absolute inset-0 bg-gradient-to-br from-accent/85 to-brand/95" />
               <div className="relative flex items-center gap-3">

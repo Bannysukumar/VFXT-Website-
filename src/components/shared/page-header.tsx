@@ -5,12 +5,12 @@ import { TypeText } from '@/components/motion/typing'
 export function PageHeader({
   title,
   description,
-  eyebrow,
   actions,
   className,
 }: {
   title: string
   description?: ReactNode
+  /** Accepted for compatibility; Hallmark drops eyebrows (Floor 9), so it is not rendered. */
   eyebrow?: string
   actions?: ReactNode
   className?: string
@@ -18,11 +18,6 @@ export function PageHeader({
   return (
     <div className={cn('flex flex-wrap items-end justify-between gap-4', className)}>
       <div className="min-w-0">
-        {eyebrow ? (
-          <p className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-accent">
-            {eyebrow}
-          </p>
-        ) : null}
         <h1 className="text-2xl sm:text-[28px]">
           <TypeText text={title} speed={28} />
         </h1>

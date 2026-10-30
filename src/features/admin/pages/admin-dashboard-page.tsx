@@ -142,7 +142,7 @@ export function AdminDashboardPage() {
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-brand via-brand/90 to-brand/40" />
         <div className="flex flex-wrap items-end justify-between gap-6">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-highlight">Admin console</p>
+            <p className="text-xs font-semiboldr text-highlight">Admin console</p>
             <h1 className="mt-2 text-3xl font-bold text-white">
               <TypeText text={`Welcome back${user?.displayName ? `, ${user.displayName.split(' ')[0]}` : ''}`} speed={45} delay={250} />
             </h1>
@@ -233,7 +233,7 @@ export function AdminDashboardPage() {
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-xs font-semibold">{entry.action}</p>
                       <p className="truncate text-xs capitalize text-ink-muted">
-                        {entry.resourceType.replaceAll('_', ' ')} · {entry.resourceId}
+                        {entry.resourceType.replaceAll('_', ' ')}, {entry.resourceId}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs text-ink-subtle">

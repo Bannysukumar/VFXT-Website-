@@ -17,7 +17,7 @@ export function BscTxLink({
   className?: string
   compact?: boolean
 }) {
-  if (!txHash?.trim()) return <span className="text-ink-subtle">—</span>
+  if (!txHash?.trim()) return <span className="text-ink-subtle">None</span>
   const hash = txHash.trim()
   const label = compact
     ? `${hash.slice(0, 10)}…${hash.slice(-6)}`
