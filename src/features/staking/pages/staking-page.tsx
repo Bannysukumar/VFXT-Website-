@@ -31,6 +31,25 @@ const schema = z.object({
 
 type Values = z.infer<typeof schema>
 
+function formatStakingDate(value: unknown): string {
+  if (!value) return '—'
+  let ms: number | null = null
+  if (typeof value === 'string' || typeof value === 'number') {
+    ms = new Date(value).getTime()
+  } else if (typeof value === 'object' && value !== null) {
+    const v = value as { _seconds?: number; seconds?: number; toMillis?: () => number }
+    if (typeof v.toMillis === 'function') ms = v.toMillis()
+    else if (typeof v._seconds === 'number') ms = v._seconds * 1000
+    else if (typeof v.seconds === 'number') ms = v.seconds * 1000
+  }
+  if (ms == null || Number.isNaN(ms)) return '—'
+  try {
+    return format(new Date(ms), 'PPp')
+  } catch {
+    return '—'
+  }
+}
+
 export function StakingPage() {
   const queryClient = useQueryClient()
   const positionsQuery = useQuery({
@@ -163,8 +182,7 @@ export function StakingPage() {
                   <div>
                     <p className="font-medium">{p.planId.replaceAll('_', ' ')}</p>
                     <p className="text-xs text-ink-muted">
-                      {p.createdAt ? format(new Date(p.createdAt), 'PPp') : '—'} · days paid{' '}
-                      {p.daysPaid}
+                      {formatStakingDate(p.createdAt)} · days paid {p.daysPaid}
                       {p.workingAccount ? ' · working' : ' · non-working'}
                     </p>
                   </div>

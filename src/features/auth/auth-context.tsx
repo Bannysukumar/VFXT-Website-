@@ -43,24 +43,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    try {
-      connectEmulatorsIfNeeded()
-      initAppCheck()
-      const auth = getFirebaseAuth()
-      const unsub = onAuthStateChanged(auth, async (next) => {
-        setUser(next)
-        if (next) {
-          const token = await next.getIdTokenResult(true)
-          const role = token.claims.adminRole
-          setAdminRole(typeof role === 'string' ? (role as AdminRole) : null)
-        } else {
-          setAdminRole(null)
-        }
-        setLoading(false)
-      })
-      return unsub
-    } catch {
-      setLoading(false)
+    let unsub: (() => void) | undefined
+    let cancelled = false
+    ;(async () => {
+      try {
+        await connectEmulatorsIfNeeded()
+        if (cancelled) return
+        initAppCheck()
+        const auth = getFirebaseAuth()
+        unsub = onAuthStateChanged(auth, async (next) => {
+          setUser(next)
+          if (next) {
+            const token = await next.getIdTokenResult(true)
+            const role = token.claims.adminRole
+            setAdminRole(typeof role === 'string' ? (role as AdminRole) : null)
+          } else {
+            setAdminRole(null)
+          }
+          setLoading(false)
+        })
+      } catch {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+      unsub?.()
     }
   }, [firebaseConfigured])
 

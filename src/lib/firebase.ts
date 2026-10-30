@@ -1,5 +1,11 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
-import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth'
+import {
+  browserSessionPersistence,
+  connectAuthEmulator,
+  getAuth,
+  setPersistence,
+  type Auth,
+} from 'firebase/auth'
 import {
   connectFirestoreEmulator,
   getFirestore,
@@ -97,7 +103,7 @@ export function initAppCheck(): AppCheck | null {
   return appCheck
 }
 
-export function connectEmulatorsIfNeeded(): void {
+export async function connectEmulatorsIfNeeded(): Promise<void> {
   if (emulatorsConnected || !env.VITE_USE_FIREBASE_EMULATORS || !hasFirebaseConfig()) {
     return
   }
@@ -110,6 +116,8 @@ export function connectEmulatorsIfNeeded(): void {
   connectAuthEmulator(authInstance, `http://${env.VITE_FIREBASE_AUTH_EMULATOR_HOST}`, {
     disableWarnings: true,
   })
+  // IndexedDB multi-tab locks hang emulator sign-in; sessionStorage survives same-tab reloads.
+  await setPersistence(authInstance, browserSessionPersistence)
 
   const [fsHost, fsPort] = env.VITE_FIREBASE_FIRESTORE_EMULATOR_HOST.split(':')
   connectFirestoreEmulator(dbInstance, fsHost, Number(fsPort))

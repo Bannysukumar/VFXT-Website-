@@ -283,6 +283,20 @@ async function handleGetMyPositions(
     .limit(100)
     .get();
 
+  const toIso = (value: unknown): string | null => {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      'toDate' in value &&
+      typeof (value as { toDate: () => Date }).toDate === 'function'
+    ) {
+      return (value as { toDate: () => Date }).toDate().toISOString();
+    }
+    return null;
+  };
+
   const positions = snap.docs.map((d) => {
     const p = d.data() as StakingPosition;
     return {
@@ -298,9 +312,9 @@ async function handleGetMyPositions(
       multiplier: p.multiplier,
       bonusTokenPct: p.bonusTokenPct,
       lockDays: p.lockDays,
-      createdAt: p.createdAt ?? null,
-      maturesAt: p.maturesAt ?? null,
-      completedAt: p.completedAt ?? null,
+      createdAt: toIso(p.createdAt),
+      maturesAt: toIso(p.maturesAt),
+      completedAt: toIso(p.completedAt),
     };
   });
 
