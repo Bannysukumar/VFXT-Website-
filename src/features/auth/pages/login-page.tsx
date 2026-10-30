@@ -88,10 +88,10 @@ export function LoginPage() {
     }
   })
 
-  async function handleWallet(mode: 'injected' | 'walletconnect') {
+  async function handleWalletConnect() {
     setWalletBusy(true)
     try {
-      const res = await loginWithWallet(mode)
+      const res = await loginWithWallet('walletconnect')
       if (res.kind === 'needs_signup') {
         toast.message('New wallet — finish signup to link this address')
         navigate(
@@ -217,29 +217,16 @@ export function LoginPage() {
         <Button
           type="button"
           size="lg"
-          variant="outline"
           className="w-full"
-          disabled={walletBusy}
-          onClick={() => void handleWallet('injected')}
-        >
-          {walletBusy ? <Loader2 className="animate-spin" /> : <Wallet className="size-4" />}
-          Connect wallet (MetaMask / Trust)
-        </Button>
-        <Button
-          type="button"
-          size="lg"
-          variant="secondary"
-          className="w-full"
-          disabled={walletBusy}
-          onClick={() => void handleWallet('walletconnect')}
+          disabled={walletBusy || !firebaseConfigured}
+          onClick={() => void handleWalletConnect()}
         >
           {walletBusy ? <Loader2 className="animate-spin" /> : <Wallet className="size-4" />}
           WalletConnect
         </Button>
         {!walletConnectConfigured() ? (
           <p className="text-center text-[11px] text-ink-subtle">
-            WalletConnect QR uses injected wallets unless{' '}
-            <code>VITE_WALLETCONNECT_PROJECT_ID</code> is set.
+            Set <code>VITE_WALLETCONNECT_PROJECT_ID</code> for QR wallet connect.
           </p>
         ) : null}
       </div>

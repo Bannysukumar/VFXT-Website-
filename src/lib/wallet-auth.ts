@@ -19,6 +19,8 @@ const SIGNUP_SESSION_KEY = 'vfxt_wallet_signup'
 export type WalletSignupSession = {
   address: string
   signupToken: string
+  /** Optional sponsor code carried from /auth/register into wallet-register. */
+  referralCode?: string
 }
 
 async function getInjectedProvider(): Promise<EthereumProvider> {
@@ -151,7 +153,10 @@ export async function loginWithWallet(
   >('verifyWalletLogin', { address, signature })
 
   if (result.needsSignup && result.signupToken) {
-    const session = { address: result.address, signupToken: result.signupToken }
+    const session: WalletSignupSession = {
+      address: result.address,
+      signupToken: result.signupToken,
+    }
     saveWalletSignupSession(session)
     return { kind: 'needs_signup', ...session }
   }

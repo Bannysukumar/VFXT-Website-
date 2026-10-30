@@ -3,13 +3,19 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { CheckCircle2, Loader2, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FieldError } from '@/components/shared/page-header'
 import { registerSchema, type RegisterValues } from '@/features/auth/schemas'
-import { lookupReferralCode, registerWithEmail } from '@/services/auth-service'
+import { finalizeRegistration, lookupReferralCode, registerWithEmail } from '@/services/auth-service'
+import {
+  loginWithWallet,
+  readWalletSignupSession,
+  saveWalletSignupSession,
+  walletConnectConfigured,
+} from '@/lib/wallet-auth'
 import { AuthLayout, PasswordInput } from '@/features/auth/components/auth-layout'
 
 export function RegisterPage() {
@@ -18,6 +24,7 @@ export function RegisterPage() {
   const [uplinerName, setUplinerName] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
+  const [walletBusy, setWalletBusy] = useState(false)
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -66,6 +73,48 @@ export function RegisterPage() {
     }
   }, [referralCode, form])
 
+  async function handleWalletConnect() {
+    const code = form.getValues('referralCode')?.trim()
+    if (!code || !uplinerName) {
+      toast.error('Enter a valid referral code before connecting your wallet')
+      return
+    }
+    setWalletBusy(true)
+    try {
+      const res = await loginWithWallet('walletconnect')
+      if (res.kind === 'needs_signup') {
+        const existing = readWalletSignupSession()
+        if (existing) {
+          saveWalletSignupSession({ ...existing, referralCode: code })
+        }
+        toast.message('Wallet verified — finish signup')
+        const q = new URLSearchParams({
+          address: res.address,
+          ref: code,
+        })
+        navigate(`/auth/wallet-register?${q.toString()}`, { replace: true })
+        return
+      }
+      if (res.needsProfile) {
+        try {
+          await finalizeRegistration({ referralCode: code })
+          toast.success('Wallet connected and referral linked')
+          navigate('/app', { replace: true })
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Could not link referral')
+          navigate(`/auth/login`, { replace: true })
+        }
+        return
+      }
+      toast.success('Wallet connected')
+      navigate('/app', { replace: true })
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Wallet connect failed')
+    } finally {
+      setWalletBusy(false)
+    }
+  }
+
   const onSubmit = form.handleSubmit(async (values) => {
     if (!uplinerName) {
       toast.error('Enter a valid referral code')
@@ -90,16 +139,18 @@ export function RegisterPage() {
   return (
     <AuthLayout
       title="Create your account"
-      description="Referral code is required. We’ll show your upliner once the code is verified."
+      description="Referral code is required. Connect with WalletConnect or register with email."
       footer={
         <>
           Already have an account? <Link to="/auth/login">Sign in</Link>
         </>
       }
     >
-      <form className="space-y-5" onSubmit={onSubmit} noValidate>
+      <div className="mb-6 space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="referralCode">Referral code</Label>
+          <Label htmlFor="referralCode">
+            Referral code <span className="text-danger">*</span>
+          </Label>
           <Input
             id="referralCode"
             placeholder="VFXT…"
@@ -122,6 +173,37 @@ export function RegisterPage() {
           ) : null}
         </div>
 
+        <Button
+          type="button"
+          size="lg"
+          className="w-full"
+          disabled={walletBusy || lookingUp || !uplinerName}
+          onClick={() => void handleWalletConnect()}
+        >
+          {walletBusy ? <Loader2 className="animate-spin" /> : <Wallet className="size-4" />}
+          WalletConnect
+        </Button>
+        {!walletConnectConfigured() ? (
+          <p className="text-center text-[11px] text-ink-subtle">
+            Set <code>VITE_WALLETCONNECT_PROJECT_ID</code> for QR wallet connect.
+          </p>
+        ) : (
+          <p className="text-center text-[11px] text-ink-muted">
+            After connecting, your referral code stays filled on the next step.
+          </p>
+        )}
+      </div>
+
+      <div className="relative mb-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-line" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase tracking-wide">
+          <span className="bg-panel px-3 text-ink-subtle">or email</span>
+        </div>
+      </div>
+
+      <form className="space-y-5" onSubmit={onSubmit} noValidate>
         <div className="space-y-2">
           <Label htmlFor="displayName">Full name</Label>
           <Input

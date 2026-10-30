@@ -28,12 +28,15 @@ export function WalletRegisterPage() {
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
 
+  const prefilledRef =
+    params.get('ref')?.trim() || session?.referralCode?.trim() || ''
+
   const form = useForm<WalletSignupValues>({
     resolver: zodResolver(walletSignupSchema),
     defaultValues: {
       displayName: '',
       mobile: '',
-      referralCode: params.get('ref') ?? '',
+      referralCode: prefilledRef,
       email: '',
       password: '',
       confirmPassword: '',
