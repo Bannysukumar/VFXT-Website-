@@ -5,7 +5,7 @@ module.exports = {
       name: 'vfxt-website',
       cwd: __dirname,
       script: 'npx',
-      args: 'serve -s dist -l 3017',
+      args: 'serve -s dist -l 3029',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
@@ -13,7 +13,7 @@ module.exports = {
       max_memory_restart: '400M',
       env: {
         NODE_ENV: 'production',
-        PORT: 3017,
+        PORT: 3029,
       },
     },
   ],
