@@ -1,0 +1,71 @@
+rules_version = '2';
+
+/**
+ * VFXT Cloud Storage Security Rules
+ * Max sizes enforced; content-type restricted; private paths by owner/admin.
+ */
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.adminRole in [
+          'super_admin',
+          'finance_admin',
+          'operations_admin',
+          'support_admin',
+          'readonly_admin'
+        ];
+    }
+
+    function isImage() {
+      return request.resource.contentType.matches('image/(jpeg|png|webp|gif)');
+    }
+
+    function isDocument() {
+      return request.resource.contentType.matches('application/pdf')
+        || request.resource.contentType.matches('image/(jpeg|png|webp)');
+    }
+
+    function underLimit(bytes) {
+      return request.resource.size < bytes;
+    }
+
+    // Public marketing assets (uploaded via Admin SDK / CI only)
+    match /public/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Profile images — owner upload, 2 MiB
+    match /profiles/{userId}/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if isOwner(userId) && isImage() && underLimit(2 * 1024 * 1024);
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Support attachments — owner, 5 MiB, images + PDF
+    match /support/{userId}/{ticketId}/{fileName} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if isOwner(userId) && isDocument() && underLimit(5 * 1024 * 1024);
+      allow delete: if isAdmin();
+    }
+
+    // KYC / approved documentation — write via Cloud Functions only
+    match /documents/{userId}/{allPaths=**} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,11 @@
+node_modules/
+lib/
+*.local
+.env
+.env.*
+!.env.example
+.runtimeconfig.json
+firebase-debug.log
+firebase-debug.*.log
+coverage/
+*.js.map

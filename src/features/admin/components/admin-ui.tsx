@@ -1,0 +1,118 @@
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import { Copy, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+
+export function StatusTabs<T extends string>({
+  value,
+  onChange,
+  options,
+  layoutId,
+}: {
+  value: T
+  onChange: (value: T) => void
+  options: { value: T; label: string }[]
+  layoutId: string
+}) {
+  return (
+    <div className="inline-flex flex-wrap gap-1 rounded-xl border border-line bg-panel-elevated p-1">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          onClick={() => onChange(option.value)}
+          className={cn(
+            'relative rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors',
+            value === option.value ? 'text-ink' : 'text-ink-muted hover:text-ink',
+          )}
+        >
+          {value === option.value ? (
+            <motion.span
+              layoutId={layoutId}
+              className="absolute inset-0 rounded-lg bg-panel shadow-xs"
+              transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+            />
+          ) : null}
+          <span className="relative">{option.label}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export function IdCell({ id, label }: { id: string; label?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        await navigator.clipboard.writeText(id)
+        toast.success(`${label ?? 'ID'} copied`)
+      }}
+      className="group inline-flex items-center gap-1.5 rounded-md font-mono text-xs text-ink-muted transition-colors hover:text-ink"
+      title={id}
+    >
+      {id.length > 14 ? `${id.slice(0, 6)}…${id.slice(-4)}` : id}
+      <Copy className="size-3 opacity-0 transition-opacity group-hover:opacity-100" />
+    </button>
+  )
+}
+
+export function RejectDialog({
+  open,
+  onOpenChange,
+  title,
+  onConfirm,
+  pending,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  title: string
+  onConfirm: (reason: string) => void
+  pending: boolean
+}) {
+  const [reason, setReason] = useState('')
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setReason('')
+        onOpenChange(next)
+      }}
+    >
+      <DialogContent>
+        <DialogTitle>{title}</DialogTitle>
+        <DialogDescription>
+          The reason is stored with the request and recorded in the audit log.
+        </DialogDescription>
+        <div className="mt-5 space-y-2">
+          <Label htmlFor="reject-reason">Reason</Label>
+          <Textarea
+            id="reject-reason"
+            className="min-h-24"
+            placeholder="e.g. Payment not received"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            disabled={reason.trim().length < 3 || pending}
+            onClick={() => onConfirm(reason.trim())}
+          >
+            {pending ? <Loader2 className="animate-spin" /> : null}
+            Reject request
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}

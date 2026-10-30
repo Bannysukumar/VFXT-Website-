@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+contracts/node_modules/
+
+# Builds
+dist/
+functions/lib/
+coverage/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+functions/.env
+functions/.secret.local
+*.pem
+service-account*.json
+*-firebase-adminsdk*.json
+*firebase-adminsdk*.json
+vfxt-*-firebase-adminsdk*.json
+
+# Firebase
+.firebase/
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+pubsub-debug.log
+
+# Hardhat
+contracts/cache/
+contracts/artifacts/
+contracts/typechain-types/
+contracts/coverage/
+contracts/coverage.json
+contracts/deployments/localhost/
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Misc
+.turbo/
+.vite/

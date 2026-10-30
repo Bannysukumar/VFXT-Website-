@@ -1,0 +1,232 @@
+rules_version = '2';
+
+/**
+ * VFXT Firestore Security Rules
+ *
+ * Principle: clients may read their own non-sensitive data.
+ * Financial mutations, balances, ledger, approvals, roles, and
+ * privileged config are Cloud Functions only (Admin SDK).
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function adminRole() {
+      return isSignedIn() && request.auth.token.adminRole is string
+        ? request.auth.token.adminRole
+        : null;
+    }
+
+    function isAdmin() {
+      return adminRole() in [
+        'super_admin',
+        'finance_admin',
+        'operations_admin',
+        'support_admin',
+        'readonly_admin'
+      ];
+    }
+
+    function isPrivilegedAdmin() {
+      return adminRole() in [
+        'super_admin',
+        'finance_admin',
+        'operations_admin',
+        'support_admin'
+      ];
+    }
+
+    function isSuperAdmin() {
+      return adminRole() == 'super_admin';
+    }
+
+    function unchanged(keys) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
+    }
+
+    // Public platform config (feature flags, branding) — read-only for clients
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Feature flags (server-managed)
+    match /featureFlags/{flagId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Token metadata (public read; server write)
+    match /token/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if false; // Auth onCreate Cloud Function
+      allow update: if isOwner(userId)
+        && unchanged([
+          'role',
+          'adminRole',
+          'status',
+          'kycStatus',
+          'referralCode',
+          'referredBy',
+          'createdAt',
+          'balances',
+          'binaryParentId',
+          'binarySide',
+          'binaryLeftId',
+          'binaryRightId',
+          'leftVolumeMinor',
+          'rightVolumeMinor',
+          'currentRank',
+          'lastRankPaidAt',
+          'rankCycleStart'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'photoURL',
+          'timezone',
+          'locale',
+          'preferences',
+          'withdrawalAddress',
+          'updatedAt'
+        ].concat(resource.data.keys()));
+      allow delete: if false;
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow update: if isOwner(userId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['read', 'readAt']);
+        allow create, delete: if false;
+      }
+    }
+
+    // Wallets — balances are never client-writable
+    match /wallets/{walletId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Immutable ledger entries
+    match /ledger/{entryId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Deposits / withdrawals — create via callable; status via Admin SDK
+    match /deposits/{depositId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    match /withdrawals/{withdrawalId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Referrals
+    match /referrals/{referralId} {
+      allow read: if isSignedIn()
+        && (resource.data.referrerId == request.auth.uid
+          || resource.data.refereeId == request.auth.uid
+          || isAdmin());
+      allow write: if false;
+    }
+
+    // Staking configs (public read when enabled; server write)
+    match /stakingConfigs/{configId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /stakingPositions/{positionId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    match /rankPayouts/{payoutId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Support tickets
+    match /supportTickets/{ticketId} {
+      allow read: if isSignedIn()
+        && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasAll(['subject', 'body', 'category', 'status', 'createdAt'])
+        && request.resource.data.status == 'open'
+        && request.resource.data.subject is string
+        && request.resource.data.subject.size() > 0
+        && request.resource.data.subject.size() <= 200
+        && request.resource.data.body is string
+        && request.resource.data.body.size() > 0
+        && request.resource.data.body.size() <= 5000;
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['body', 'updatedAt'])
+        && unchanged(['status', 'userId', 'assigneeId', 'priority']);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isSignedIn()
+          && (get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId
+                == request.auth.uid
+              || isAdmin());
+        allow create: if isSignedIn()
+          && get(/databases/$(database)/documents/supportTickets/$(ticketId)).data.userId
+               == request.auth.uid
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.body is string
+          && request.resource.data.body.size() > 0
+          && request.resource.data.body.size() <= 5000;
+        allow update, delete: if false;
+      }
+    }
+
+    // Admin audit logs — immutable, admin-readable
+    match /auditLogs/{logId} {
+      allow read: if isPrivilegedAdmin() || isSuperAdmin();
+      allow write: if false;
+    }
+
+    // Idempotency keys — server only
+    match /idempotencyKeys/{keyId} {
+      allow read, write: if false;
+    }
+
+    // Hot-wallet private keys and related secrets — never client-accessible
+    match /secrets/{docId} {
+      allow read, write: if false;
+    }
+
+    // Used on-chain tx hashes (deposit anti-replay) — server only
+    match /usedCryptoTx/{txHash} {
+      allow read, write: if false;
+    }
+
+    // Deny everything else by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

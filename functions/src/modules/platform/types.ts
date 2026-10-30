@@ -1,0 +1,161 @@
+import type { Timestamp, FieldValue } from 'firebase-admin/firestore';
+
+export interface ContactSettings {
+  companyName: string;
+  email: string;
+  phone: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  region: string;
+  postalCode: string;
+  country: string;
+  supportHours: string;
+}
+
+export interface FooterLink {
+  label: string;
+  href: string;
+}
+
+export interface FooterColumn {
+  title: string;
+  links: FooterLink[];
+}
+
+export interface FooterSettings {
+  tagline: string;
+  copyright: string;
+  columns: FooterColumn[];
+}
+
+export interface LockedPackageConfig {
+  id: string;
+  days: number;
+  multiplier: number;
+  bonusTokenPct: number;
+  label: string;
+  enabled: boolean;
+}
+
+export interface RankRewardConfig {
+  rank: number;
+  leftUsd: number;
+  rightUsd: number;
+  rewardUsd: number;
+  cycleDays: number;
+  enabled: boolean;
+}
+
+export interface PlanSettings {
+  minStakeUsdCents: number;
+  dailyRateBps: number;
+  maxDays: number;
+  nonWorkingCapX: number;
+  workingCapX: number;
+  levelCommissionBps: number[];
+  directReferralBonusBps: number;
+  lockedPackages: LockedPackageConfig[];
+  rankRewards: RankRewardConfig[];
+}
+
+export interface WithdrawSettings {
+  /** Minimum withdrawal amount in USD cents. */
+  minWithdrawUsdCents: number;
+  /** When true, after first successful withdrawal, auto-submit when balance >= min. */
+  autoWithdrawEnabled: boolean;
+  /** Require saved profile address for auto-withdraw. */
+  requireProfileAddress: boolean;
+}
+
+export interface HotWalletPoolSettings {
+  /** When true, deposits/withdrawals pick a random enabled hot wallet. */
+  multiWalletEnabled: boolean;
+}
+
+export interface PlatformSettings {
+  contact: ContactSettings;
+  footer: FooterSettings;
+  plan: PlanSettings;
+  withdraw: WithdrawSettings;
+  hotWalletPool: HotWalletPoolSettings;
+  updatedAt?: Timestamp | FieldValue;
+  updatedBy?: string;
+}
+
+export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
+  contact: {
+    companyName: 'Virtual FX Trades',
+    email: 'support@virtualfxtrades.com',
+    phone: '',
+    addressLine1: '',
+    addressLine2: '',
+    city: '',
+    region: '',
+    postalCode: '',
+    country: 'United States',
+    supportHours: 'Mon–Fri 9:00–18:00 (US Eastern)',
+  },
+  footer: {
+    tagline: 'Transparent trading infrastructure for modern investors.',
+    copyright: '© Virtual FX Trades. All rights reserved.',
+    columns: [
+      {
+        title: 'Product',
+        links: [
+          { label: 'Token', href: '/token' },
+          { label: 'Security', href: '/security' },
+          { label: 'Support', href: '/support' },
+        ],
+      },
+      {
+        title: 'Company',
+        links: [
+          { label: 'About', href: '/about' },
+          { label: 'Contact', href: '/contact' },
+        ],
+      },
+      {
+        title: 'Legal',
+        links: [
+          { label: 'Terms', href: '/legal/terms' },
+          { label: 'Privacy', href: '/legal/privacy' },
+          { label: 'Risk', href: '/legal/risk' },
+        ],
+      },
+    ],
+  },
+  plan: {
+    minStakeUsdCents: 10_000,
+    dailyRateBps: 100,
+    maxDays: 200,
+    nonWorkingCapX: 2,
+    workingCapX: 3,
+    levelCommissionBps: [50, 50, 25, 25, 20, 20, 10],
+    directReferralBonusBps: 500,
+    lockedPackages: [
+      { id: 'locked_300', days: 300, multiplier: 3, bonusTokenPct: 50, label: '300-day · 3X', enabled: true },
+      { id: 'locked_500', days: 500, multiplier: 5, bonusTokenPct: 100, label: '500-day · 5X', enabled: true },
+      { id: 'locked_700', days: 700, multiplier: 7, bonusTokenPct: 150, label: '700-day · 7X', enabled: true },
+    ],
+    rankRewards: [
+      { rank: 1, leftUsd: 1_000, rightUsd: 1_000, rewardUsd: 10, cycleDays: 7, enabled: true },
+      { rank: 2, leftUsd: 2_000, rightUsd: 2_000, rewardUsd: 20, cycleDays: 7, enabled: true },
+      { rank: 3, leftUsd: 5_000, rightUsd: 5_000, rewardUsd: 50, cycleDays: 7, enabled: true },
+      { rank: 4, leftUsd: 10_000, rightUsd: 10_000, rewardUsd: 100, cycleDays: 15, enabled: true },
+      { rank: 5, leftUsd: 15_000, rightUsd: 15_000, rewardUsd: 150, cycleDays: 15, enabled: true },
+      { rank: 6, leftUsd: 20_000, rightUsd: 20_000, rewardUsd: 200, cycleDays: 15, enabled: true },
+      { rank: 7, leftUsd: 30_000, rightUsd: 30_000, rewardUsd: 300, cycleDays: 30, enabled: true },
+      { rank: 8, leftUsd: 50_000, rightUsd: 50_000, rewardUsd: 500, cycleDays: 30, enabled: true },
+      { rank: 9, leftUsd: 100_000, rightUsd: 100_000, rewardUsd: 1_000, cycleDays: 30, enabled: true },
+    ],
+  },
+  withdraw: {
+    minWithdrawUsdCents: 1_000, // $10
+    autoWithdrawEnabled: false,
+    requireProfileAddress: true,
+  },
+  hotWalletPool: {
+    multiWalletEnabled: false,
+  },
+};

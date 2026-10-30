@@ -1,0 +1,99 @@
+import { createBrowserRouter } from 'react-router-dom'
+import { PublicShell } from '@/components/layout/public-shell'
+import { AppShell } from '@/components/layout/app-shell'
+import { AdminRoute, ProtectedRoute } from '@/features/auth/components/protected-route'
+import { LoginPage } from '@/features/auth/pages/login-page'
+import { RegisterPage } from '@/features/auth/pages/register-page'
+import { ResetPasswordPage } from '@/features/auth/pages/reset-password-page'
+import { HomePage } from '@/features/marketing/home-page'
+import { AboutPage } from '@/features/marketing/about-page'
+import { TokenPublicPage } from '@/features/token/pages/token-public-page'
+import { DashboardPage } from '@/features/dashboard/pages/dashboard-page'
+import { WalletsPage } from '@/features/wallets/pages/wallets-page'
+import { DepositsPage } from '@/features/deposits/pages/deposits-page'
+import { WithdrawalsPage } from '@/features/withdrawals/pages/withdrawals-page'
+import { ReferralsPage } from '@/features/referrals/pages/referrals-page'
+import { StakingPage } from '@/features/staking/pages/staking-page'
+import { RanksPage } from '@/features/ranks/pages/ranks-page'
+import { SupportPage } from '@/features/support/pages/support-page'
+import { TransferPage } from '@/features/wallets/pages/transfer-page'
+import { AdminDashboardPage } from '@/features/admin/pages/admin-dashboard-page'
+import { AdminDepositsPage } from '@/features/admin/pages/admin-deposits-page'
+import { AdminWithdrawalsPage } from '@/features/admin/pages/admin-withdrawals-page'
+import { AdminUsersPage } from '@/features/admin/pages/admin-users-page'
+import { AdminTicketsPage } from '@/features/admin/pages/admin-tickets-page'
+import { AdminAuditPage } from '@/features/admin/pages/admin-audit-page'
+import { AdminStakingPage } from '@/features/admin/pages/admin-staking-page'
+import { AdminAffiliatesPage } from '@/features/admin/pages/admin-affiliates-page'
+import { AdminCryptoWalletPage } from '@/features/admin/pages/admin-crypto-wallet-page'
+import { AdminSettingsPage } from '@/features/admin/pages/admin-settings-page'
+import { ProfilePage } from '@/features/profile/pages/profile-page'
+import { TokenPublicPage as AppTokenPage } from '@/features/token/pages/token-public-page'
+import { SupportPublicPage } from '@/features/marketing/support-public-page'
+import { SecurityPage } from '@/features/marketing/security-page'
+import { ContactPage } from '@/features/marketing/contact-page'
+import { PrivacyPage, RiskDisclosurePage, TermsPage } from '@/features/marketing/legal-page'
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <PublicShell />,
+    children: [
+      { index: true, element: <HomePage /> },
+      { path: 'about', element: <AboutPage /> },
+      { path: 'token', element: <TokenPublicPage /> },
+      { path: 'support', element: <SupportPublicPage /> },
+      { path: 'security', element: <SecurityPage /> },
+      { path: 'contact', element: <ContactPage /> },
+      { path: 'legal/terms', element: <TermsPage /> },
+      { path: 'legal/privacy', element: <PrivacyPage /> },
+      { path: 'legal/risk', element: <RiskDisclosurePage /> },
+      { path: 'auth/login', element: <LoginPage /> },
+      { path: 'auth/register', element: <RegisterPage /> },
+      { path: 'auth/reset', element: <ResetPasswordPage /> },
+    ],
+  },
+  {
+    path: '/app',
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [
+          { index: true, element: <DashboardPage /> },
+          { path: 'wallets', element: <WalletsPage /> },
+          { path: 'deposits', element: <DepositsPage /> },
+          { path: 'withdrawals', element: <WithdrawalsPage /> },
+          { path: 'transfer', element: <TransferPage /> },
+          { path: 'token', element: <AppTokenPage /> },
+          { path: 'referrals', element: <ReferralsPage /> },
+          { path: 'staking', element: <StakingPage /> },
+          { path: 'ranks', element: <RanksPage /> },
+          { path: 'support', element: <SupportPage /> },
+          { path: 'profile', element: <ProfilePage /> },
+        ],
+      },
+    ],
+  },
+  {
+    path: '/admin',
+    element: <AdminRoute />,
+    children: [
+      {
+        element: <AppShell variant="admin" />,
+        children: [
+          { index: true, element: <AdminDashboardPage /> },
+          { path: 'deposits', element: <AdminDepositsPage /> },
+          { path: 'withdrawals', element: <AdminWithdrawalsPage /> },
+          { path: 'staking', element: <AdminStakingPage /> },
+          { path: 'crypto-wallet', element: <AdminCryptoWalletPage /> },
+          { path: 'users', element: <AdminUsersPage /> },
+          { path: 'affiliates', element: <AdminAffiliatesPage /> },
+          { path: 'tickets', element: <AdminTicketsPage /> },
+          { path: 'audit', element: <AdminAuditPage /> },
+          { path: 'settings', element: <AdminSettingsPage /> },
+        ],
+      },
+    ],
+  },
+])

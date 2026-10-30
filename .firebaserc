@@ -1,0 +1,8 @@
+{
+  "projects": {
+    "default": "vfxt-a60d6",
+    "dev": "vfxt-a60d6",
+    "staging": "vfxt-a60d6",
+    "prod": "vfxt-a60d6"
+  }
+}
