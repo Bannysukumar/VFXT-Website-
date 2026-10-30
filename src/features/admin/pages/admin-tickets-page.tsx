@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/shared/page-header'
 import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { IdCell, StatusTabs } from '@/features/admin/components/admin-ui'
+import { AdminFiltersBar } from '@/features/admin/components/admin-filters'
 import { cn } from '@/lib/utils'
 import { updateTicketStatus } from '@/services/admin-service'
 import { fetchTicketsByStatus } from '@/services/records-service'
@@ -30,6 +31,7 @@ const priorityTone = { low: 'secondary', normal: 'info', high: 'danger' } as con
 export function AdminTicketsPage() {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<TicketStatus>('open')
+  const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
 
   const query = useQuery({
@@ -49,12 +51,31 @@ export function AdminTicketsPage() {
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const rows = query.data ?? []
+  const allRows = query.data ?? []
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return allRows
+    return allRows.filter((t) =>
+      [t.id, t.userId, t.subject, t.body, t.category, t.priority].some((v) =>
+        String(v ?? '')
+          .toLowerCase()
+          .includes(term),
+      ),
+    )
+  }, [allRows, search])
 
   return (
     <div className="space-y-6">
       <PageHeader eyebrow="People" title="Support tickets" description="Triage user tickets and move them through the support workflow." />
       <StatusTabs value={status} onChange={setStatus} options={tabs} layoutId="ticket-tabs" />
+      <AdminFiltersBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search subject, user, ticket ID…"
+        onRefresh={() => void query.refetch()}
+        refreshing={query.isFetching}
+        resultCount={rows.length}
+      />
       {query.isLoading ? (
         <div className="space-y-3">
           {[0, 1, 2, 3].map((i) => (

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ArrowDownToLine, Check, Loader2, X } from 'lucide-react'
@@ -12,7 +12,9 @@ import { SkeletonRows } from '@/components/shared/stat-card'
 import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { IdCell, RejectDialog, StatusTabs } from '@/features/admin/components/admin-ui'
+import { AdminFiltersBar } from '@/features/admin/components/admin-filters'
 import { formatMinor } from '@/lib/money'
+import { exportRowsToCsv, exportRowsToExcel } from '@/lib/export-table'
 import { approveDeposit, rejectDeposit } from '@/services/admin-service'
 import { fetchDepositsByStatus } from '@/services/records-service'
 import type { TransactionStatus } from '@/types/models'
@@ -26,6 +28,7 @@ const tabs: { value: TransactionStatus; label: string }[] = [
 export function AdminDepositsPage() {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<TransactionStatus>('pending')
+  const [search, setSearch] = useState('')
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -63,8 +66,27 @@ export function AdminDepositsPage() {
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const rows = query.data ?? []
+  const allRows = query.data ?? []
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return allRows
+    return allRows.filter((r) =>
+      [r.id, r.userId, r.note, r.status, String(r.amountMinor)].some((v) =>
+        String(v ?? '')
+          .toLowerCase()
+          .includes(term),
+      ),
+    )
+  }, [allRows, search])
   const total = rows.reduce((sum, r) => sum + r.amountMinor, 0)
+  const exportCols = [
+    { key: 'id', label: 'Deposit ID' },
+    { key: 'userId', label: 'User' },
+    { key: 'amountMinor', label: 'Amount minor' },
+    { key: 'status', label: 'Status' },
+    { key: 'note', label: 'Note' },
+    { key: 'createdAt', label: 'Created' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -73,15 +95,41 @@ export function AdminDepositsPage() {
         title="Deposit requests"
         description="Approving a deposit writes an atomic ledger credit to the user's wallet."
       />
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <StatusTabs value={status} onChange={setStatus} options={tabs} layoutId="deposit-tabs" />
-        {rows.length > 0 ? (
-          <p className="text-sm text-ink-muted">
-            {rows.length} request{rows.length === 1 ? '' : 's'} ·{' '}
-            <span className="tabular font-semibold text-ink">{formatMinor(total, { scale: 2, currency: 'USD' })}</span>
-          </p>
-        ) : null}
-      </div>
+      <StatusTabs value={status} onChange={setStatus} options={tabs} layoutId="deposit-tabs" />
+      <AdminFiltersBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search deposit ID, user, note…"
+        onRefresh={() => void query.refetch()}
+        refreshing={query.isFetching}
+        resultCount={rows.length}
+        exportDisabled={rows.length === 0}
+        onExportCsv={() =>
+          exportRowsToCsv(
+            `vfxt-deposits-${status}-${new Date().toISOString().slice(0, 10)}`,
+            exportCols,
+            rows as unknown as Array<Record<string, unknown>>,
+          )
+        }
+        onExportExcel={() =>
+          exportRowsToExcel(
+            `vfxt-deposits-${status}-${new Date().toISOString().slice(0, 10)}`,
+            exportCols,
+            rows as unknown as Array<Record<string, unknown>>,
+            'Deposits',
+          )
+        }
+        extra={
+          rows.length > 0 ? (
+            <p className="text-sm text-ink-muted">
+              Total{' '}
+              <span className="tabular font-semibold text-ink">
+                {formatMinor(total, { scale: 2, currency: 'USD' })}
+              </span>
+            </p>
+          ) : null
+        }
+      />
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           {query.isLoading ? (

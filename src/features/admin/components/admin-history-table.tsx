@@ -1,13 +1,12 @@
-import { useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Download, FileSpreadsheet, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { PageHeader } from '@/components/shared/page-header'
 import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { SkeletonRows } from '@/components/shared/stat-card'
+import { AdminFiltersBar } from '@/features/admin/components/admin-filters'
 import {
   exportRowsToCsv,
   exportRowsToExcel,
@@ -32,6 +31,7 @@ type Props = {
   exportBasename: string
   amountField?: string
   amountCurrency?: 'USD' | 'VFXT'
+  searchPlaceholder?: string
 }
 
 export function AdminHistoryTable({
@@ -45,11 +45,25 @@ export function AdminHistoryTable({
   exportBasename,
   amountField = 'amountMinor',
   amountCurrency = 'USD',
+  searchPlaceholder = 'Search user, tx, status…',
 }: Props) {
+  const [search, setSearch] = useState('')
   const query = useQuery({ queryKey, queryFn })
-  const rows = query.data?.rows ?? []
+  const allRows = query.data?.rows ?? []
+
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return allRows
+    return allRows.filter((row) =>
+      Object.values(row).some((v) => {
+        if (v == null) return false
+        if (typeof v === 'object') return JSON.stringify(v).toLowerCase().includes(term)
+        return String(v).toLowerCase().includes(term)
+      }),
+    )
+  }, [allRows, search])
+
   const totalMinor =
-    query.data?.totalMinor ??
     rows.reduce((s, r) => s + Number(r[amountField] ?? 0), 0)
 
   const exportRows = useMemo(
@@ -69,53 +83,31 @@ export function AdminHistoryTable({
   return (
     <div className="space-y-6">
       <PageHeader eyebrow={eyebrow} title={title} description={description} />
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-ink-muted">
-          {rows.length} row{rows.length === 1 ? '' : 's'}
-          {rows.length > 0 ? (
-            <>
-              {' '}
-              · Total{' '}
+      <AdminFiltersBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder={searchPlaceholder}
+        onRefresh={() => void query.refetch()}
+        refreshing={query.isFetching}
+        resultCount={rows.length}
+        exportDisabled={rows.length === 0}
+        onExportCsv={() => exportRowsToCsv(exportBasename, exportCols, exportRows)}
+        onExportExcel={() =>
+          exportRowsToExcel(exportBasename, exportCols, exportRows, title.slice(0, 31))
+        }
+        extra={
+          rows.length > 0 ? (
+            <p className="text-sm text-ink-muted">
+              Total{' '}
               <span className="tabular font-semibold text-ink">
                 {amountCurrency === 'VFXT'
                   ? `${formatMinor(totalMinor, { scale: 0 })} VFXT`
                   : formatMinor(totalMinor, { scale: 2, currency: 'USD' })}
               </span>
-            </>
-          ) : null}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={rows.length === 0}
-            onClick={() => exportRowsToCsv(exportBasename, exportCols, exportRows)}
-          >
-            <Download className="size-3.5" />
-            Export CSV
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={rows.length === 0}
-            onClick={() =>
-              exportRowsToExcel(exportBasename, exportCols, exportRows, title.slice(0, 31))
-            }
-          >
-            <FileSpreadsheet className="size-3.5" />
-            Export Excel
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={query.isFetching}
-            onClick={() => void query.refetch()}
-          >
-            {query.isFetching ? <Loader2 className="size-3.5 animate-spin" /> : null}
-            Refresh
-          </Button>
-        </div>
-      </div>
+            </p>
+          ) : null
+        }
+      />
 
       <Card className="overflow-hidden">
         <CardContent className="p-0">

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
 import { ArrowUpFromLine, Check, CheckCheck, Loader2, X } from 'lucide-react'
@@ -12,7 +12,9 @@ import { SkeletonRows } from '@/components/shared/stat-card'
 import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
 import { IdCell, RejectDialog, StatusTabs } from '@/features/admin/components/admin-ui'
+import { AdminFiltersBar } from '@/features/admin/components/admin-filters'
 import { formatMinor } from '@/lib/money'
+import { exportRowsToCsv, exportRowsToExcel } from '@/lib/export-table'
 import { approveWithdrawal, completeWithdrawal, rejectWithdrawal } from '@/services/admin-service'
 import { fetchWithdrawalsByStatus } from '@/services/records-service'
 import type { TransactionStatus } from '@/types/models'
@@ -28,6 +30,7 @@ const tabs: { value: TransactionStatus; label: string }[] = [
 export function AdminWithdrawalsPage() {
   const queryClient = useQueryClient()
   const [status, setStatus] = useState<TransactionStatus>('pending')
+  const [search, setSearch] = useState('')
   const [rejecting, setRejecting] = useState<string | null>(null)
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -65,8 +68,27 @@ export function AdminWithdrawalsPage() {
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const rows = query.data ?? []
+  const allRows = query.data ?? []
+  const rows = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    if (!term) return allRows
+    return allRows.filter((r) =>
+      [r.id, r.userId, r.destination, r.status, String(r.amountMinor)].some((v) =>
+        String(v ?? '')
+          .toLowerCase()
+          .includes(term),
+      ),
+    )
+  }, [allRows, search])
   const actionable = ['pending', 'approved', 'processing'].includes(status)
+  const exportCols = [
+    { key: 'id', label: 'Withdrawal ID' },
+    { key: 'userId', label: 'User' },
+    { key: 'destination', label: 'Destination' },
+    { key: 'amountMinor', label: 'Amount minor' },
+    { key: 'status', label: 'Status' },
+    { key: 'createdAt', label: 'Created' },
+  ]
 
   return (
     <div className="space-y-6">
@@ -76,6 +98,30 @@ export function AdminWithdrawalsPage() {
         description="Approve, complete, or reject withdrawals. Rejections release reserved funds back to the user."
       />
       <StatusTabs value={status} onChange={setStatus} options={tabs} layoutId="withdrawal-tabs" />
+      <AdminFiltersBar
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search withdrawal, user, destination…"
+        onRefresh={() => void query.refetch()}
+        refreshing={query.isFetching}
+        resultCount={rows.length}
+        exportDisabled={rows.length === 0}
+        onExportCsv={() =>
+          exportRowsToCsv(
+            `vfxt-withdrawals-${status}-${new Date().toISOString().slice(0, 10)}`,
+            exportCols,
+            rows as unknown as Array<Record<string, unknown>>,
+          )
+        }
+        onExportExcel={() =>
+          exportRowsToExcel(
+            `vfxt-withdrawals-${status}-${new Date().toISOString().slice(0, 10)}`,
+            exportCols,
+            rows as unknown as Array<Record<string, unknown>>,
+            'Withdrawals',
+          )
+        }
+      />
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           {query.isLoading ? (

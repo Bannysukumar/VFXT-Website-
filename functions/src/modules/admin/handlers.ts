@@ -9,6 +9,14 @@ import {
 } from '../../lib/permissions';
 import { listPendingSchema, listUsersSchema } from './schemas';
 
+function tsToIso(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  const v = value as { toDate?: () => Date };
+  if (typeof v.toDate === 'function') return v.toDate().toISOString();
+  return null;
+}
+
 async function handleListUsers(
   request: CallableRequest,
 ): Promise<{ users: Array<Record<string, unknown>>; nextCursor: string | null }> {
@@ -19,33 +27,76 @@ async function handleListUsers(
   }
 
   const db = getDb();
-  let query = db
-    .collection(Collections.users)
-    .orderBy('uid')
-    .limit(parsed.data.limit);
+  let query = db.collection(Collections.users).orderBy('uid').limit(parsed.data.limit);
+
+  if (parsed.data.status) {
+    query = db
+      .collection(Collections.users)
+      .where('status', '==', parsed.data.status)
+      .orderBy('uid')
+      .limit(parsed.data.limit);
+  }
 
   if (parsed.data.startAfterUid) {
     query = query.startAfter(parsed.data.startAfterUid);
   }
 
   const snap = await query.get();
-  const users = snap.docs.map((d) => {
+  let users = snap.docs.map((d) => {
     const data = d.data();
     return {
-      uid: data.uid,
-      email: data.email ?? null,
-      displayName: data.displayName ?? null,
-      status: data.status,
-      kycStatus: data.kycStatus,
-      adminRole: data.adminRole ?? null,
-      createdAt: data.createdAt ?? null,
+      uid: (data.uid as string) ?? d.id,
+      email: (data.email as string | null) ?? null,
+      displayName: (data.displayName as string | null) ?? null,
+      mobile: (data.mobile as string | null) ?? null,
+      referralCode: (data.referralCode as string | null) ?? null,
+      referredBy: (data.referredBy as string | null) ?? null,
+      walletAddress: (data.walletAddress as string | null) ?? null,
+      status: data.status as string | undefined,
+      kycStatus: data.kycStatus as string | undefined,
+      adminRole: (data.adminRole as string | null) ?? null,
+      createdAt: tsToIso(data.createdAt),
+      referredByName: null as string | null,
+      referredByCode: null as string | null,
     };
   });
+
+  const referrerIds = [
+    ...new Set(users.map((u) => u.referredBy).filter((id): id is string => Boolean(id))),
+  ];
+  if (referrerIds.length > 0) {
+    const refs = await Promise.all(
+      referrerIds.map((id) => db.collection(Collections.users).doc(id).get()),
+    );
+    const byId = new Map(
+      refs
+        .filter((s) => s.exists)
+        .map((s) => {
+          const data = s.data()!;
+          return [
+            s.id,
+            {
+              name: (data.displayName as string | null) ?? (data.email as string | null) ?? null,
+              code: (data.referralCode as string | null) ?? null,
+            },
+          ] as const;
+        }),
+    );
+    users = users.map((u) => {
+      if (!u.referredBy) return u;
+      const ref = byId.get(u.referredBy);
+      return {
+        ...u,
+        referredByName: ref?.name ?? null,
+        referredByCode: ref?.code ?? null,
+      };
+    });
+  }
 
   const last = users[users.length - 1];
   return {
     users,
-    nextCursor: last ? (last.uid as string) : null,
+    nextCursor: last ? last.uid : null,
   };
 }
 

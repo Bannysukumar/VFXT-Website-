@@ -78,10 +78,21 @@ const updateUserSchema = z
   .object({
     uid: z.string().min(1).max(128),
     displayName: z.string().min(1).max(80).optional(),
+    mobile: z
+      .string()
+      .min(8)
+      .max(20)
+      .regex(/^[+0-9][0-9\s\-()]{7,19}$/)
+      .optional(),
     status: z.enum(['active', 'suspended', 'closed']).optional(),
     kycStatus: z.enum(['none', 'pending', 'verified', 'rejected']).optional(),
     disabled: z.boolean().optional(),
     withdrawalAddress: z.string().max(128).nullable().optional(),
+    walletAddress: z
+      .string()
+      .regex(/^0x[a-fA-F0-9]{40}$/)
+      .nullable()
+      .optional(),
   })
   .strict();
 
@@ -106,10 +117,18 @@ export const adminUpdateUser = onCall(CALLABLE_OPTS, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     };
     if (profilePatch.displayName !== undefined) updates.displayName = profilePatch.displayName;
+    if (profilePatch.mobile !== undefined) {
+      updates.mobile = profilePatch.mobile.replace(/\s+/g, ' ').trim();
+    }
     if (profilePatch.status !== undefined) updates.status = profilePatch.status;
     if (profilePatch.kycStatus !== undefined) updates.kycStatus = profilePatch.kycStatus;
     if (profilePatch.withdrawalAddress !== undefined) {
       updates.withdrawalAddress = profilePatch.withdrawalAddress;
+    }
+    if (profilePatch.walletAddress !== undefined) {
+      updates.walletAddress = profilePatch.walletAddress
+        ? profilePatch.walletAddress.toLowerCase()
+        : null;
     }
 
     await ref.update(updates);

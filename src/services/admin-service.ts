@@ -64,16 +64,36 @@ export interface AdminUserSummary {
   uid: string
   email: string | null
   displayName: string | null
+  mobile?: string | null
+  referralCode?: string | null
+  referredBy?: string | null
+  referredByName?: string | null
+  referredByCode?: string | null
+  walletAddress?: string | null
   status?: string
   kycStatus?: string
   adminRole: AdminRole | null
+  createdAt?: string | null
 }
 
-export async function listUsers(startAfterUid?: string) {
+export type ListUsersFilters = {
+  startAfterUid?: string
+  status?: string
+  kycStatus?: string
+  limit?: number
+}
+
+export async function listUsers(filters: ListUsersFilters = {}) {
+  const payload: Record<string, unknown> = {
+    limit: filters.limit ?? 100,
+  }
+  if (filters.startAfterUid) payload.startAfterUid = filters.startAfterUid
+  if (filters.status) payload.status = filters.status
+  if (filters.kycStatus) payload.kycStatus = filters.kycStatus
   return callFunction<
-    { limit: number; startAfterUid?: string },
+    Record<string, unknown>,
     { users: AdminUserSummary[]; nextCursor: string | null }
-  >('listUsers', startAfterUid ? { limit: 50, startAfterUid } : { limit: 50 })
+  >('listUsers', payload)
 }
 
 export async function updateTicketStatus(
@@ -119,10 +139,12 @@ export async function getAdminUserDetail(uid: string) {
 export type AdminUpdateUserInput = {
   uid: string
   displayName?: string
+  mobile?: string
   status?: 'active' | 'suspended' | 'closed'
   kycStatus?: 'none' | 'pending' | 'verified' | 'rejected'
   disabled?: boolean
   withdrawalAddress?: string | null
+  walletAddress?: string | null
 }
 
 export async function adminUpdateUser(input: AdminUpdateUserInput) {
