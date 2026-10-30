@@ -416,7 +416,7 @@ export function DashboardPage() {
                         </TD>
                         <TD className="text-ink-muted">{format(new Date(entry.createdAt), 'MMM d, yyyy · p')}</TD>
                         <TD>
-                          <StatusBadge status={entry.status} />
+                          <StatusBadge status={entry.status ?? 'completed'} />
                         </TD>
                         <TD className={cn('tabular text-right font-semibold', !isOut && 'text-accent')}>
                           {isOut ? '−' : '+'}

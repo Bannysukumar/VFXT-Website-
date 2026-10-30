@@ -5,15 +5,6 @@ export const loginSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters'),
 })
 
-const optionalWallet = z
-  .string()
-  .trim()
-  .optional()
-  .transform((v) => v ?? '')
-  .refine((v) => v === '' || /^0x[a-fA-F0-9]{40}$/.test(v), {
-    message: 'Enter a valid BEP-20 address (0x…)',
-  })
-
 export const registerSchema = z
   .object({
     displayName: z.string().min(2, 'Name is required').max(80),
@@ -27,7 +18,12 @@ export const registerSchema = z
       .string()
       .min(4, 'Referral code is required')
       .max(32, 'Referral code is too long'),
-    walletAddress: optionalWallet,
+    walletAddress: z
+      .string()
+      .trim()
+      .refine((v) => v === '' || /^0x[a-fA-F0-9]{40}$/.test(v), {
+        message: 'Enter a valid BEP-20 address (0x…)',
+      }),
     password: z
       .string()
       .min(8, 'At least 8 characters')

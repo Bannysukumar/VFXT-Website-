@@ -18,7 +18,6 @@ import {
   Globe,
   ChevronDown,
   ChevronRight,
-  ScrollText,
   Ticket,
   UserCog,
   Home,
