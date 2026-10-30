@@ -40,11 +40,18 @@ export const processAutoWithdrawals = onSchedule(
       const user = userDoc.data();
       const uid = userDoc.id;
       const destination =
+        (typeof user.walletAddress === 'string' && user.walletAddress) ||
         (typeof user.withdrawalAddress === 'string' && user.withdrawalAddress) ||
         (typeof user.lastWithdrawalAddress === 'string' && user.lastWithdrawalAddress) ||
         null;
       if (!destination) continue;
-      if (settings.requireProfileAddress && !user.withdrawalAddress) continue;
+      if (
+        settings.requireProfileAddress &&
+        !user.walletAddress &&
+        !user.withdrawalAddress
+      ) {
+        continue;
+      }
 
       try {
         const walletId = walletDocId(uid, 'withdrawal');

@@ -62,14 +62,16 @@ export function AdminWithdrawSettingsPage() {
       <PageHeader
         eyebrow="Console"
         title="Withdraw"
-        description="Minimum amount, commission fee, auto-withdraw, and address requirements."
+        description="Minimum amount, commission fee, auto-withdraw after first payout, and address rules."
       />
 
       <Card>
         <CardHeader>
           <CardTitle className="font-sans text-lg">Withdraw settings</CardTitle>
           <CardDescription>
-            Applies to user withdrawal requests. Net USDT sent on-chain after commission.
+            After a member’s first withdrawal, their wallet is linked. When auto-withdraw is on and
+            the withdrawal wallet reaches the minimum, payouts run automatically to that unique
+            address.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid max-w-md gap-4">
@@ -104,6 +106,10 @@ export function AdminWithdrawSettingsPage() {
               <option value="0">No</option>
               <option value="1">Yes</option>
             </NativeSelect>
+            <p className="text-xs text-ink-muted">
+              When Yes: after the first successful withdrawal, any time the withdrawal wallet is at
+              or above the minimum, the system auto-sends to the linked wallet (every ~5 minutes).
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Require profile address</Label>

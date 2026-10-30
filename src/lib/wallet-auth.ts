@@ -14,6 +14,13 @@ declare global {
   }
 }
 
+const SIGNUP_SESSION_KEY = 'vfxt_wallet_signup'
+
+export type WalletSignupSession = {
+  address: string
+  signupToken: string
+}
+
 async function getInjectedProvider(): Promise<EthereumProvider> {
   if (typeof window === 'undefined' || !window.ethereum) {
     throw new Error('No wallet found. Install MetaMask, Trust, or open in a Web3 browser.')
@@ -36,7 +43,6 @@ async function connectInjected(): Promise<string> {
 async function connectWalletConnect(): Promise<{ address: string; provider: EthereumProvider }> {
   const projectId = (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined)?.trim()
   if (!projectId) {
-    // Fall back to injected (MetaMask / Trust in-app / WalletConnect-enabled browsers)
     const address = await connectInjected()
     return { address, provider: await getInjectedProvider() }
   }
@@ -68,7 +74,6 @@ async function connectWalletConnect(): Promise<{ address: string; provider: Ethe
       },
     }
   } catch (err) {
-    // If WC fails (missing package / modal), try injected
     if (window.ethereum) {
       const address = await connectInjected()
       return { address, provider: await getInjectedProvider() }
@@ -77,11 +82,42 @@ async function connectWalletConnect(): Promise<{ address: string; provider: Ethe
   }
 }
 
-export async function loginWithWallet(mode: 'injected' | 'walletconnect' = 'injected'): Promise<{
-  needsProfile: boolean
-  isNewUser: boolean
-  address: string
-}> {
+export type WalletAuthResult =
+  | {
+      kind: 'logged_in'
+      needsProfile: boolean
+      isNewUser: boolean
+      address: string
+    }
+  | {
+      kind: 'needs_signup'
+      address: string
+      signupToken: string
+    }
+
+export function saveWalletSignupSession(session: WalletSignupSession) {
+  sessionStorage.setItem(SIGNUP_SESSION_KEY, JSON.stringify(session))
+}
+
+export function readWalletSignupSession(): WalletSignupSession | null {
+  try {
+    const raw = sessionStorage.getItem(SIGNUP_SESSION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as WalletSignupSession
+    if (!parsed.address || !parsed.signupToken) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function clearWalletSignupSession() {
+  sessionStorage.removeItem(SIGNUP_SESSION_KEY)
+}
+
+export async function loginWithWallet(
+  mode: 'injected' | 'walletconnect' = 'injected',
+): Promise<WalletAuthResult> {
   if (!isFirebaseReady()) {
     throw new Error('Firebase is not configured')
   }
@@ -104,20 +140,54 @@ export async function loginWithWallet(mode: 'injected' | 'walletconnect' = 'inje
   const result = await callFunction<
     { address: string; signature: string },
     {
-      customToken: string
-      uid: string
+      customToken: string | null
+      uid: string | null
       address: string
       isNewUser: boolean
       needsProfile: boolean
+      needsSignup: boolean
+      signupToken: string | null
     }
   >('verifyWalletLogin', { address, signature })
 
+  if (result.needsSignup && result.signupToken) {
+    const session = { address: result.address, signupToken: result.signupToken }
+    saveWalletSignupSession(session)
+    return { kind: 'needs_signup', ...session }
+  }
+
+  if (!result.customToken) {
+    throw new Error('Wallet login failed — no session returned')
+  }
+
   await signInWithCustomToken(getFirebaseAuth(), result.customToken)
   return {
+    kind: 'logged_in',
     needsProfile: result.needsProfile,
     isNewUser: result.isNewUser,
     address: result.address,
   }
+}
+
+export async function completeWalletSignup(input: {
+  signupToken: string
+  address: string
+  email: string
+  password: string
+  displayName: string
+  mobile: string
+  referralCode: string
+}) {
+  if (!isFirebaseReady()) {
+    throw new Error('Firebase is not configured')
+  }
+  const result = await callFunction<
+    typeof input,
+    { customToken: string; uid: string; address: string; ok: true }
+  >('completeWalletSignup', input)
+  await signInWithCustomToken(getFirebaseAuth(), result.customToken)
+  clearWalletSignupSession()
+  return result
 }
 
 export function walletConnectConfigured(): boolean {

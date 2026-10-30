@@ -4,6 +4,7 @@ import { AppShell } from '@/components/layout/app-shell'
 import { AdminRoute, ProtectedRoute } from '@/features/auth/components/protected-route'
 import { LoginPage } from '@/features/auth/pages/login-page'
 import { RegisterPage } from '@/features/auth/pages/register-page'
+import { WalletRegisterPage } from '@/features/auth/pages/wallet-register-page'
 import { ResetPasswordPage } from '@/features/auth/pages/reset-password-page'
 import { HomePage } from '@/features/marketing/home-page'
 import { AboutPage } from '@/features/marketing/about-page'
@@ -56,6 +57,7 @@ export const router = createBrowserRouter([
       { path: 'legal/risk', element: <RiskDisclosurePage /> },
       { path: 'auth/login', element: <LoginPage /> },
       { path: 'auth/register', element: <RegisterPage /> },
+      { path: 'auth/wallet-register', element: <WalletRegisterPage /> },
       { path: 'auth/reset', element: <ResetPasswordPage /> },
     ],
   },

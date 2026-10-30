@@ -6,7 +6,11 @@ initAdmin();
 // Auth trigger (v1)
 export { onUserCreated } from './modules/auth/handlers';
 export { finalizeRegistration } from './modules/auth/registration';
-export { getWalletLoginNonce, verifyWalletLogin } from './modules/auth/wallet-login';
+export {
+  getWalletLoginNonce,
+  verifyWalletLogin,
+  completeWalletSignup,
+} from './modules/auth/wallet-login';
 
 // Users
 export { updateProfile } from './modules/users/handlers';

@@ -10,12 +10,14 @@ import { AppError } from '../../lib/errors';
 import { log } from '../../lib/logger';
 import type { UserProfile } from '../../types/models';
 import { createDefaultWallets } from '../wallets/handlers';
+import { applyCodeForUserExport } from '../referrals/handlers';
+import {
+  findWalletClaim,
+  normalizeWalletAddress,
+} from './wallet-ownership';
 
 const NONCE_TTL_MS = 10 * 60 * 1000;
-
-function normalizeAddress(addr: string): string {
-  return addr.trim().toLowerCase();
-}
+const SIGNUP_TTL_MS = 30 * 60 * 1000;
 
 function buildLoginMessage(address: string, nonce: string): string {
   return [
@@ -42,7 +44,7 @@ export const getWalletLoginNonce = onCall(CALLABLE_OPTS, async (request) => {
     if (!parsed.success) {
       throw new AppError('invalid-argument', 'Valid wallet address required');
     }
-    const address = normalizeAddress(parsed.data.address);
+    const address = normalizeWalletAddress(parsed.data.address);
     const nonce = randomBytes(16).toString('hex');
     const db = getDb();
     await db.collection(Collections.config).doc(`walletNonce_${address}`).set({
@@ -71,7 +73,7 @@ export const verifyWalletLogin = onCall(CALLABLE_OPTS, async (request) => {
       throw new AppError('invalid-argument', 'Address and signature required');
     }
 
-    const address = normalizeAddress(parsed.data.address);
+    const address = normalizeWalletAddress(parsed.data.address);
     const db = getDb();
     const nonceRef = db.collection(Collections.config).doc(`walletNonce_${address}`);
     const nonceSnap = await nonceRef.get();
@@ -99,103 +101,207 @@ export const verifyWalletLogin = onCall(CALLABLE_OPTS, async (request) => {
 
     await nonceRef.delete();
 
-    // Find existing profile by wallet
-    let uid: string | null = null;
     const byWallet = await db
       .collection(Collections.users)
       .where('walletAddress', '==', address)
       .limit(1)
       .get();
+
+    const auth = getAuth();
+
     if (!byWallet.empty) {
-      uid = byWallet.docs[0]!.id;
+      const uid = byWallet.docs[0]!.id;
+      const profile = byWallet.docs[0]!.data() as UserProfile;
+      const needsProfile = !profile.mobile || !profile.referredBy;
+      const customToken = await auth.createCustomToken(uid, {
+        walletAddress: address,
+        loginMethod: 'wallet',
+      });
+      log.info('wallet_login_existing', { uid, address, needsProfile });
+      return {
+        customToken,
+        uid,
+        address,
+        isNewUser: false,
+        needsProfile,
+        needsSignup: false,
+        signupToken: null,
+      };
+    }
+
+    // Not linked yet — reject if already used on another account / withdrawal.
+    const claim = await findWalletClaim(db, address);
+    if (claim) {
+      throw new AppError(
+        'already-exists',
+        'This wallet is already linked to an account or used for a withdrawal. Sign in with that account.',
+      );
+    }
+
+    // Verified ownership → allow signup with this wallet (do not create account yet).
+    const signupToken = randomBytes(24).toString('hex');
+    await db.collection(Collections.config).doc(`walletSignup_${signupToken}`).set({
+      address,
+      signupToken,
+      createdAt: FieldValue.serverTimestamp(),
+      expiresAt: Timestamp.fromMillis(Date.now() + SIGNUP_TTL_MS),
+    });
+
+    log.info('wallet_login_needs_signup', { address });
+    return {
+      customToken: null,
+      uid: null,
+      address,
+      isNewUser: true,
+      needsProfile: true,
+      needsSignup: true,
+      signupToken,
+    };
+  } catch (err) {
+    throw toHttpsError(err);
+  }
+});
+
+const completeWalletSignupSchema = z.object({
+  signupToken: z.string().min(16).max(128),
+  address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+  email: z.string().email(),
+  password: z.string().min(8).max(128),
+  displayName: z.string().min(2).max(80),
+  mobile: z
+    .string()
+    .min(8)
+    .max(20)
+    .regex(/^[+0-9][0-9\s\-()]{7,19}$/),
+  referralCode: z.string().min(4).max(32),
+});
+
+/** Finish signup after wallet was verified and is not already claimed. */
+export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
+  try {
+    initAdmin();
+    const parsed = completeWalletSignupSchema.safeParse(request.data ?? {});
+    if (!parsed.success) {
+      throw new AppError(
+        'invalid-argument',
+        parsed.error.issues[0]?.message ?? 'Invalid signup payload',
+      );
+    }
+
+    const address = normalizeWalletAddress(parsed.data.address);
+    const db = getDb();
+    const sessionRef = db
+      .collection(Collections.config)
+      .doc(`walletSignup_${parsed.data.signupToken}`);
+    const sessionSnap = await sessionRef.get();
+    if (!sessionSnap.exists) {
+      throw new AppError('failed-precondition', 'Wallet signup session expired — connect again');
+    }
+    const session = sessionSnap.data()!;
+    if (normalizeWalletAddress(String(session.address)) !== address) {
+      throw new AppError('permission-denied', 'Wallet does not match signup session');
+    }
+    const exp = session.expiresAt as Timestamp | undefined;
+    if (exp && exp.toMillis() < Date.now()) {
+      await sessionRef.delete();
+      throw new AppError('failed-precondition', 'Wallet signup session expired — connect again');
+    }
+
+    const claim = await findWalletClaim(db, address);
+    if (claim) {
+      await sessionRef.delete();
+      throw new AppError(
+        'already-exists',
+        'This wallet was claimed by another account. Connect a different wallet.',
+      );
     }
 
     const auth = getAuth();
-    let isNewUser = false;
-    let needsProfile = false;
-
-    if (!uid) {
-      // Create Firebase Auth user; onUserCreated provisions profile + wallets.
+    let uid: string;
+    try {
       const created = await auth.createUser({
-        displayName: `${address.slice(0, 6)}…${address.slice(-4)}`,
+        email: parsed.data.email.trim().toLowerCase(),
+        password: parsed.data.password,
+        displayName: parsed.data.displayName.trim(),
+        emailVerified: false,
       });
       uid = created.uid;
-      isNewUser = true;
-
-      const userRef = db.collection(Collections.users).doc(uid);
-      let ready = false;
-      for (let i = 0; i < 12; i += 1) {
-        const snap = await userRef.get();
-        if (snap.exists) {
-          await userRef.update({
-            walletAddress: address,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
-          ready = true;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 400));
+    } catch (err: unknown) {
+      const code = (err as { code?: string })?.code;
+      if (code === 'auth/email-already-exists') {
+        throw new AppError('already-exists', 'Email is already registered — sign in instead');
       }
-      if (!ready) {
-        const referralCode = generateReferralCode(uid);
-        const profile: UserProfile = {
-          uid,
-          email: null,
-          displayName: created.displayName ?? null,
-          photoURL: null,
-          mobile: null,
-          walletAddress: address,
-          timezone: null,
-          locale: null,
-          preferences: {},
-          status: 'active',
-          kycStatus: 'none',
-          referralCode,
-          referredBy: null,
-          binaryParentId: null,
-          binarySide: null,
-          binaryLeftId: null,
-          binaryRightId: null,
-          leftVolumeMinor: 0,
-          rightVolumeMinor: 0,
-          currentRank: 0,
-          lastRankPaidAt: null,
-          rankCycleStart: null,
-          adminRole: null,
-          role: 'user',
-          createdAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-        };
-        await userRef.set(profile, { merge: true });
-        await createDefaultWallets(db, uid);
-      }
-      needsProfile = true;
-    } else {
-      const profile = (await db.collection(Collections.users).doc(uid).get()).data() as
-        | UserProfile
-        | undefined;
-      needsProfile = !profile?.mobile || !profile?.referredBy;
-      // Ensure walletAddress set
-      if (profile && !profile.walletAddress) {
-        await db.collection(Collections.users).doc(uid).update({
-          walletAddress: address,
-          updatedAt: FieldValue.serverTimestamp(),
-        });
-      }
+      throw err;
     }
+
+    const userRef = db.collection(Collections.users).doc(uid);
+    let ready = false;
+    for (let i = 0; i < 12; i += 1) {
+      const snap = await userRef.get();
+      if (snap.exists) {
+        ready = true;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+
+    const mobile = parsed.data.mobile.replace(/\s+/g, ' ').trim();
+    if (!ready) {
+      const referralCode = generateReferralCode(uid);
+      const profile: UserProfile = {
+        uid,
+        email: parsed.data.email.trim().toLowerCase(),
+        displayName: parsed.data.displayName.trim(),
+        photoURL: null,
+        mobile,
+        walletAddress: address,
+        timezone: null,
+        locale: null,
+        preferences: {},
+        status: 'active',
+        kycStatus: 'none',
+        referralCode,
+        referredBy: null,
+        binaryParentId: null,
+        binarySide: null,
+        binaryLeftId: null,
+        binaryRightId: null,
+        leftVolumeMinor: 0,
+        rightVolumeMinor: 0,
+        currentRank: 0,
+        lastRankPaidAt: null,
+        rankCycleStart: null,
+        adminRole: null,
+        role: 'user',
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      await userRef.set(profile, { merge: true });
+      await createDefaultWallets(db, uid);
+    } else {
+      await userRef.update({
+        mobile,
+        displayName: parsed.data.displayName.trim(),
+        walletAddress: address,
+        withdrawalAddress: address,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    await applyCodeForUserExport(uid, parsed.data.referralCode);
+    await sessionRef.delete();
 
     const customToken = await auth.createCustomToken(uid, {
       walletAddress: address,
       loginMethod: 'wallet',
     });
 
-    log.info('wallet_login', { uid, address, isNewUser, needsProfile });
+    log.info('wallet_signup_completed', { uid, address });
     return {
       customToken,
       uid,
       address,
-      isNewUser,
-      needsProfile,
+      ok: true as const,
     };
   } catch (err) {
     throw toHttpsError(err);

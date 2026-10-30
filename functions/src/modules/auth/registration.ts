@@ -51,13 +51,13 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
     }
 
     if (walletAddress) {
-      const taken = await db
-        .collection(Collections.users)
-        .where('walletAddress', '==', walletAddress)
-        .limit(1)
-        .get();
-      if (!taken.empty && taken.docs[0]!.id !== ctx.uid) {
-        throw new AppError('already-exists', 'This wallet is already linked to another account');
+      const { findWalletClaim } = await import('./wallet-ownership');
+      const claim = await findWalletClaim(db, walletAddress, ctx.uid);
+      if (claim) {
+        throw new AppError(
+          'already-exists',
+          'This wallet is already linked to another account or used for a withdrawal',
+        );
       }
     }
 
@@ -66,7 +66,10 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     };
     if (displayName) patch.displayName = displayName.trim();
-    if (walletAddress) patch.walletAddress = walletAddress;
+    if (walletAddress) {
+      patch.walletAddress = walletAddress;
+      patch.withdrawalAddress = walletAddress;
+    }
 
     await ref.update(patch);
 

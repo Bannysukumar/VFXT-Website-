@@ -73,6 +73,14 @@ export function LoginPage() {
     setWalletBusy(true)
     try {
       const res = await loginWithWallet(mode)
+      if (res.kind === 'needs_signup') {
+        toast.message('New wallet — finish signup to link this address')
+        navigate(
+          `/auth/wallet-register?address=${encodeURIComponent(res.address)}`,
+          { replace: true },
+        )
+        return
+      }
       if (res.needsProfile) {
         setNeedsProfile(true)
         toast.message('Complete your profile to finish signup')

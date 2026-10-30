@@ -96,13 +96,50 @@ async function handleCreateWithdrawalRequest(
 
   const { assertBep20Address, sendUsdtBep20 } = await import('../crypto/bsc-usdt');
   const { getHotWalletPublicInfo } = await import('../crypto/hot-wallet');
-  const toAddress = assertBep20Address(destination);
+  const { findWalletClaim, normalizeWalletAddress } = await import(
+    '../auth/wallet-ownership'
+  );
+  const toAddress = normalizeWalletAddress(assertBep20Address(destination));
 
   const db = getDb();
+  const userSnap = await db.collection(Collections.users).doc(ctx.uid).get();
+  const userData = userSnap.data() ?? {};
+  const linkedWallet =
+    typeof userData.walletAddress === 'string'
+      ? normalizeWalletAddress(userData.walletAddress)
+      : null;
+
+  // Destination must be unique across the platform (except this user's own linked wallet).
+  const claim = await findWalletClaim(db, toAddress, ctx.uid);
+  if (claim) {
+    throw new AppError(
+      'already-exists',
+      'This wallet address is already linked to another account. Use a unique address.',
+    );
+  }
+  if (linkedWallet && linkedWallet !== toAddress) {
+    throw new AppError(
+      'failed-precondition',
+      `Withdrawals must go to your linked wallet (${linkedWallet.slice(0, 8)}…).`,
+    );
+  }
+
   await ensureUserWallets(db, ctx.uid);
   const walletId = walletDocId(ctx.uid, 'withdrawal');
   const withdrawalId = uuidv4();
   const resolvedMethod = method || 'usdt_bep20';
+
+  // First withdrawal without a linked wallet → bind this unique address to the account.
+  if (!linkedWallet) {
+    await db.collection(Collections.users).doc(ctx.uid).set(
+      {
+        walletAddress: toAddress,
+        withdrawalAddress: toAddress,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
 
   await db.runTransaction(async (tx) => {
     await reserveFunds(tx, db, {
@@ -202,6 +239,8 @@ async function handleCreateWithdrawalRequest(
       {
         firstWithdrawalCompletedAt: FieldValue.serverTimestamp(),
         lastWithdrawalAddress: toAddress,
+        walletAddress: toAddress,
+        withdrawalAddress: toAddress,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -408,6 +447,20 @@ async function handleCompleteWithdrawal(
     .doc(withdrawalId)
     .get();
   const w = wSnap.data() as WithdrawalRequest;
+  const dest =
+    typeof w.destination === 'string' ? w.destination.toLowerCase() : null;
+  if (dest) {
+    await db.collection(Collections.users).doc(w.userId).set(
+      {
+        firstWithdrawalCompletedAt: FieldValue.serverTimestamp(),
+        lastWithdrawalAddress: dest,
+        walletAddress: dest,
+        withdrawalAddress: dest,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  }
   await createNotification({
     userId: w.userId,
     type: 'withdrawal_completed',
