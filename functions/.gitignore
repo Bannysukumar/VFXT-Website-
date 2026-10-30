@@ -1,5 +1,6 @@
 node_modules/
-lib/
+# Compiled output only (do not ignore src/lib)
+/lib/
 *.local
 .env
 .env.*
