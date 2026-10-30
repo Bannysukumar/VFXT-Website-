@@ -50,7 +50,14 @@ function assertTransition(
 
 async function handleCreateWithdrawalRequest(
   request: CallableRequest,
-): Promise<{ withdrawalId: string; txHash: string | null; status: string }> {
+): Promise<{
+  withdrawalId: string;
+  txHash: string | null;
+  status: string;
+  amountMinor: number;
+  commissionMinor: number;
+  netAmountMinor: number;
+}> {
   const ctx = requireAuth(request);
   gateEmailVerifiedForFinance(ctx);
 
