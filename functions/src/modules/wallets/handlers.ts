@@ -157,10 +157,13 @@ export const transferBetweenWallets = onCall(
       const fromWalletId = walletDocId(ctx.uid, fromKind);
       const toWalletId = walletDocId(ctx.uid, toKind);
 
-      // VFXT → USD routes convert whole tokens to cents.
+      const { getTokenEconomicsSettings } = await import('../platform/store');
+      const tokenFx = await getTokenEconomicsSettings();
+
+      // VFXT → USD routes convert whole tokens to cents at admin token price.
       const creditAmount =
         fromCurrency === 'VFXT' && toCurrency === 'USD'
-          ? vfxtTokensToUsdCents(amountMinor)
+          ? vfxtTokensToUsdCents(amountMinor, tokenFx.tokensPerUsd)
           : amountMinor;
 
       if (creditAmount <= 0) {

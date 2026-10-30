@@ -62,10 +62,25 @@ export interface PlanSettings {
 export interface WithdrawSettings {
   /** Minimum withdrawal amount in USD cents. */
   minWithdrawUsdCents: number;
+  /** Withdrawal fee in basis points (500 = 5%). Deducted from payout; user is debited full amount. */
+  commissionBps: number;
   /** When true, after first successful withdrawal, auto-submit when balance >= min. */
   autoWithdrawEnabled: boolean;
   /** Require saved profile address for auto-withdraw. */
   requireProfileAddress: boolean;
+}
+
+export interface DepositSettings {
+  /** Minimum deposit amount in USD cents. */
+  minDepositUsdCents: number;
+}
+
+export interface TokenEconomicsSettings {
+  /**
+   * Whole VFXT tokens credited per $1 USDT deposited.
+   * Default 10_000 ⇒ $0.0001 per token. Price ≈ 1 / tokensPerUsd USD.
+   */
+  tokensPerUsd: number;
 }
 
 export interface HotWalletPoolSettings {
@@ -77,6 +92,8 @@ export interface PlatformSettings {
   contact: ContactSettings;
   footer: FooterSettings;
   plan: PlanSettings;
+  deposit: DepositSettings;
+  token: TokenEconomicsSettings;
   withdraw: WithdrawSettings;
   hotWalletPool: HotWalletPoolSettings;
   updatedAt?: Timestamp | FieldValue;
@@ -150,8 +167,15 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
       { rank: 9, leftUsd: 100_000, rightUsd: 100_000, rewardUsd: 1_000, cycleDays: 30, enabled: true },
     ],
   },
+  deposit: {
+    minDepositUsdCents: 1_000, // $10
+  },
+  token: {
+    tokensPerUsd: 10_000, // $0.0001 / VFXT
+  },
   withdraw: {
     minWithdrawUsdCents: 1_000, // $10
+    commissionBps: 500, // 5%
     autoWithdrawEnabled: false,
     requireProfileAddress: true,
   },

@@ -6,40 +6,20 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input, NativeSelect, Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
 import { PageHeader } from '@/components/shared/page-header'
 import { LoadingState } from '@/components/shared/loading-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { getAdminPlatformSettings, updatePlatformSettings } from '@/services/admin-service'
 import { cn } from '@/lib/utils'
 
-type TabId = 'contact' | 'footer' | 'plan' | 'withdraw' | 'hotwallet'
+type TabId = 'contact' | 'footer' | 'deposit' | 'hotwallet'
 
 const tabs: { id: TabId; label: string }[] = [
   { id: 'contact', label: 'Contact' },
   { id: 'footer', label: 'Footer' },
-  { id: 'plan', label: 'Plan' },
-  { id: 'withdraw', label: 'Withdraw' },
+  { id: 'deposit', label: 'Deposit / token' },
   { id: 'hotwallet', label: 'Hot wallet pool' },
 ]
-
-interface LockedPackageRow {
-  id: string
-  days: number
-  multiplier: number
-  bonusTokenPct: number
-  label: string
-  enabled: boolean
-}
-
-interface RankRewardRow {
-  rank: number
-  leftUsd: number
-  rightUsd: number
-  rewardUsd: number
-  cycleDays: number
-  enabled: boolean
-}
 
 export function AdminSettingsPage() {
   const queryClient = useQueryClient()
@@ -54,15 +34,9 @@ export function AdminSettingsPage() {
   const [footerTagline, setFooterTagline] = useState('')
   const [footerCopyright, setFooterCopyright] = useState('')
   const [footerColumnsJson, setFooterColumnsJson] = useState('[]')
-  const [minStakeUsdCents, setMinStakeUsdCents] = useState('')
-  const [dailyRateBps, setDailyRateBps] = useState('')
-  const [levelCommissionBps, setLevelCommissionBps] = useState('')
-  const [directReferralBonusBps, setDirectReferralBonusBps] = useState('')
-  const [lockedPackages, setLockedPackages] = useState<LockedPackageRow[]>([])
-  const [rankRewards, setRankRewards] = useState<RankRewardRow[]>([])
-  const [minWithdrawUsdCents, setMinWithdrawUsdCents] = useState('')
-  const [autoWithdrawEnabled, setAutoWithdrawEnabled] = useState(false)
-  const [requireProfileAddress, setRequireProfileAddress] = useState(true)
+  const [minDepositUsdCents, setMinDepositUsdCents] = useState('')
+  const [tokensPerUsd, setTokensPerUsd] = useState('')
+  const [tokenPriceUsd, setTokenPriceUsd] = useState('')
   const [multiWalletEnabled, setMultiWalletEnabled] = useState(false)
 
   useEffect(() => {
@@ -89,20 +63,15 @@ export function AdminSettingsPage() {
       setFooterCopyright(f.copyright ?? '')
       setFooterColumnsJson(JSON.stringify(f.columns ?? [], null, 2))
     }
-    const p = s.plan as Record<string, unknown> | undefined
-    if (p) {
-      setMinStakeUsdCents(String(p.minStakeUsdCents ?? ''))
-      setDailyRateBps(String(p.dailyRateBps ?? ''))
-      setLevelCommissionBps(Array.isArray(p.levelCommissionBps) ? p.levelCommissionBps.join(', ') : '')
-      setDirectReferralBonusBps(String(p.directReferralBonusBps ?? ''))
-      setLockedPackages((p.lockedPackages as LockedPackageRow[]) ?? [])
-      setRankRewards((p.rankRewards as RankRewardRow[]) ?? [])
+    const d = s.deposit as Record<string, unknown> | undefined
+    if (d) {
+      setMinDepositUsdCents(String(d.minDepositUsdCents ?? ''))
     }
-    const w = s.withdraw as Record<string, unknown> | undefined
-    if (w) {
-      setMinWithdrawUsdCents(String(w.minWithdrawUsdCents ?? ''))
-      setAutoWithdrawEnabled(Boolean(w.autoWithdrawEnabled))
-      setRequireProfileAddress(w.requireProfileAddress !== false)
+    const t = s.token as Record<string, unknown> | undefined
+    if (t) {
+      const per = Number(t.tokensPerUsd ?? 10_000)
+      setTokensPerUsd(String(per))
+      setTokenPriceUsd(per > 0 ? String(1 / per) : '')
     }
     const h = s.hotWalletPool as { multiWalletEnabled?: boolean } | undefined
     if (h) setMultiWalletEnabled(Boolean(h.multiWalletEnabled))
@@ -129,35 +98,25 @@ export function AdminSettingsPage() {
       toast.error('Footer columns must be valid JSON')
     }
   }
-  const savePlan = () => {
-    const bps = levelCommissionBps
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean)
-      .map((s) => Number.parseInt(s, 10))
-    if (bps.some((n) => !Number.isFinite(n))) {
-      toast.error('Level commission bps must be comma-separated integers')
+  const saveDepositToken = () => {
+    let per = Number.parseInt(tokensPerUsd, 10)
+    const price = Number.parseFloat(tokenPriceUsd)
+    if (Number.isFinite(price) && price > 0) {
+      per = Math.max(1, Math.round(1 / price))
+    }
+    if (!Number.isFinite(per) || per <= 0) {
+      toast.error('Set a valid token price or VFXT per $1')
       return
     }
     save.mutate({
-      plan: {
-        minStakeUsdCents: Number.parseInt(minStakeUsdCents, 10),
-        dailyRateBps: Number.parseInt(dailyRateBps, 10),
-        levelCommissionBps: bps,
-        directReferralBonusBps: Number.parseInt(directReferralBonusBps, 10),
-        lockedPackages,
-        rankRewards,
+      deposit: {
+        minDepositUsdCents: Number.parseInt(minDepositUsdCents, 10),
+      },
+      token: {
+        tokensPerUsd: per,
       },
     })
   }
-  const saveWithdraw = () =>
-    save.mutate({
-      withdraw: {
-        minWithdrawUsdCents: Number.parseInt(minWithdrawUsdCents, 10),
-        autoWithdrawEnabled,
-        requireProfileAddress,
-      },
-    })
   const saveHotWallet = () => save.mutate({ hotWalletPool: { multiWalletEnabled } })
 
   if (settings.isLoading) return <LoadingState />
@@ -170,7 +129,7 @@ export function AdminSettingsPage() {
       <PageHeader
         eyebrow="Console"
         title="Platform settings"
-        description="Contact details, footer content, plan economics, withdrawals, and hot wallet pool."
+        description="Contact details, footer content, deposit / token price, and hot wallet pool. Plan and Withdraw are separate menu pages."
       />
 
       <div className="flex flex-wrap gap-2">
@@ -263,240 +222,63 @@ export function AdminSettingsPage() {
         </Card>
       ) : null}
 
-      {tab === 'plan' ? (
-        <div className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="font-sans text-lg">Plan core</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Min stake (USD cents)</Label>
-                <Input value={minStakeUsdCents} onChange={(e) => setMinStakeUsdCents(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Daily rate (bps)</Label>
-                <Input value={dailyRateBps} onChange={(e) => setDailyRateBps(e.target.value)} />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>Level commission bps (comma-separated)</Label>
-                <Input value={levelCommissionBps} onChange={(e) => setLevelCommissionBps(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label>Direct referral bonus (bps)</Label>
-                <Input value={directReferralBonusBps} onChange={(e) => setDirectReferralBonusBps(e.target.value)} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle className="font-sans text-lg">Locked packages</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>Label</TH>
-                    <TH>Days</TH>
-                    <TH>Mult.</TH>
-                    <TH>Bonus %</TH>
-                    <TH>Enabled</TH>
-                  </tr>
-                </THead>
-                <TBody>
-                  {lockedPackages.map((row, i) => (
-                    <TR key={row.id}>
-                      <TD>
-                        <Input
-                          className="h-9 min-w-32"
-                          value={row.label}
-                          onChange={(e) => {
-                            const next = [...lockedPackages]
-                            next[i] = { ...row, label: e.target.value }
-                            setLockedPackages(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-20"
-                          value={row.days}
-                          onChange={(e) => {
-                            const next = [...lockedPackages]
-                            next[i] = { ...row, days: Number(e.target.value) }
-                            setLockedPackages(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-20"
-                          value={row.multiplier}
-                          onChange={(e) => {
-                            const next = [...lockedPackages]
-                            next[i] = { ...row, multiplier: Number(e.target.value) }
-                            setLockedPackages(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-20"
-                          value={row.bonusTokenPct}
-                          onChange={(e) => {
-                            const next = [...lockedPackages]
-                            next[i] = { ...row, bonusTokenPct: Number(e.target.value) }
-                            setLockedPackages(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <NativeSelect
-                          className="h-9"
-                          value={row.enabled ? '1' : '0'}
-                          onChange={(e) => {
-                            const next = [...lockedPackages]
-                            next[i] = { ...row, enabled: e.target.value === '1' }
-                            setLockedPackages(next)
-                          }}
-                        >
-                          <option value="1">Yes</option>
-                          <option value="0">No</option>
-                        </NativeSelect>
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <CardHeader>
-              <CardTitle className="font-sans text-lg">Rank rewards</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>Rank</TH>
-                    <TH>Left USD</TH>
-                    <TH>Right USD</TH>
-                    <TH>Reward USD</TH>
-                    <TH>Cycle days</TH>
-                    <TH>Enabled</TH>
-                  </tr>
-                </THead>
-                <TBody>
-                  {rankRewards.map((row, i) => (
-                    <TR key={row.rank}>
-                      <TD className="tabular">{row.rank}</TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-24"
-                          value={row.leftUsd}
-                          onChange={(e) => {
-                            const next = [...rankRewards]
-                            next[i] = { ...row, leftUsd: Number(e.target.value) }
-                            setRankRewards(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-24"
-                          value={row.rightUsd}
-                          onChange={(e) => {
-                            const next = [...rankRewards]
-                            next[i] = { ...row, rightUsd: Number(e.target.value) }
-                            setRankRewards(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-24"
-                          value={row.rewardUsd}
-                          onChange={(e) => {
-                            const next = [...rankRewards]
-                            next[i] = { ...row, rewardUsd: Number(e.target.value) }
-                            setRankRewards(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <Input
-                          className="h-9 w-20"
-                          value={row.cycleDays}
-                          onChange={(e) => {
-                            const next = [...rankRewards]
-                            next[i] = { ...row, cycleDays: Number(e.target.value) }
-                            setRankRewards(next)
-                          }}
-                        />
-                      </TD>
-                      <TD>
-                        <NativeSelect
-                          className="h-9"
-                          value={row.enabled ? '1' : '0'}
-                          onChange={(e) => {
-                            const next = [...rankRewards]
-                            next[i] = { ...row, enabled: e.target.value === '1' }
-                            setRankRewards(next)
-                          }}
-                        >
-                          <option value="1">Yes</option>
-                          <option value="0">No</option>
-                        </NativeSelect>
-                      </TD>
-                    </TR>
-                  ))}
-                </TBody>
-              </Table>
-            </CardContent>
-          </Card>
-
-          <Button onClick={savePlan} disabled={save.isPending}>
-            <Save className="size-4" />
-            Save plan
-          </Button>
-        </div>
-      ) : null}
-
-      {tab === 'withdraw' ? (
+      {tab === 'deposit' ? (
         <Card>
           <CardHeader>
-            <CardTitle className="font-sans text-lg">Withdrawals</CardTitle>
+            <CardTitle className="font-sans text-lg">Deposit &amp; token price</CardTitle>
+            <CardDescription>
+              Successful USDT deposits credit Fund Wallet (USD for staking) and VFXT tokens at your
+              rate.
+            </CardDescription>
           </CardHeader>
           <CardContent className="grid max-w-md gap-4">
             <div className="space-y-2">
-              <Label>Min withdraw (USD cents)</Label>
-              <Input value={minWithdrawUsdCents} onChange={(e) => setMinWithdrawUsdCents(e.target.value)} />
+              <Label>Min deposit (USD cents)</Label>
+              <Input
+                value={minDepositUsdCents}
+                onChange={(e) => setMinDepositUsdCents(e.target.value)}
+                placeholder="1000 = $10"
+              />
+              <p className="text-xs text-ink-muted">
+                ${(Number(minDepositUsdCents || 0) / 100).toFixed(2)} minimum
+              </p>
             </div>
             <div className="space-y-2">
-              <Label>Auto-withdraw enabled</Label>
-              <NativeSelect
-                value={autoWithdrawEnabled ? '1' : '0'}
-                onChange={(e) => setAutoWithdrawEnabled(e.target.value === '1')}
-              >
-                <option value="0">No</option>
-                <option value="1">Yes</option>
-              </NativeSelect>
+              <Label>Token price (USD per 1 VFXT)</Label>
+              <Input
+                value={tokenPriceUsd}
+                onChange={(e) => {
+                  setTokenPriceUsd(e.target.value)
+                  const p = Number.parseFloat(e.target.value)
+                  if (Number.isFinite(p) && p > 0) {
+                    setTokensPerUsd(String(Math.max(1, Math.round(1 / p))))
+                  }
+                }}
+                placeholder="0.0001"
+              />
             </div>
             <div className="space-y-2">
-              <Label>Require profile address</Label>
-              <NativeSelect
-                value={requireProfileAddress ? '1' : '0'}
-                onChange={(e) => setRequireProfileAddress(e.target.value === '1')}
-              >
-                <option value="1">Yes</option>
-                <option value="0">No</option>
-              </NativeSelect>
+              <Label>VFXT tokens per $1 USDT</Label>
+              <Input
+                value={tokensPerUsd}
+                onChange={(e) => {
+                  setTokensPerUsd(e.target.value)
+                  const n = Number.parseInt(e.target.value, 10)
+                  if (Number.isFinite(n) && n > 0) setTokenPriceUsd(String(1 / n))
+                }}
+                placeholder="10000"
+              />
+              <p className="text-xs text-ink-muted">
+                Example: $100 deposit →{' '}
+                {Number.isFinite(Number(tokensPerUsd))
+                  ? (100 * Number(tokensPerUsd)).toLocaleString()
+                  : '—'}{' '}
+                VFXT
+              </p>
             </div>
-            <Button onClick={saveWithdraw} disabled={save.isPending}>
+            <Button onClick={saveDepositToken} disabled={save.isPending}>
               <Save className="size-4" />
-              Save withdraw settings
+              Save deposit / token settings
             </Button>
           </CardContent>
         </Card>

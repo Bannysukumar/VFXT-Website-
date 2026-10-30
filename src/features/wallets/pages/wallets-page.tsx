@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { toast } from 'sonner'
+import { ChevronRight } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LoadingState } from '@/components/shared/loading-state'
@@ -59,7 +60,8 @@ export function WalletsPage() {
         <div>
           <h1 className="text-4xl">Wallets</h1>
           <p className="text-ink-muted">
-            Fund, staking, daily ROI, level income, direct referral, withdrawal, and VFXT.
+            Tap a wallet to open its history. Fund, staking, daily ROI, level income, direct
+            referral, withdrawal, and VFXT.
           </p>
         </div>
         <div className="flex gap-2">
@@ -82,34 +84,44 @@ export function WalletsPage() {
             wallets.find((w) => w.id.endsWith(`_${kind}`))
           const scale = wallet?.scale ?? (meta.currency === 'VFXT' ? 0 : 2)
           return (
-            <Card key={kind}>
-              <CardHeader>
-                <CardDescription>{meta.label}</CardDescription>
-                <CardTitle className="font-sans text-2xl">
-                  {wallet
-                    ? formatMinor(wallet.availableMinor, {
+            <Link
+              key={kind}
+              to={`/app/wallets/${kind}/history`}
+              className="group block no-underline outline-none"
+            >
+              <Card className="h-full transition-colors group-hover:border-brand/40 group-hover:bg-panel-elevated group-focus-visible:ring-2 group-focus-visible:ring-brand">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2">
+                    <CardDescription>{meta.label}</CardDescription>
+                    <ChevronRight className="size-4 text-ink-subtle transition-transform group-hover:translate-x-0.5 group-hover:text-ink" />
+                  </div>
+                  <CardTitle className="font-sans text-2xl">
+                    {wallet
+                      ? formatMinor(wallet.availableMinor, {
+                          scale,
+                          currency: meta.currency === 'USD' ? 'USD' : undefined,
+                        })
+                      : '—'}
+                    {meta.currency === 'VFXT' && wallet ? ' VFXT' : ''}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-1 text-sm text-ink-muted">
+                  <p>{meta.description}</p>
+                  {wallet ? (
+                    <p>
+                      Reserved{' '}
+                      {formatMinor(wallet.reservedMinor, {
                         scale,
                         currency: meta.currency === 'USD' ? 'USD' : undefined,
-                      })
-                    : '—'}
-                  {meta.currency === 'VFXT' && wallet ? ' VFXT' : ''}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-sm text-ink-muted">
-                <p>{meta.description}</p>
-                {wallet ? (
-                  <p>
-                    Reserved{' '}
-                    {formatMinor(wallet.reservedMinor, {
-                      scale,
-                      currency: meta.currency === 'USD' ? 'USD' : undefined,
-                    })}
-                  </p>
-                ) : (
-                  <p>Not provisioned yet — tap Sync wallets.</p>
-                )}
-              </CardContent>
-            </Card>
+                      })}
+                    </p>
+                  ) : (
+                    <p>Not provisioned yet — tap Sync wallets.</p>
+                  )}
+                  <p className="pt-1 text-xs font-medium text-brand">View history →</p>
+                </CardContent>
+              </Card>
+            </Link>
           )
         })}
       </div>

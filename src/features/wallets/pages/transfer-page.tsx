@@ -50,6 +50,7 @@ export function TransferPage() {
       toast.success('Transfer completed')
       form.reset({ route: form.getValues('route'), amount: '' })
       await queryClient.invalidateQueries({ queryKey: ['wallets'] })
+      await queryClient.invalidateQueries({ queryKey: ['ledger'] })
     },
     onError: (e: Error) => toast.error(e.message),
   })

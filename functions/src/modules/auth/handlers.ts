@@ -32,6 +32,8 @@ export const onUserCreated = functionsV1
       email: user.email ?? null,
       displayName: user.displayName ?? null,
       photoURL: user.photoURL ?? null,
+      mobile: null,
+      walletAddress: null,
       timezone: null,
       locale: null,
       preferences: {},

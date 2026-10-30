@@ -46,12 +46,27 @@ export function ReferralsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardDescription>Your referral code</CardDescription>
-            <CardTitle className="font-mono text-2xl">{data.referralCode || '—'}</CardTitle>
+            <CardDescription>Your unique referral link</CardDescription>
+            <CardTitle className="font-mono text-lg break-all">
+              {data.referralCode
+                ? `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/register?ref=${data.referralCode}`
+                : '—'}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-wrap gap-2">
             <Button
               variant="secondary"
+              size="sm"
+              onClick={async () => {
+                const link = `${window.location.origin}/auth/register?ref=${data.referralCode}`
+                await navigator.clipboard.writeText(link)
+                toast.success('Referral link copied')
+              }}
+            >
+              Copy link
+            </Button>
+            <Button
+              variant="outline"
               size="sm"
               onClick={async () => {
                 await navigator.clipboard.writeText(data.referralCode)
@@ -84,7 +99,10 @@ export function ReferralsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-sans text-lg">Apply a sponsor code</CardTitle>
-          <CardDescription>Only if you are not already referred. Binary placement is server-side.</CardDescription>
+          <CardDescription>
+            New signups must enter a referral on register. Use this only if your account was created
+            without a sponsor (legacy). Binary placement is server-side.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row">
           <Input

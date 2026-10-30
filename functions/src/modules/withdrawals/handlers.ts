@@ -67,11 +67,23 @@ async function handleCreateWithdrawalRequest(
   assertPositiveMinor(amountMinor);
 
   const { getWithdrawSettings } = await import('../platform/store');
+  const { splitWithdrawalCommission } = await import('../../config/plan');
   const withdrawSettings = await getWithdrawSettings();
   if (amountMinor < withdrawSettings.minWithdrawUsdCents) {
     throw new AppError(
       'invalid-argument',
       `Minimum withdrawal is $${(withdrawSettings.minWithdrawUsdCents / 100).toFixed(2)}`,
+    );
+  }
+
+  const { commissionMinor, netMinor } = splitWithdrawalCommission(
+    amountMinor,
+    withdrawSettings.commissionBps,
+  );
+  if (netMinor <= 0) {
+    throw new AppError(
+      'invalid-argument',
+      'Withdrawal amount too small after commission',
     );
   }
 
@@ -96,7 +108,13 @@ async function handleCreateWithdrawalRequest(
       referenceId: withdrawalId,
       description: `Withdrawal reserved (${resolvedMethod})`,
       createdBy: ctx.uid,
-      metadata: { destination: toAddress, method: resolvedMethod },
+      metadata: {
+        destination: toAddress,
+        method: resolvedMethod,
+        commissionMinor,
+        netMinor,
+        commissionBps: withdrawSettings.commissionBps,
+      },
     });
 
     const doc: WithdrawalRequest = {
@@ -105,6 +123,9 @@ async function handleCreateWithdrawalRequest(
       walletId,
       currency,
       amountMinor,
+      commissionMinor,
+      netAmountMinor: netMinor,
+      commissionBps: withdrawSettings.commissionBps,
       status: 'processing',
       destination: toAddress,
       method: resolvedMethod,
@@ -125,13 +146,20 @@ async function handleCreateWithdrawalRequest(
       updatedAt: FieldValue.serverTimestamp(),
     });
     log.info('withdrawal_queued_manual', { withdrawalId, uid: ctx.uid });
-    return { withdrawalId, txHash: null, status: 'pending' };
+    return {
+      withdrawalId,
+      txHash: null,
+      status: 'pending',
+      amountMinor,
+      commissionMinor,
+      netAmountMinor: netMinor,
+    };
   }
 
   try {
     const { txHash } = await sendUsdtBep20({
       to: toAddress,
-      amountUsdCents: amountMinor,
+      amountUsdCents: netMinor,
     });
 
     await db.runTransaction(async (tx) => {
@@ -143,9 +171,15 @@ async function handleCreateWithdrawalRequest(
         currency,
         referenceType: 'withdrawal',
         referenceId: withdrawalId,
-        description: `USDT BEP-20 sent ${txHash.slice(0, 10)}…`,
+        description: `USDT BEP-20 sent ${txHash.slice(0, 10)}… (fee $${(commissionMinor / 100).toFixed(2)})`,
         createdBy: 'system:crypto-withdraw',
-        metadata: { txHash, destination: toAddress },
+        metadata: {
+          txHash,
+          destination: toAddress,
+          commissionMinor,
+          netMinor,
+          commissionBps: withdrawSettings.commissionBps,
+        },
       });
       tx.update(db.collection(Collections.withdrawals).doc(withdrawalId), {
         status: 'completed',
@@ -170,12 +204,28 @@ async function handleCreateWithdrawalRequest(
       userId: ctx.uid,
       type: 'withdrawal_completed',
       title: 'Withdrawal sent',
-      body: 'Your USDT (BEP-20) withdrawal was broadcast on BSC.',
-      data: { withdrawalId, txHash },
+      body:
+        commissionMinor > 0
+          ? `Sent $${(netMinor / 100).toFixed(2)} USDT (fee $${(commissionMinor / 100).toFixed(2)}).`
+          : 'Your USDT (BEP-20) withdrawal was broadcast on BSC.',
+      data: { withdrawalId, txHash, commissionMinor, netMinor },
     });
 
-    log.info('withdrawal_auto_sent', { withdrawalId, txHash, uid: ctx.uid });
-    return { withdrawalId, txHash, status: 'completed' };
+    log.info('withdrawal_auto_sent', {
+      withdrawalId,
+      txHash,
+      uid: ctx.uid,
+      commissionMinor,
+      netMinor,
+    });
+    return {
+      withdrawalId,
+      txHash,
+      status: 'completed',
+      amountMinor,
+      commissionMinor,
+      netAmountMinor: netMinor,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Transfer failed';
     await db.runTransaction(async (tx) => {

@@ -79,9 +79,21 @@ const platformPatchSchema = z
           .optional(),
       })
       .optional(),
+    deposit: z
+      .object({
+        minDepositUsdCents: z.number().int().positive().optional(),
+      })
+      .optional(),
+    token: z
+      .object({
+        /** Whole VFXT per $1 USDT. */
+        tokensPerUsd: z.number().int().positive().max(1_000_000_000).optional(),
+      })
+      .optional(),
     withdraw: z
       .object({
         minWithdrawUsdCents: z.number().int().positive().optional(),
+        commissionBps: z.number().int().min(0).max(10_000).optional(),
         autoWithdrawEnabled: z.boolean().optional(),
         requireProfileAddress: z.boolean().optional(),
       })
@@ -101,8 +113,17 @@ export const getPublicPlatformSettings = onCall(CALLABLE_OPTS, async () => {
     return {
       contact: s.contact,
       footer: s.footer,
+      deposit: {
+        minDepositUsdCents: s.deposit.minDepositUsdCents,
+      },
+      token: {
+        tokensPerUsd: s.token.tokensPerUsd,
+        /** Convenience: USD price of 1 VFXT. */
+        priceUsd: 1 / s.token.tokensPerUsd,
+      },
       withdraw: {
         minWithdrawUsdCents: s.withdraw.minWithdrawUsdCents,
+        commissionBps: s.withdraw.commissionBps,
         autoWithdrawEnabled: s.withdraw.autoWithdrawEnabled,
       },
       plan: s.plan,

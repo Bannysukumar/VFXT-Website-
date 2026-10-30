@@ -64,6 +64,12 @@ export const processAutoWithdrawals = onSchedule(
 
         const toAddress = assertBep20Address(destination);
         const amountMinor = available; // sweep available balance (already >= min)
+        const { splitWithdrawalCommission } = await import('../../config/plan');
+        const { commissionMinor, netMinor } = splitWithdrawalCommission(
+          amountMinor,
+          settings.commissionBps,
+        );
+        if (netMinor <= 0) continue;
         const withdrawalId = uuidv4();
 
         await db.runTransaction(async (tx) => {
@@ -77,7 +83,13 @@ export const processAutoWithdrawals = onSchedule(
             referenceId: withdrawalId,
             description: 'Auto-withdrawal reserved',
             createdBy: 'system:auto-withdraw',
-            metadata: { destination: toAddress, auto: true },
+            metadata: {
+              destination: toAddress,
+              auto: true,
+              commissionMinor,
+              netMinor,
+              commissionBps: settings.commissionBps,
+            },
           });
           const doc: WithdrawalRequest = {
             withdrawalId,
@@ -85,6 +97,9 @@ export const processAutoWithdrawals = onSchedule(
             walletId,
             currency: 'USD',
             amountMinor,
+            commissionMinor,
+            netAmountMinor: netMinor,
+            commissionBps: settings.commissionBps,
             status: 'processing',
             destination: toAddress,
             method: 'usdt_bep20',
@@ -101,7 +116,7 @@ export const processAutoWithdrawals = onSchedule(
         try {
           const { txHash } = await sendUsdtBep20({
             to: toAddress,
-            amountUsdCents: amountMinor,
+            amountUsdCents: netMinor,
           });
           await db.runTransaction(async (tx) => {
             await debitReserved(tx, db, {
@@ -114,7 +129,13 @@ export const processAutoWithdrawals = onSchedule(
               referenceId: withdrawalId,
               description: `Auto USDT send ${txHash.slice(0, 10)}…`,
               createdBy: 'system:auto-withdraw',
-              metadata: { txHash, destination: toAddress, auto: true },
+              metadata: {
+                txHash,
+                destination: toAddress,
+                auto: true,
+                commissionMinor,
+                netMinor,
+              },
             });
             tx.update(db.collection(Collections.withdrawals).doc(withdrawalId), {
               status: 'completed',
@@ -127,10 +148,20 @@ export const processAutoWithdrawals = onSchedule(
             userId: uid,
             type: 'withdrawal_completed',
             title: 'Auto-withdrawal sent',
-            body: 'Your withdrawal wallet reached the minimum and was paid out automatically.',
-            data: { withdrawalId, txHash },
+            body:
+              commissionMinor > 0
+                ? `Sent $${(netMinor / 100).toFixed(2)} USDT (fee $${(commissionMinor / 100).toFixed(2)}).`
+                : 'Your withdrawal wallet reached the minimum and was paid out automatically.',
+            data: { withdrawalId, txHash, commissionMinor, netMinor },
           });
-          log.info('auto_withdrawal_sent', { uid, withdrawalId, txHash, amountMinor });
+          log.info('auto_withdrawal_sent', {
+            uid,
+            withdrawalId,
+            txHash,
+            amountMinor,
+            commissionMinor,
+            netMinor,
+          });
         } catch (err) {
           const { releaseReserved } = await import('../wallets/ledger');
           const message = err instanceof Error ? err.message : 'Auto-withdraw failed';

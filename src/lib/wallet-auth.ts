@@ -1,0 +1,127 @@
+import { callFunction } from '@/services/api'
+import { getFirebaseAuth, isFirebaseReady } from '@/lib/firebase'
+import { signInWithCustomToken } from 'firebase/auth'
+import { env } from '@/lib/env'
+
+type EthereumProvider = {
+  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>
+  enable?: () => Promise<string[]>
+}
+
+declare global {
+  interface Window {
+    ethereum?: EthereumProvider
+  }
+}
+
+async function getInjectedProvider(): Promise<EthereumProvider> {
+  if (typeof window === 'undefined' || !window.ethereum) {
+    throw new Error('No wallet found. Install MetaMask, Trust, or open in a Web3 browser.')
+  }
+  return window.ethereum
+}
+
+async function connectInjected(): Promise<string> {
+  const eth = await getInjectedProvider()
+  const accounts = (await eth.request({ method: 'eth_requestAccounts' })) as string[]
+  const address = accounts[0]
+  if (!address) throw new Error('No account returned from wallet')
+  return address
+}
+
+/**
+ * WalletConnect v2 via EthereumProvider when project id is configured.
+ * Falls back to injected browser wallets.
+ */
+async function connectWalletConnect(): Promise<{ address: string; provider: EthereumProvider }> {
+  const projectId = (import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined)?.trim()
+  if (!projectId) {
+    // Fall back to injected (MetaMask / Trust in-app / WalletConnect-enabled browsers)
+    const address = await connectInjected()
+    return { address, provider: await getInjectedProvider() }
+  }
+
+  try {
+    const { EthereumProvider } = await import('@walletconnect/ethereum-provider')
+    const provider = await EthereumProvider.init({
+      projectId,
+      showQrModal: true,
+      chains: [56],
+      optionalChains: [1, 56],
+      methods: ['eth_sendTransaction', 'personal_sign'],
+      events: ['chainChanged', 'accountsChanged'],
+      metadata: {
+        name: 'Virtual FX Trades',
+        description: 'VFXT platform login',
+        url: typeof window !== 'undefined' ? window.location.origin : 'https://virtualfxtrades.com',
+        icons: [`${typeof window !== 'undefined' ? window.location.origin : ''}/favicon.svg`],
+      },
+    })
+    await provider.enable()
+    const accounts = provider.accounts
+    const address = accounts[0]
+    if (!address) throw new Error('No account from WalletConnect')
+    return {
+      address,
+      provider: {
+        request: (args) => provider.request(args) as Promise<unknown>,
+      },
+    }
+  } catch (err) {
+    // If WC fails (missing package / modal), try injected
+    if (window.ethereum) {
+      const address = await connectInjected()
+      return { address, provider: await getInjectedProvider() }
+    }
+    throw err instanceof Error ? err : new Error('WalletConnect failed')
+  }
+}
+
+export async function loginWithWallet(mode: 'injected' | 'walletconnect' = 'injected'): Promise<{
+  needsProfile: boolean
+  isNewUser: boolean
+  address: string
+}> {
+  if (!isFirebaseReady()) {
+    throw new Error('Firebase is not configured')
+  }
+
+  const { address, provider } =
+    mode === 'walletconnect'
+      ? await connectWalletConnect()
+      : { address: await connectInjected(), provider: await getInjectedProvider() }
+
+  const challenge = await callFunction<
+    { address: string },
+    { nonce: string; message: string; address: string }
+  >('getWalletLoginNonce', { address })
+
+  const signature = (await provider.request({
+    method: 'personal_sign',
+    params: [challenge.message, address],
+  })) as string
+
+  const result = await callFunction<
+    { address: string; signature: string },
+    {
+      customToken: string
+      uid: string
+      address: string
+      isNewUser: boolean
+      needsProfile: boolean
+    }
+  >('verifyWalletLogin', { address, signature })
+
+  await signInWithCustomToken(getFirebaseAuth(), result.customToken)
+  return {
+    needsProfile: result.needsProfile,
+    isNewUser: result.isNewUser,
+    address: result.address,
+  }
+}
+
+export function walletConnectConfigured(): boolean {
+  return Boolean((import.meta.env.VITE_WALLETCONNECT_PROJECT_ID as string | undefined)?.trim())
+}
+
+void env

@@ -36,14 +36,23 @@ export async function fetchUserWallets(userId: string): Promise<WalletAccount[]>
   })
 }
 
-export async function fetchUserLedger(userId: string, pageSize = 50): Promise<LedgerEntry[]> {
+export function walletDocId(userId: string, kind: string): string {
+  return `${userId}_${kind}`
+}
+
+export async function fetchUserLedger(
+  userId: string,
+  pageSize = 50,
+  options?: { walletId?: string },
+): Promise<LedgerEntry[]> {
   if (!isFirebaseReady()) return []
-  const q = query(
-    collection(getDb(), 'ledger'),
+  const constraints = [
     where('userId', '==', userId),
+    ...(options?.walletId ? [where('walletId', '==', options.walletId)] : []),
     orderBy('createdAt', 'desc'),
     limit(pageSize),
-  )
+  ]
+  const q = query(collection(getDb(), 'ledger'), ...constraints)
   const snap = await getDocs(q)
   return snap.docs.map((doc) => {
     const data = doc.data()
@@ -52,11 +61,13 @@ export async function fetchUserLedger(userId: string, pageSize = 50): Promise<Le
       userId: data.userId,
       walletId: data.walletId,
       type: data.type,
+      direction: data.direction,
       amountMinor: Number(data.amountMinor ?? 0),
       balanceAfterAvailableMinor: Number(data.balanceAfterAvailableMinor ?? 0),
       balanceAfterReservedMinor: Number(data.balanceAfterReservedMinor ?? 0),
       currency: data.currency,
-      status: data.status,
+      status: data.status ?? 'completed',
+      description: data.description,
       idempotencyKey: data.idempotencyKey,
       referenceType: data.referenceType,
       referenceId: data.referenceId,

@@ -10,6 +10,7 @@ import { AboutPage } from '@/features/marketing/about-page'
 import { TokenPublicPage } from '@/features/token/pages/token-public-page'
 import { DashboardPage } from '@/features/dashboard/pages/dashboard-page'
 import { WalletsPage } from '@/features/wallets/pages/wallets-page'
+import { WalletHistoryPage } from '@/features/wallets/pages/wallet-history-page'
 import { DepositsPage } from '@/features/deposits/pages/deposits-page'
 import { WithdrawalsPage } from '@/features/withdrawals/pages/withdrawals-page'
 import { ReferralsPage } from '@/features/referrals/pages/referrals-page'
@@ -27,6 +28,11 @@ import { AdminStakingPage } from '@/features/admin/pages/admin-staking-page'
 import { AdminAffiliatesPage } from '@/features/admin/pages/admin-affiliates-page'
 import { AdminCryptoWalletPage } from '@/features/admin/pages/admin-crypto-wallet-page'
 import { AdminSettingsPage } from '@/features/admin/pages/admin-settings-page'
+import { AdminPlanPage } from '@/features/admin/pages/admin-plan-page'
+import { AdminWithdrawSettingsPage } from '@/features/admin/pages/admin-withdraw-settings-page'
+import { AdminAutoDepositsPage } from '@/features/admin/pages/admin-auto-deposits-page'
+import { AdminAutoWithdrawalsPage } from '@/features/admin/pages/admin-auto-withdrawals-page'
+import { AdminIncomePage } from '@/features/admin/pages/admin-income-page'
 import { ProfilePage } from '@/features/profile/pages/profile-page'
 import { TokenPublicPage as AppTokenPage } from '@/features/token/pages/token-public-page'
 import { SupportPublicPage } from '@/features/marketing/support-public-page'
@@ -62,6 +68,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <DashboardPage /> },
           { path: 'wallets', element: <WalletsPage /> },
+          { path: 'wallets/:kind/history', element: <WalletHistoryPage /> },
           { path: 'deposits', element: <DepositsPage /> },
           { path: 'withdrawals', element: <WithdrawalsPage /> },
           { path: 'transfer', element: <TransferPage /> },
@@ -84,7 +91,10 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminDashboardPage /> },
           { path: 'deposits', element: <AdminDepositsPage /> },
+          { path: 'auto-deposits', element: <AdminAutoDepositsPage /> },
           { path: 'withdrawals', element: <AdminWithdrawalsPage /> },
+          { path: 'auto-withdrawals', element: <AdminAutoWithdrawalsPage /> },
+          { path: 'income/:incomeType', element: <AdminIncomePage /> },
           { path: 'staking', element: <AdminStakingPage /> },
           { path: 'crypto-wallet', element: <AdminCryptoWalletPage /> },
           { path: 'users', element: <AdminUsersPage /> },
@@ -92,6 +102,8 @@ export const router = createBrowserRouter([
           { path: 'tickets', element: <AdminTicketsPage /> },
           { path: 'audit', element: <AdminAuditPage /> },
           { path: 'settings', element: <AdminSettingsPage /> },
+          { path: 'plan', element: <AdminPlanPage /> },
+          { path: 'withdraw', element: <AdminWithdrawSettingsPage /> },
         ],
       },
     ],

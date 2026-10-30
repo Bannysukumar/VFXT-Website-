@@ -17,6 +17,10 @@ export interface UserProfile {
   email: string | null;
   displayName: string | null;
   photoURL: string | null;
+  /** E.164-ish mobile number collected at registration. */
+  mobile: string | null;
+  /** Optional BEP-20 wallet linked at signup or wallet-login. */
+  walletAddress: string | null;
   timezone: string | null;
   locale: string | null;
   preferences: Record<string, unknown>;
@@ -143,7 +147,14 @@ export interface WithdrawalRequest {
   userId: string;
   walletId: string;
   currency: WalletCurrency;
+  /** Gross amount debited from the user wallet (USD cents). */
   amountMinor: number;
+  /** Fee kept by platform (USD cents). */
+  commissionMinor?: number;
+  /** Net USDT sent on-chain (USD cents). */
+  netAmountMinor?: number;
+  /** Fee rate applied (basis points). */
+  commissionBps?: number;
   status: WithdrawalStatus;
   destination: string;
   method: string;

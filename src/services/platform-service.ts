@@ -32,8 +32,16 @@ export interface FooterSettings {
 export interface PublicPlatformSettings {
   contact: ContactSettings
   footer: FooterSettings
+  deposit: {
+    minDepositUsdCents: number
+  }
+  token: {
+    tokensPerUsd: number
+    priceUsd: number
+  }
   withdraw: {
     minWithdrawUsdCents: number
+    commissionBps: number
     autoWithdrawEnabled: boolean
   }
   plan: Record<string, unknown>

@@ -83,9 +83,21 @@ export const WALLET_META: Record<
   },
 }
 
-/** USD cents → whole VFXT tokens ($0.0001 each). */
-export function usdCentsToVfxtTokens(cents: number): number {
-  return cents * 100
+/** Default VFXT per $1 (overridden by platform.token.tokensPerUsd). */
+export const DEFAULT_VFXT_PER_USD = 10_000
+
+/** USD cents → whole VFXT tokens. */
+export function usdCentsToVfxtTokens(cents: number, tokensPerUsd = DEFAULT_VFXT_PER_USD): number {
+  return Math.floor((cents * tokensPerUsd) / 100)
+}
+
+export function splitWithdrawalCommission(
+  amountMinor: number,
+  commissionBps: number,
+): { commissionMinor: number; netMinor: number } {
+  const bps = Math.max(0, Math.min(10_000, Math.floor(commissionBps)))
+  const commissionMinor = Math.floor((amountMinor * bps) / 10_000)
+  return { commissionMinor, netMinor: amountMinor - commissionMinor }
 }
 
 export function dailyYieldCents(principalCents: number): number {

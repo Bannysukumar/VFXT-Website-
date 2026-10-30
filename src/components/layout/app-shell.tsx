@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import type { LucideIcon } from 'lucide-react'
@@ -27,6 +27,19 @@ import {
   KeyRound,
   Settings,
   UserCircle,
+  Landmark,
+  History,
+  Layers,
+  BadgePercent,
+  Gift,
+  LineChart,
+  Lock,
+  Banknote,
+  SlidersHorizontal,
+  Network,
+  ClipboardList,
+  Zap,
+  CircleDollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -53,21 +66,41 @@ interface NavItem {
   disabled?: boolean
 }
 
+interface NavSection {
+  title: string
+  items: NavItem[]
+  /** When true, section starts collapsed unless a child route is active */
+  collapsible?: boolean
+}
+
 const IMPERSONATOR_KEY = 'vfxt_impersonator'
 
-const userNav: { title: string; items: NavItem[] }[] = [
+const userNav: NavSection[] = [
   {
-    title: 'Main',
+    title: 'Workspace',
     items: [
-      { to: '/app', label: 'Overview', icon: LayoutDashboard, end: true },
-      { to: '/app/wallets', label: 'Wallets', icon: Wallet },
-      { to: '/app/deposits', label: 'Deposits', icon: ArrowDownToLine },
-      { to: '/app/withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
+      { to: '/app', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/app/wallets', label: 'Wallets', icon: Wallet, end: true },
+      { to: '/app/deposits', label: 'Deposit', icon: ArrowDownToLine },
+      { to: '/app/withdrawals', label: 'Withdraw', icon: ArrowUpFromLine },
       { to: '/app/transfer', label: 'Transfer', icon: ArrowRightLeft },
     ],
   },
   {
-    title: 'Earn',
+    title: 'History',
+    collapsible: true,
+    items: [
+      { to: '/app/wallets/fund/history', label: 'Fund', icon: Landmark },
+      { to: '/app/wallets/staking/history', label: 'Staking', icon: PiggyBank },
+      { to: '/app/wallets/daily_roi/history', label: 'Daily ROI', icon: LineChart },
+      { to: '/app/wallets/level_income/history', label: 'Level income', icon: Network },
+      { to: '/app/wallets/direct_referral/history', label: 'Direct bonus', icon: Gift },
+      { to: '/app/wallets/withdrawal/history', label: 'Withdrawal', icon: Banknote },
+      { to: '/app/wallets/vfxt/history', label: 'VFXT', icon: Coins },
+    ],
+  },
+  {
+    title: 'Grow',
     items: [
       { to: '/app/staking', label: 'Staking', icon: PiggyBank },
       { to: '/app/referrals', label: 'Affiliate', icon: Users },
@@ -76,7 +109,7 @@ const userNav: { title: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: 'Help',
+    title: 'Account',
     items: [
       { to: '/app/support', label: 'Support', icon: LifeBuoy },
       { to: '/app/profile', label: 'Profile', icon: UserCircle },
@@ -84,44 +117,73 @@ const userNav: { title: string; items: NavItem[] }[] = [
   },
 ]
 
-const adminNav: { title: string; items: NavItem[] }[] = [
+const adminNav: NavSection[] = [
   {
-    title: 'Console',
+    title: 'Overview',
+    items: [{ to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+  },
+  {
+    title: 'Configuration',
     items: [
-      { to: '/admin', label: 'Overview', icon: LayoutDashboard, end: true },
-      { to: '/admin/settings', label: 'Settings', icon: Settings },
+      { to: '/admin/settings', label: 'Platform', icon: Settings },
+      { to: '/admin/plan', label: 'Plan', icon: SlidersHorizontal },
+      { to: '/admin/withdraw', label: 'Withdraw rules', icon: BadgePercent },
     ],
   },
   {
-    title: 'Finance',
+    title: 'Operations',
     items: [
       { to: '/admin/deposits', label: 'Deposits', icon: ArrowDownToLine },
+      { to: '/admin/auto-deposits', label: 'Auto deposits', icon: Zap },
       { to: '/admin/withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
+      { to: '/admin/auto-withdrawals', label: 'Auto withdrawals', icon: CircleDollarSign },
       { to: '/admin/staking', label: 'Staking', icon: PiggyBank },
-      { to: '/admin/crypto-wallet', label: 'Crypto wallet', icon: KeyRound },
+      { to: '/admin/crypto-wallet', label: 'Hot wallet', icon: KeyRound },
     ],
   },
   {
-    title: 'Network',
+    title: 'Income reports',
+    collapsible: true,
+    items: [
+      { to: '/admin/income/roi', label: 'Daily ROI', icon: LineChart },
+      { to: '/admin/income/level-commission', label: 'Level commission', icon: Network },
+      { to: '/admin/income/direct-bonus', label: 'Direct bonus', icon: Gift },
+      { to: '/admin/income/referral-bonus', label: 'Referral bonus', icon: Users },
+      { to: '/admin/income/rank-reward', label: 'Rank rewards', icon: Trophy },
+      { to: '/admin/income/staking-reward', label: 'Staking rewards', icon: PiggyBank },
+      { to: '/admin/income/locked-maturity', label: 'Locked maturity', icon: Lock },
+      { to: '/admin/income/locked-bonus', label: 'Locked bonus', icon: Layers },
+      { to: '/admin/income/deposit-credit', label: 'Deposit credits', icon: Landmark },
+    ],
+  },
+  {
+    title: 'Members',
     items: [
       { to: '/admin/users', label: 'Users', icon: UserCog },
       { to: '/admin/affiliates', label: 'Affiliates', icon: Users },
     ],
   },
   {
-    title: 'Support',
+    title: 'System',
     items: [
-      { to: '/admin/tickets', label: 'Support tickets', icon: Ticket },
-      { to: '/admin/audit', label: 'Audit log', icon: ScrollText },
+      { to: '/admin/tickets', label: 'Tickets', icon: Ticket },
+      { to: '/admin/audit', label: 'Audit log', icon: ClipboardList },
     ],
   },
 ]
 
 const titles: Record<string, string> = {
-  '/app': 'Overview',
+  '/app': 'Dashboard',
   '/app/wallets': 'Wallets',
-  '/app/deposits': 'Deposits',
-  '/app/withdrawals': 'Withdrawals',
+  '/app/wallets/fund/history': 'Fund history',
+  '/app/wallets/staking/history': 'Staking history',
+  '/app/wallets/daily_roi/history': 'Daily ROI history',
+  '/app/wallets/level_income/history': 'Level income history',
+  '/app/wallets/direct_referral/history': 'Direct bonus history',
+  '/app/wallets/withdrawal/history': 'Withdrawal history',
+  '/app/wallets/vfxt/history': 'VFXT history',
+  '/app/deposits': 'Deposit',
+  '/app/withdrawals': 'Withdraw',
   '/app/transfer': 'Transfer',
   '/app/token': 'Token',
   '/app/referrals': 'Affiliate',
@@ -129,15 +191,28 @@ const titles: Record<string, string> = {
   '/app/ranks': 'Ranks',
   '/app/support': 'Support',
   '/app/profile': 'Profile',
-  '/admin': 'Overview',
-  '/admin/settings': 'Settings',
+  '/admin': 'Dashboard',
+  '/admin/settings': 'Platform settings',
+  '/admin/plan': 'Plan',
+  '/admin/withdraw': 'Withdraw rules',
   '/admin/deposits': 'Deposits',
+  '/admin/auto-deposits': 'Auto deposits',
   '/admin/withdrawals': 'Withdrawals',
+  '/admin/auto-withdrawals': 'Auto withdrawals',
+  '/admin/income/roi': 'Daily ROI',
+  '/admin/income/level-commission': 'Level commission',
+  '/admin/income/direct-bonus': 'Direct bonus',
+  '/admin/income/referral-bonus': 'Referral bonus',
+  '/admin/income/rank-reward': 'Rank rewards',
+  '/admin/income/staking-reward': 'Staking rewards',
+  '/admin/income/locked-maturity': 'Locked maturity',
+  '/admin/income/locked-bonus': 'Locked bonus',
+  '/admin/income/deposit-credit': 'Deposit credits',
   '/admin/staking': 'Staking',
-  '/admin/crypto-wallet': 'Crypto wallet',
+  '/admin/crypto-wallet': 'Hot wallet',
   '/admin/users': 'Users',
   '/admin/affiliates': 'Affiliates',
-  '/admin/tickets': 'Support tickets',
+  '/admin/tickets': 'Tickets',
   '/admin/audit': 'Audit log',
 }
 
@@ -163,6 +238,115 @@ function Avatar({ name, className }: { name: string; className?: string }) {
   )
 }
 
+function sectionHasActive(section: NavSection, pathname: string) {
+  const path = pathname.replace(/\/$/, '') || '/'
+  return section.items.some((item) => {
+    if (item.end) return path === item.to
+    return path === item.to || path.startsWith(`${item.to}/`)
+  })
+}
+
+function NavSectionBlock({
+  section,
+  variant,
+  onNavigate,
+}: {
+  section: NavSection
+  variant: 'user' | 'admin'
+  onNavigate: () => void
+}) {
+  const { pathname } = useLocation()
+  const active = sectionHasActive(section, pathname)
+  const [open, setOpen] = useState(() => !section.collapsible || active)
+
+  useEffect(() => {
+    if (active) setOpen(true)
+  }, [active])
+
+  const headerId = `nav-section-${variant}-${section.title.replace(/\s+/g, '-').toLowerCase()}`
+
+  return (
+    <div>
+      {section.collapsible ? (
+        <button
+          type="button"
+          id={headerId}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="mb-1.5 flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left transition-colors hover:bg-white/[0.04]"
+        >
+          <History className="size-3 text-white/30" aria-hidden />
+          <span className="flex-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+            {section.title}
+          </span>
+          <ChevronDown
+            className={cn(
+              'size-3.5 text-white/30 transition-transform duration-200',
+              open ? 'rotate-0' : '-rotate-90',
+            )}
+          />
+        </button>
+      ) : (
+        <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/40">
+          {section.title}
+        </p>
+      )}
+
+      {open || !section.collapsible ? (
+        <div
+          className="space-y-0.5"
+          role={section.collapsible ? 'region' : undefined}
+          aria-labelledby={section.collapsible ? headerId : undefined}
+        >
+          {section.items.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.end}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  'group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium text-white/55 transition-colors hover:bg-white/[0.06] hover:text-white',
+                  isActive && 'bg-white/[0.12] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]',
+                  item.disabled && 'pointer-events-none opacity-40',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive ? (
+                    <motion.span
+                      layoutId={`nav-indicator-${variant}`}
+                      className="absolute inset-y-1.5 left-0 w-[3px] rounded-r-full bg-accent-bright"
+                      transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+                    />
+                  ) : null}
+                  <span
+                    className={cn(
+                      'grid size-7 shrink-0 place-items-center rounded-md transition-colors',
+                      isActive
+                        ? 'bg-accent-bright/15 text-accent-bright'
+                        : 'bg-white/[0.04] text-white/40 group-hover:bg-white/[0.08] group-hover:text-white/75',
+                    )}
+                  >
+                    <item.icon className="size-3.5" />
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                  {item.disabled ? (
+                    <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
+                      Soon
+                    </span>
+                  ) : null}
+                </>
+              )}
+            </NavLink>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
   const { user, isAdmin, adminRole } = useAuth()
   const { sidebarOpen, setSidebarOpen, toggleSidebar } = useUiStore()
@@ -171,7 +355,7 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
   const displayName = user?.displayName || user?.email?.split('@')[0] || 'Account'
   const normalized = pathname.replace(/\/$/, '') || '/'
   const pageTitle = titles[normalized] ?? 'Dashboard'
-  const sections = variant === 'admin' ? adminNav : userNav
+  const sections = useMemo(() => (variant === 'admin' ? adminNav : userNav), [variant])
   const homePath = variant === 'admin' ? '/admin' : '/app'
   const [impersonatorUid, setImpersonatorUid] = useState<string | null>(() =>
     typeof sessionStorage !== 'undefined' ? sessionStorage.getItem(IMPERSONATOR_KEY) : null,
@@ -197,22 +381,28 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
   }
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[272px_1fr]">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[280px_1fr]">
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-[272px] flex-col overflow-hidden bg-brand text-white transition-transform duration-300 lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col overflow-hidden bg-brand text-white transition-transform duration-300 lg:sticky lg:top-0 lg:h-dvh lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="pointer-events-none absolute -left-20 -top-20 size-64 rounded-full bg-accent/25 blur-3xl" />
-        <div className="relative flex h-16 items-center justify-between px-5">
-          <Link to={homePath} aria-label="VFXT dashboard" className="flex items-center gap-2">
+        <div className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-accent/20 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-16 -right-10 size-56 rounded-full bg-highlight/10 blur-3xl" />
+
+        <div className="relative flex h-[4.25rem] items-center justify-between border-b border-white/[0.08] px-5">
+          <Link to={homePath} aria-label="VFXT dashboard" className="flex items-center gap-2.5">
             <Logo inverted />
             {variant === 'admin' ? (
-              <span className="rounded-md bg-highlight px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+              <span className="rounded-md bg-highlight/95 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand">
                 Admin
               </span>
-            ) : null}
+            ) : (
+              <span className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-white/35 sm:inline">
+                Member
+              </span>
+            )}
           </Link>
           <Button
             variant="ghost"
@@ -225,87 +415,55 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
           </Button>
         </div>
 
-        <nav className="relative flex-1 space-y-6 overflow-y-auto px-3 py-4">
+        <nav className="relative flex-1 space-y-5 overflow-y-auto px-3 py-4 [scrollbar-width:thin]">
           {sections.map((section) => (
-            <div key={section.title}>
-              <p className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-white/35">
-                {section.title}
-              </p>
-              <div className="space-y-0.5">
-                {section.items.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    end={item.end}
-                    onClick={() => setSidebarOpen(false)}
-                    className={({ isActive }) =>
-                      cn(
-                        'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white',
-                        isActive && 'bg-white/10 text-white',
-                        item.disabled && 'pointer-events-none opacity-40',
-                      )
-                    }
-                  >
-                    {({ isActive }) => (
-                      <>
-                        {isActive ? (
-                          <motion.span
-                            layoutId={`nav-indicator-${variant}`}
-                            className="absolute inset-y-1.5 left-0 w-1 rounded-r-full bg-accent-bright"
-                            transition={{ type: 'spring', stiffness: 500, damping: 40 }}
-                          />
-                        ) : null}
-                        <item.icon
-                          className={cn(
-                            'size-[18px] transition-colors',
-                            isActive ? 'text-accent-bright' : 'text-white/45 group-hover:text-white/80',
-                          )}
-                        />
-                        {item.label}
-                        {item.disabled ? (
-                          <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide">
-                            Soon
-                          </span>
-                        ) : null}
-                      </>
-                    )}
-                  </NavLink>
-                ))}
-              </div>
-            </div>
+            <NavSectionBlock
+              key={section.title}
+              section={section}
+              variant={variant}
+              onNavigate={() => setSidebarOpen(false)}
+            />
           ))}
         </nav>
 
-        <div className="relative space-y-3 p-3">
+        <div className="relative space-y-3 border-t border-white/[0.08] p-3">
           {variant === 'user' ? (
             <Link
               to="/app/token"
               onClick={() => setSidebarOpen(false)}
-              className="group relative block overflow-hidden rounded-xl p-4"
+              className="group relative block overflow-hidden rounded-xl p-3.5"
             >
-              <img src={images.cryptoDesk.replace(/w=\d+/, 'w=500')} alt="" className="absolute inset-0 size-full object-cover opacity-40 transition-transform duration-700 group-hover:scale-110" />
-              <div className="absolute inset-0 bg-gradient-to-br from-accent/80 to-brand/90" />
-              <div className="relative">
-                <Coins className="size-5 text-highlight" />
-                <p className="mt-2 text-sm font-semibold text-white">VFXT token</p>
-                <p className="text-xs text-white/70">See the launch roadmap</p>
+              <img
+                src={images.cryptoDesk.replace(/w=\d+/, 'w=500')}
+                alt=""
+                className="absolute inset-0 size-full object-cover opacity-35 transition-transform duration-700 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/85 to-brand/95" />
+              <div className="relative flex items-center gap-3">
+                <span className="grid size-9 place-items-center rounded-lg bg-white/10">
+                  <Coins className="size-4 text-highlight" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-white">VFXT token</p>
+                  <p className="text-xs text-white/65">Roadmap & utility</p>
+                </div>
               </div>
             </Link>
           ) : (
             <Link
               to="/app"
               onClick={() => setSidebarOpen(false)}
-              className="flex items-center gap-2 rounded-lg border border-white/10 px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/5 hover:text-white"
+              className="flex items-center gap-2.5 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2.5 text-sm font-medium text-white/70 transition-colors hover:bg-white/[0.06] hover:text-white"
             >
               <Home className="size-4" />
-              Back to user app
+              Member app
             </Link>
           )}
           <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.04] p-2.5">
             <Avatar name={displayName} className="size-9" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold">{displayName}</p>
-              <p className="truncate text-xs text-white/45">
+              <p className="truncate text-xs capitalize text-white/45">
                 {variant === 'admin' ? adminRole?.replaceAll('_', ' ') ?? 'admin' : user?.email}
               </p>
             </div>
@@ -364,6 +522,13 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
                   Deposit
                 </Link>
               </Button>
+            ) : isAdmin ? (
+              <Button variant="outline" size="sm" asChild className="hidden sm:inline-flex">
+                <Link to="/admin/settings">
+                  <Settings />
+                  Settings
+                </Link>
+              </Button>
             ) : null}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -392,6 +557,12 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
                   <Link to="/app/wallets">
                     <Wallet />
                     Wallets
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link to="/app/profile">
+                    <UserCircle />
+                    Profile
                   </Link>
                 </DropdownMenuItem>
                 {isAdmin ? (

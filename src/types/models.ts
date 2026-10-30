@@ -23,10 +23,23 @@ export type LedgerEntryType =
   | 'withdrawal_release'
   | 'transfer_in'
   | 'transfer_out'
+  | 'transfer'
   | 'adjustment'
   | 'fee'
   | 'referral_credit'
+  | 'referral_bonus'
   | 'staking_reward'
+  | 'stake'
+  | 'roi'
+  | 'level_commission'
+  | 'direct_bonus'
+  | 'rank_reward'
+  | 'wallet_transfer'
+  | 'locked_maturity'
+  | 'locked_bonus'
+  | string
+
+export type LedgerDirection = 'credit' | 'debit'
 
 export type CurrencyCode = 'USD' | 'VFXT'
 
@@ -67,12 +80,14 @@ export interface LedgerEntry {
   userId: string
   walletId: string
   type: LedgerEntryType
+  direction?: LedgerDirection
   amountMinor: number
   balanceAfterAvailableMinor: number
   balanceAfterReservedMinor: number
   currency: CurrencyCode
-  status: TransactionStatus
-  idempotencyKey: string
+  status?: TransactionStatus | string
+  description?: string
+  idempotencyKey?: string
   referenceType?: string
   referenceId?: string
   metadata?: Record<string, string | number | boolean | null>

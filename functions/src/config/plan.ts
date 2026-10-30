@@ -8,8 +8,10 @@
  */
 
 export const VFXT_PRICE_USD = 0.0001;
-/** Whole VFXT tokens per $1 USDT. */
+/** Whole VFXT tokens per $1 USDT (default; override via platform.token.tokensPerUsd). */
 export const VFXT_PER_USDT = 10_000;
+/** @deprecated Prefer platform.token.tokensPerUsd — kept as DEFAULT_VFXT_PER_USD alias. */
+export const DEFAULT_VFXT_PER_USD = VFXT_PER_USDT;
 /** VFXT wallet decimals — whole tokens. */
 export const VFXT_DECIMALS = 0;
 /** USD wallet decimals — cents. */
@@ -130,20 +132,45 @@ export const ALLOWED_TRANSFERS: ReadonlyArray<{
   { from: 'direct_referral', to: 'withdrawal' },
 ];
 
-/** $1 = 100 cents = 10_000 VFXT ⇒ tokens = cents * 100. */
-export function usdCentsToVfxtTokens(cents: number): number {
+/**
+ * USD cents → whole VFXT tokens.
+ * Default rate: $1 = 100 cents = 10_000 VFXT ⇒ tokens = cents * tokensPerUsd / 100.
+ */
+export function usdCentsToVfxtTokens(
+  cents: number,
+  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
+): number {
   if (!Number.isInteger(cents) || cents < 0) {
     throw new Error('usdCents must be a non-negative integer');
   }
-  return cents * 100;
+  if (!Number.isInteger(tokensPerUsd) || tokensPerUsd <= 0) {
+    throw new Error('tokensPerUsd must be a positive integer');
+  }
+  return Math.floor((cents * tokensPerUsd) / 100);
 }
 
 /** Inverse of usdCentsToVfxtTokens (truncates toward zero). */
-export function vfxtTokensToUsdCents(tokens: number): number {
+export function vfxtTokensToUsdCents(
+  tokens: number,
+  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
+): number {
   if (!Number.isInteger(tokens) || tokens < 0) {
     throw new Error('tokens must be a non-negative integer');
   }
-  return Math.floor(tokens / 100);
+  if (!Number.isInteger(tokensPerUsd) || tokensPerUsd <= 0) {
+    throw new Error('tokensPerUsd must be a positive integer');
+  }
+  return Math.floor((tokens * 100) / tokensPerUsd);
+}
+
+/** Withdrawal fee + net payout. */
+export function splitWithdrawalCommission(
+  amountMinor: number,
+  commissionBps: number,
+): { commissionMinor: number; netMinor: number } {
+  const bps = Math.max(0, Math.min(10_000, Math.floor(commissionBps)));
+  const commissionMinor = Math.floor((amountMinor * bps) / 10_000);
+  return { commissionMinor, netMinor: amountMinor - commissionMinor };
 }
 
 /** Daily 1% of principal in cents (floor). */

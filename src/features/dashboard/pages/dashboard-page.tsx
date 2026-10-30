@@ -13,7 +13,9 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  Copy,
   LifeBuoy,
+  Link2,
   Lock,
   Receipt,
   Wallet,
@@ -29,8 +31,10 @@ import { useAuth } from '@/features/auth/auth-context'
 import { formatMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { images } from '@/lib/media'
+import { toast } from 'sonner'
 import { fetchUserLedger, fetchUserWallets } from '@/services/wallet-service'
 import { fetchMyDeposits, fetchMyWithdrawals } from '@/services/records-service'
+import { getAffiliateDashboard } from '@/services/plan-service'
 import { CountUp } from '@/components/motion/reveal'
 import { TypeText } from '@/components/motion/typing'
 
@@ -73,8 +77,17 @@ export function DashboardPage() {
     queryFn: () => fetchMyWithdrawals(userId, 10),
     enabled: Boolean(userId),
   })
+  const affiliateQuery = useQuery({
+    queryKey: ['affiliate', userId],
+    queryFn: getAffiliateDashboard,
+    enabled: Boolean(userId),
+  })
 
   const wallets = walletsQuery.data ?? []
+  const referralCode = affiliateQuery.data?.referralCode
+  const referralLink = referralCode
+    ? `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/register?ref=${referralCode}`
+    : null
   const ledger = useMemo(() => ledgerQuery.data ?? [], [ledgerQuery.data])
   const primary = wallets.find((w) => w.currency === 'USD') ?? wallets[0]
   const primaryCurrency = primary?.currency === 'USD' ? 'USD' : undefined
@@ -175,6 +188,56 @@ export function DashboardPage() {
           </div>
         </div>
       </motion.section>
+
+      {referralLink ? (
+        <Card>
+          <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+            <div>
+              <CardDescription>Your unique referral link</CardDescription>
+              <CardTitle className="mt-1 flex items-center gap-2 font-sans text-base">
+                <Link2 className="size-4 text-accent" />
+                Invite members under you
+              </CardTitle>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(referralLink)
+                  toast.success('Referral link copied')
+                }}
+              >
+                <Copy className="size-3.5" />
+                Copy link
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  if (!referralCode) return
+                  await navigator.clipboard.writeText(referralCode)
+                  toast.success('Referral code copied')
+                }}
+              >
+                Copy code
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/app/referrals">Affiliate</Link>
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <p className="break-all rounded-xl border border-line bg-canvas px-3 py-2 font-mono text-xs text-ink-muted">
+              {referralLink}
+            </p>
+            <p className="mt-2 text-xs text-ink-subtle">
+              Code <span className="font-mono font-semibold text-ink">{referralCode}</span> — required
+              when someone registers.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

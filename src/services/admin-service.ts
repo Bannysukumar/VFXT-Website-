@@ -204,3 +204,35 @@ export async function updateCryptoHotWallet(input: {
 export async function removeCryptoHotWallet(id: string) {
   return callFunction<{ id: string }, { ok: true }>('removeCryptoHotWallet', { id })
 }
+
+export type AdminIncomeType =
+  | 'roi'
+  | 'level_commission'
+  | 'direct_bonus'
+  | 'referral_bonus'
+  | 'rank_reward'
+  | 'staking_reward'
+  | 'locked_maturity'
+  | 'locked_bonus'
+  | 'deposit_credit'
+
+export async function adminListAutoDeposits(limit = 500) {
+  return callFunction<
+    { limit: number },
+    { rows: Array<Record<string, unknown>>; count: number }
+  >('adminListAutoDeposits', { limit })
+}
+
+export async function adminListAutoWithdrawals(limit = 500) {
+  return callFunction<
+    { limit: number },
+    { rows: Array<Record<string, unknown>>; count: number }
+  >('adminListAutoWithdrawals', { limit })
+}
+
+export async function adminListIncomeByType(type: AdminIncomeType, limit = 500) {
+  return callFunction<
+    { type: AdminIncomeType; limit: number },
+    { rows: Array<Record<string, unknown>>; count: number; totalMinor: number; type: string }
+  >('adminListIncomeByType', { type, limit })
+}

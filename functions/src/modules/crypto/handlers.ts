@@ -183,6 +183,14 @@ async function creditDepositFromChain(params: {
   const txRef = db.collection(Collections.usedCryptoTx).doc(params.txHash.toLowerCase());
   const depositRef = db.collection(Collections.deposits).doc(params.depositId);
 
+  const { getTokenEconomicsSettings } = await import('../platform/store');
+  const { usdCentsToVfxtTokens } = await import('../../config/plan');
+  const { walletDocId } = await import('../wallets/types');
+  const { ensureUserWallets } = await import('../wallets/handlers');
+  await ensureUserWallets(db, params.userId);
+  const tokenFx = await getTokenEconomicsSettings();
+  const vfxtTokens = usdCentsToVfxtTokens(params.amountMinor, tokenFx.tokensPerUsd);
+
   await db.runTransaction(async (tx) => {
     const used = await tx.get(txRef);
     if (used.exists) {
@@ -202,6 +210,7 @@ async function creditDepositFromChain(params: {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    // Fund wallet (USD) — used for staking packages.
     await creditAvailable(tx, db, {
       userId: params.userId,
       walletId: params.walletId,
@@ -217,13 +226,37 @@ async function creditDepositFromChain(params: {
         from: params.from,
         chainId: BSC_CHAIN_ID,
         token: USDT_BEP20_ADDRESS,
+        vfxtTokens,
+        tokensPerUsd: tokenFx.tokensPerUsd,
       },
     });
+
+    // VFXT wallet — tokens at admin price for token balance / staking use.
+    if (vfxtTokens > 0) {
+      await creditAvailable(tx, db, {
+        userId: params.userId,
+        walletId: walletDocId(params.userId, 'vfxt'),
+        type: 'deposit_credit',
+        amountMinor: vfxtTokens,
+        currency: 'VFXT',
+        referenceType: 'deposit',
+        referenceId: params.depositId,
+        description: `VFXT credited from USDT deposit (${tokenFx.tokensPerUsd}/$1)`,
+        createdBy: 'system:crypto-monitor',
+        metadata: {
+          txHash: params.txHash,
+          amountUsdCents: params.amountMinor,
+          tokensPerUsd: tokenFx.tokensPerUsd,
+        },
+      });
+    }
 
     tx.update(depositRef, {
       status: 'completed',
       method: 'usdt_bep20',
       txHash: params.txHash,
+      vfxtTokensCredited: vfxtTokens,
+      tokensPerUsd: tokenFx.tokensPerUsd,
       reviewedBy: 'system:crypto-monitor',
       reviewedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -234,8 +267,15 @@ async function creditDepositFromChain(params: {
     userId: params.userId,
     type: 'deposit_completed',
     title: 'Deposit confirmed',
-    body: 'Your USDT (BEP-20) payment was verified and credited.',
-    data: { depositId: params.depositId, txHash: params.txHash },
+    body:
+      vfxtTokens > 0
+        ? `Payment verified. ${(params.amountMinor / 100).toFixed(2)} USDT → ${vfxtTokens.toLocaleString()} VFXT credited (ready to stake).`
+        : 'Your USDT (BEP-20) payment was verified and credited.',
+    data: {
+      depositId: params.depositId,
+      txHash: params.txHash,
+      vfxtTokens,
+    },
   });
 }
 

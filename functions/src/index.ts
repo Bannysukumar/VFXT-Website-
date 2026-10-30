@@ -5,6 +5,8 @@ initAdmin();
 
 // Auth trigger (v1)
 export { onUserCreated } from './modules/auth/handlers';
+export { finalizeRegistration } from './modules/auth/registration';
+export { getWalletLoginNonce, verifyWalletLogin } from './modules/auth/wallet-login';
 
 // Users
 export { updateProfile } from './modules/users/handlers';
@@ -45,6 +47,7 @@ export {
   listReferrals,
   getAffiliateDashboard,
 } from './modules/referrals/handlers';
+export { lookupReferralCode } from './modules/referrals/lookup';
 
 // Staking
 export {
@@ -77,6 +80,11 @@ export {
   listPendingWithdrawals,
   getPlatformStats,
 } from './modules/admin/handlers';
+export {
+  adminListAutoDeposits,
+  adminListAutoWithdrawals,
+  adminListIncomeByType,
+} from './modules/admin/history';
 
 export {
   getAdminUserDetail,

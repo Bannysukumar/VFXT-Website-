@@ -16,6 +16,8 @@ import { formatMinor, parseToMinor } from '@/lib/money'
 import { images } from '@/lib/media'
 import { fetchUserWallets, requestWithdrawal } from '@/services/wallet-service'
 import { fetchMyWithdrawals } from '@/services/records-service'
+import { getPublicPlatformSettings } from '@/services/platform-service'
+import { splitWithdrawalCommission } from '@/lib/plan'
 
 const schema = z.object({
   amount: z.string().min(1, 'Amount required'),
@@ -48,11 +50,20 @@ export function WithdrawalsPage() {
     queryFn: () => fetchUserWallets(user!.uid),
     enabled: Boolean(user?.uid),
   })
+  const platform = useQuery({
+    queryKey: ['platform', 'public'],
+    queryFn: getPublicPlatformSettings,
+  })
+  const minWithdrawCents = platform.data?.withdraw?.minWithdrawUsdCents ?? 1000
+  const commissionBps = platform.data?.withdraw?.commissionBps ?? 0
+  const { commissionMinor, netMinor } = splitWithdrawalCommission(amountMinor, commissionBps)
+
   const withdrawalWallet =
     wallets.data?.find((w) => w.id.endsWith('_withdrawal') || w.kind === 'withdrawal') ??
     wallets.data?.find((w) => w.currency === 'USD')
   const available = withdrawalWallet?.availableMinor ?? 0
   const exceeds = withdrawalWallet ? amountMinor > available : false
+  const belowMin = amountMinor > 0 && amountMinor < minWithdrawCents
 
   const history = useQuery({
     queryKey: ['my-withdrawals', user?.uid],
@@ -64,6 +75,9 @@ export function WithdrawalsPage() {
     mutationFn: async (values: Values) => {
       const minor = Number(parseToMinor(values.amount, 2))
       if (minor <= 0) throw new Error('Amount must be positive')
+      if (minor < minWithdrawCents) {
+        throw new Error(`Minimum withdrawal is $${(minWithdrawCents / 100).toFixed(2)}`)
+      }
       return requestWithdrawal({
         amountMinor: minor,
         currency: 'USD',
@@ -144,10 +158,22 @@ export function WithdrawalsPage() {
                   </button>
                 </div>
                 <FieldError message={errors.amount?.message} />
+                <p className="text-xs text-ink-muted">
+                  Min withdraw ${(minWithdrawCents / 100).toFixed(2)}
+                  {commissionBps > 0
+                    ? ` · Fee ${(commissionBps / 100).toFixed(2)}%`
+                    : ''}
+                </p>
                 {exceeds ? (
                   <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
                     <AlertTriangle className="size-3.5" />
                     Amount exceeds your Withdrawal Wallet balance. Transfer earnings there first.
+                  </p>
+                ) : null}
+                {belowMin ? (
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-warning">
+                    <AlertTriangle className="size-3.5" />
+                    Below minimum withdrawal of ${(minWithdrawCents / 100).toFixed(2)}.
                   </p>
                 ) : null}
               </div>
@@ -170,11 +196,25 @@ export function WithdrawalsPage() {
               </div>
               <div className="rounded-xl border border-line bg-canvas px-4 py-2">
                 <SummaryRow label="Withdrawal amount" value={usdMoney(amountMinor)} />
-                <SummaryRow label="Available after reserve" value={usdMoney(Math.max(available - amountMinor, 0))} />
+                {commissionBps > 0 ? (
+                  <SummaryRow
+                    label={`Commission (${(commissionBps / 100).toFixed(2)}%)`}
+                    value={usdMoney(commissionMinor)}
+                  />
+                ) : null}
+                <SummaryRow
+                  label="Available after reserve"
+                  value={usdMoney(Math.max(available - amountMinor, 0))}
+                />
                 <div className="border-t border-line" />
-                <SummaryRow strong label="You will receive" value={usdMoney(amountMinor)} />
+                <SummaryRow strong label="You will receive (on-chain)" value={usdMoney(netMinor)} />
               </div>
-              <Button type="submit" size="lg" className="w-full" disabled={mutation.isPending || exceeds}>
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={mutation.isPending || exceeds || belowMin}
+              >
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
                 {mutation.isPending ? 'Sending…' : 'Withdraw USDT now'}
               </Button>

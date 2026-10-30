@@ -19,7 +19,7 @@ import { applyReferralCodeSchema, listReferralsSchema } from './schemas';
 
 const PENDING_REFERRAL_CLAIM = 'pendingReferralCode';
 
-async function applyCodeForUser(
+export async function applyCodeForUserExport(
   refereeId: string,
   code: string,
 ): Promise<{ referralId: string; referrerId: string; ok: true }> {
@@ -124,7 +124,7 @@ export async function maybeApplyPendingReferral(
       ? (claims[PENDING_REFERRAL_CLAIM] as string)
       : null;
   if (!pending) return;
-  await applyCodeForUser(uid, pending);
+  await applyCodeForUserExport(uid, pending);
 }
 
 async function handleApplyReferralCode(
@@ -135,7 +135,7 @@ async function handleApplyReferralCode(
   if (!parsed.success) {
     throw new AppError('invalid-argument', parsed.error.message);
   }
-  return applyCodeForUser(ctx.uid, parsed.data.code);
+  return applyCodeForUserExport(ctx.uid, parsed.data.code);
 }
 
 export const applyReferralCode = onCall(CALLABLE_OPTS, async (request) => {

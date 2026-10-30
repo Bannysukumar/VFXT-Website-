@@ -7,6 +7,8 @@ import {
   type ContactSettings,
   type FooterSettings,
   type WithdrawSettings,
+  type DepositSettings,
+  type TokenEconomicsSettings,
   type HotWalletPoolSettings,
 } from './types';
 
@@ -33,6 +35,8 @@ function deepMergePlatform(
       lockedPackages: patch.plan?.lockedPackages ?? base.plan.lockedPackages,
       rankRewards: patch.plan?.rankRewards ?? base.plan.rankRewards,
     },
+    deposit: { ...base.deposit, ...(patch.deposit ?? {}) },
+    token: { ...base.token, ...(patch.token ?? {}) },
     withdraw: { ...base.withdraw, ...(patch.withdraw ?? {}) },
     hotWalletPool: { ...base.hotWalletPool, ...(patch.hotWalletPool ?? {}) },
   };
@@ -70,6 +74,14 @@ export async function getFooterSettings(): Promise<FooterSettings> {
 
 export async function getWithdrawSettings(): Promise<WithdrawSettings> {
   return (await getPlatformSettings()).withdraw;
+}
+
+export async function getDepositSettings(): Promise<DepositSettings> {
+  return (await getPlatformSettings()).deposit;
+}
+
+export async function getTokenEconomicsSettings(): Promise<TokenEconomicsSettings> {
+  return (await getPlatformSettings()).token;
 }
 
 export async function getHotWalletPoolSettings(): Promise<HotWalletPoolSettings> {
