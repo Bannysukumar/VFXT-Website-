@@ -15,6 +15,7 @@ import { WalletHistoryPage } from '@/features/wallets/pages/wallet-history-page'
 import { DepositsPage } from '@/features/deposits/pages/deposits-page'
 import { WithdrawalsPage } from '@/features/withdrawals/pages/withdrawals-page'
 import { ReferralsPage } from '@/features/referrals/pages/referrals-page'
+import { ReferralLevelPage } from '@/features/referrals/pages/referral-level-page'
 import { StakingPage } from '@/features/staking/pages/staking-page'
 import { RanksPage } from '@/features/ranks/pages/ranks-page'
 import { SupportPage } from '@/features/support/pages/support-page'
@@ -76,6 +77,7 @@ export const router = createBrowserRouter([
           { path: 'transfer', element: <TransferPage /> },
           { path: 'token', element: <AppTokenPage /> },
           { path: 'referrals', element: <ReferralsPage /> },
+          { path: 'referrals/level/:level', element: <ReferralLevelPage /> },
           { path: 'staking', element: <StakingPage /> },
           { path: 'ranks', element: <RanksPage /> },
           { path: 'support', element: <SupportPage /> },

@@ -19,6 +19,25 @@ import { loginWithWallet, walletConnectConfigured } from '@/lib/wallet-auth'
 import { useAuth } from '@/features/auth/auth-context'
 import { AuthLayout, PasswordInput } from '@/features/auth/components/auth-layout'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { getFirebaseAuth } from '@/lib/firebase'
+
+async function resolvePostLoginPath(fallback: string): Promise<string> {
+  // Prefer returning to an explicit deep-link (e.g. /admin/users), otherwise
+  // send admins to the console and members to the app.
+  if (fallback.startsWith('/admin')) return fallback
+  if (fallback.startsWith('/app') && fallback !== '/app') return fallback
+  try {
+    const user = getFirebaseAuth().currentUser
+    if (!user) return fallback || '/app'
+    const token = await user.getIdTokenResult(true)
+    if (typeof token.claims.adminRole === 'string' && token.claims.adminRole) {
+      return '/admin'
+    }
+  } catch {
+    /* fall through */
+  }
+  return fallback && fallback !== '/app' ? fallback : '/app'
+}
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -63,7 +82,7 @@ export function LoginPage() {
     try {
       await loginWithEmail(values.email, values.password)
       toast.success('Welcome back')
-      navigate(from, { replace: true })
+      navigate(await resolvePostLoginPath(from), { replace: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Sign-in failed')
     }
@@ -86,7 +105,7 @@ export function LoginPage() {
         toast.message('Complete your profile to finish signup')
       } else {
         toast.success('Wallet connected')
-        navigate(from, { replace: true })
+        navigate(await resolvePostLoginPath(from), { replace: true })
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Wallet login failed')
@@ -107,7 +126,7 @@ export function LoginPage() {
         displayName: values.displayName,
       })
       toast.success('Profile completed')
-      navigate(from, { replace: true })
+      navigate(await resolvePostLoginPath(from), { replace: true })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Could not finish signup')
     }

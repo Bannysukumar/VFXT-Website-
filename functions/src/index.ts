@@ -50,6 +50,7 @@ export {
   applyReferralCode,
   listReferrals,
   getAffiliateDashboard,
+  getAffiliateLevelMembers,
 } from './modules/referrals/handlers';
 export { lookupReferralCode } from './modules/referrals/lookup';
 

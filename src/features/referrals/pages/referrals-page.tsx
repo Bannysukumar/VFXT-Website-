@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
+import { ChevronRight } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +11,7 @@ import { LoadingState } from '@/components/shared/loading-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { LEVEL_COMMISSION_BPS, DIRECT_REFERRAL_BONUS_BPS } from '@/lib/plan'
 import { formatMinor } from '@/lib/money'
+import { cn } from '@/lib/utils'
 import { applyReferralCode, getAffiliateDashboard } from '@/services/plan-service'
 
 export function ReferralsPage() {
@@ -39,7 +42,7 @@ export function ReferralsPage() {
         <h1 className="text-4xl">Affiliate network</h1>
         <p className="mt-1 text-ink-muted">
           Seven-level commissions on capital plus {DIRECT_REFERRAL_BONUS_BPS / 100}% direct bonus in
-          VFXT restaking tokens. Each level unlocks after you have that many direct referrals.
+          VFXT restaking tokens. Tap an unlocked level to view members.
         </p>
       </div>
 
@@ -47,7 +50,7 @@ export function ReferralsPage() {
         <Card>
           <CardHeader>
             <CardDescription>Your unique referral link</CardDescription>
-            <CardTitle className="font-mono text-lg break-all">
+            <CardTitle className="break-all font-mono text-lg">
               {data.referralCode
                 ? `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/register?ref=${data.referralCode}`
                 : '—'}
@@ -105,11 +108,7 @@ export function ReferralsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 sm:flex-row">
-          <Input
-            placeholder="VFXT…"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-          />
+          <Input placeholder="VFXT…" value={code} onChange={(e) => setCode(e.target.value)} />
           <Button onClick={() => apply.mutate()} disabled={!code || apply.isPending}>
             Link sponsor
           </Button>
@@ -119,47 +118,95 @@ export function ReferralsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="font-sans text-lg">Level unlock matrix</CardTitle>
+          <CardDescription>Open a level to see member names and details.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-1 p-2 sm:p-4">
           {LEVEL_COMMISSION_BPS.map((bps, idx) => {
             const level = idx + 1
             const unlocked = data.unlockedLevels >= level
             const stat = data.levelStats?.find((s) => s.level === level)
-            return (
+            const memberCount =
+              level === 1 ? data.directCount : (stat?.memberCount ?? null)
+            const canOpen = unlocked && (level === 1 ? data.directCount > 0 : true)
+            const row = (
               <div
-                key={level}
-                className="flex items-center justify-between border-b border-line py-2 text-sm last:border-0"
+                className={cn(
+                  'flex items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm transition-colors',
+                  canOpen && 'hover:bg-panel-elevated',
+                  !unlocked && 'opacity-70',
+                )}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="font-medium">Level {level}</span>
                   <Badge variant={unlocked ? 'success' : 'warning'}>
-                    {unlocked ? 'Unlocked' : `Need ${level} directs`}
+                    {unlocked
+                      ? memberCount != null
+                        ? `${memberCount} member${memberCount === 1 ? '' : 's'}`
+                        : 'Unlocked'
+                      : `Need ${level} direct${level === 1 ? '' : 's'}`}
                   </Badge>
                 </div>
-                <div className="text-right">
-                  <p>{(bps / 100).toFixed(2)}% of capital</p>
-                  <p className="text-xs text-ink-muted">
-                    Earned {formatMinor(stat?.earnedMinor ?? 0, { scale: 2, currency: 'USD' })}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <p>{(bps / 100).toFixed(2)}% of capital</p>
+                    <p className="text-xs text-ink-muted">
+                      Earned {formatMinor(stat?.earnedMinor ?? 0, { scale: 2, currency: 'USD' })}
+                    </p>
+                  </div>
+                  {canOpen ? <ChevronRight className="size-4 shrink-0 text-ink-subtle" /> : null}
                 </div>
               </div>
+            )
+
+            if (!canOpen) {
+              return (
+                <div key={level} className="border-b border-line last:border-0">
+                  {row}
+                </div>
+              )
+            }
+
+            return (
+              <Link
+                key={level}
+                to={`/app/referrals/level/${level}`}
+                className="block border-b border-line no-underline last:border-0"
+              >
+                {row}
+              </Link>
             )
           })}
         </CardContent>
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="font-sans text-lg">Direct team</CardTitle>
+        <CardHeader className="flex-row items-center justify-between gap-3">
+          <div>
+            <CardTitle className="font-sans text-lg">Direct team</CardTitle>
+            <CardDescription>Level 1 members (quick view).</CardDescription>
+          </div>
+          {data.directCount > 0 ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/app/referrals/level/1">View all</Link>
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-2">
           {(data.directs ?? []).length === 0 ? (
             <p className="text-sm text-ink-muted">No directs yet. Share your code to grow levels.</p>
           ) : (
-            data.directs.map((d) => (
-              <div key={d.uid} className="flex justify-between border-b border-line py-2 text-sm last:border-0">
-                <span className="font-mono text-xs">{d.uid}</span>
-                <span className="text-ink-muted">{d.email ?? '—'}</span>
+            data.directs.slice(0, 8).map((d) => (
+              <div
+                key={d.uid}
+                className="flex items-center justify-between gap-3 border-b border-line py-2 text-sm last:border-0"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{d.displayName || '—'}</p>
+                  <p className="truncate text-xs text-ink-muted">{d.mobile || d.email || d.uid}</p>
+                </div>
+                <span className="shrink-0 font-mono text-xs text-ink-muted">
+                  {d.referralCode || '—'}
+                </span>
               </div>
             ))
           )}

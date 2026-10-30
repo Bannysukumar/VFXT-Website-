@@ -16,13 +16,29 @@ export interface StakingPosition {
   maturesAt?: string | null
 }
 
+export interface AffiliateMember {
+  uid: string
+  displayName: string | null
+  email: string | null
+  mobile: string | null
+  referralCode: string | null
+  createdAt: string | null
+  level: number
+}
+
 export interface AffiliateDashboard {
   referralCode: string
   directCount: number
   unlockedLevels: number
   levelIncomeMinor: number
-  directs: Array<{ uid: string; email?: string | null; createdAt?: string }>
-  levelStats: Array<{ level: number; rateBps: number; unlocked: boolean; earnedMinor: number }>
+  directs: AffiliateMember[]
+  levelStats: Array<{
+    level: number
+    rateBps: number
+    unlocked: boolean
+    earnedMinor: number
+    memberCount?: number | null
+  }>
 }
 
 export interface RankStatus {
@@ -53,6 +69,18 @@ export async function getMyStakingPositions() {
 
 export async function getAffiliateDashboard() {
   return callFunction<undefined, AffiliateDashboard>('getAffiliateDashboard')
+}
+
+export async function getAffiliateLevelMembers(level: number, limit = 100) {
+  return callFunction<
+    { level: number; limit: number },
+    {
+      level: number
+      unlocked: boolean
+      count: number
+      members: AffiliateMember[]
+    }
+  >('getAffiliateLevelMembers', { level, limit })
 }
 
 export async function applyReferralCode(code: string) {

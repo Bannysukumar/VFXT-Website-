@@ -1,5 +1,5 @@
 import { onCall, CallableRequest } from 'firebase-functions/v2/https';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { UserRecord } from 'firebase-admin/auth';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -15,9 +15,103 @@ import { ReferralDoc, UserProfile, WalletDoc } from '../../types/models';
 import { walletDocId } from '../wallets/types';
 import { countDirectReferrals } from '../staking/commissions';
 import { placeInBinaryTree } from './binary';
-import { applyReferralCodeSchema, listReferralsSchema } from './schemas';
+import {
+  affiliateLevelSchema,
+  applyReferralCodeSchema,
+  listReferralsSchema,
+} from './schemas';
 
 const PENDING_REFERRAL_CLAIM = 'pendingReferralCode';
+
+function tsToIso(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  const v = value as { toDate?: () => Date };
+  if (typeof v.toDate === 'function') return v.toDate().toISOString();
+  return null;
+}
+
+type DownlineMember = {
+  uid: string;
+  displayName: string | null;
+  email: string | null;
+  mobile: string | null;
+  referralCode: string | null;
+  createdAt: string | null;
+  level: number;
+};
+
+async function listDirectIds(
+  db: Firestore,
+  referrerId: string,
+  limit = 100,
+): Promise<string[]> {
+  const snap = await db
+    .collection(Collections.referrals)
+    .where('referrerId', '==', referrerId)
+    .where('status', '==', 'active')
+    .limit(limit)
+    .get();
+  return snap.docs.map((d) => (d.data() as ReferralDoc).refereeId);
+}
+
+async function loadMemberProfiles(
+  db: Firestore,
+  ids: string[],
+  level: number,
+): Promise<DownlineMember[]> {
+  const out: DownlineMember[] = [];
+  for (const uid of ids) {
+    const snap = await db.collection(Collections.users).doc(uid).get();
+    if (!snap.exists) {
+      out.push({
+        uid,
+        displayName: null,
+        email: null,
+        mobile: null,
+        referralCode: null,
+        createdAt: null,
+        level,
+      });
+      continue;
+    }
+    const u = snap.data() as UserProfile;
+    out.push({
+      uid,
+      displayName: u.displayName ?? null,
+      email: u.email ?? null,
+      mobile: u.mobile ?? null,
+      referralCode: u.referralCode ?? null,
+      createdAt: tsToIso(u.createdAt),
+      level,
+    });
+  }
+  return out;
+}
+
+/** BFS downline members at a specific unilevel depth (1 = directs). */
+async function getMembersAtLevel(
+  db: Firestore,
+  rootUid: string,
+  targetLevel: number,
+  limit = 100,
+): Promise<DownlineMember[]> {
+  let current = [rootUid];
+  for (let depth = 1; depth <= targetLevel; depth += 1) {
+    const next: string[] = [];
+    for (const uid of current) {
+      const kids = await listDirectIds(db, uid, 100);
+      next.push(...kids);
+      if (next.length >= 500) break;
+    }
+    current = [...new Set(next)];
+    if (depth === targetLevel) {
+      return loadMemberProfiles(db, current.slice(0, limit), targetLevel);
+    }
+    if (current.length === 0) return [];
+  }
+  return [];
+}
 
 export async function applyCodeForUserExport(
   refereeId: string,
@@ -222,26 +316,8 @@ async function handleGetAffiliateDashboard(
     .limit(50)
     .get();
 
-  const directs: Array<{
-    uid: string;
-    email?: string | null;
-    createdAt?: unknown;
-  }> = [];
-  for (const d of refsSnap.docs) {
-    const ref = d.data() as ReferralDoc;
-    const refereeSnap = await db
-      .collection(Collections.users)
-      .doc(ref.refereeId)
-      .get();
-    const email = refereeSnap.exists
-      ? ((refereeSnap.data() as UserProfile).email ?? null)
-      : null;
-    directs.push({
-      uid: ref.refereeId,
-      email,
-      createdAt: ref.createdAt ?? null,
-    });
-  }
+  const directIds = refsSnap.docs.map((d) => (d.data() as ReferralDoc).refereeId);
+  const directs = await loadMemberProfiles(db, directIds, 1);
 
   const levelWalletSnap = await db
     .collection(Collections.wallets)
@@ -251,7 +327,7 @@ async function handleGetAffiliateDashboard(
     ? (levelWalletSnap.data() as WalletDoc).availableMinor
     : 0;
 
-  // Per-level earned (best-effort from ledger; capped query).
+  // Per-level earned. Member counts for deeper levels load on the level detail page.
   const levelStats = [];
   for (let level = 1; level <= LEVEL_COMMISSION_BPS.length; level += 1) {
     levelStats.push({
@@ -259,6 +335,7 @@ async function handleGetAffiliateDashboard(
       rateBps: LEVEL_COMMISSION_BPS[level - 1],
       unlocked: isLevelUnlocked(directCount, level),
       earnedMinor: 0,
+      memberCount: level === 1 ? directCount : null,
     });
   }
 
@@ -303,3 +380,38 @@ export const getAffiliateDashboard = onCall(
     }
   },
 );
+
+export const getAffiliateLevelMembers = onCall(CALLABLE_OPTS, async (request) => {
+  try {
+    const ctx = requireAuth(request);
+    const parsed = affiliateLevelSchema.safeParse(request.data ?? {});
+    if (!parsed.success) {
+      throw new AppError('invalid-argument', parsed.error.message);
+    }
+    const db = getDb();
+    const directCount = await countDirectReferrals(db, ctx.uid);
+    const unlocked = isLevelUnlocked(directCount, parsed.data.level);
+    if (!unlocked) {
+      return {
+        level: parsed.data.level,
+        unlocked: false,
+        members: [] as DownlineMember[],
+        count: 0,
+      };
+    }
+    const members = await getMembersAtLevel(
+      db,
+      ctx.uid,
+      parsed.data.level,
+      parsed.data.limit,
+    );
+    return {
+      level: parsed.data.level,
+      unlocked: true,
+      members,
+      count: members.length,
+    };
+  } catch (err) {
+    throw toHttpsError(err);
+  }
+});
