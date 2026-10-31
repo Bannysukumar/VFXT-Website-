@@ -229,10 +229,6 @@ fun ImportWalletScreen(
                     )
                 }
             }
-            state.error?.let {
-                Spacer(Modifier.height(Spacing.md))
-                Text(it, style = MaterialTheme.typography.bodyMedium, color = colors.error)
-            }
 
             Spacer(Modifier.height(Spacing.xl))
             Row(verticalAlignment = Alignment.Top) {
@@ -245,6 +241,15 @@ fun ImportWalletScreen(
                 )
             }
             Spacer(Modifier.height(Spacing.xl))
+        }
+        // Outside the scroll area so it stays visible above the button even with the keyboard open.
+        state.error?.let {
+            Text(
+                it,
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.error,
+                modifier = Modifier.padding(horizontal = Spacing.screen).padding(top = Spacing.sm),
+            )
         }
         VfxtPrimaryButton(
             text = "Import wallet",

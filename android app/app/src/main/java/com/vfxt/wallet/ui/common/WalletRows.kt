@@ -37,9 +37,10 @@ import java.text.DateFormat
 import java.util.Date
 
 fun networkShortName(networkId: String): String =
-    Networks.all.firstOrNull { it.id == networkId }?.shortName ?: networkId
+    Networks.all.firstOrNull { it.id == networkId }?.shortName
+        ?: networkId.removePrefix("custom-").take(12).ifBlank { networkId }
 
-/** Token position row. Unknown balances show "Not synced" rather than a fabricated zero. */
+/** Token position row. Live unit price + 24h change under the name (Trust/MetaMask style). */
 @Composable
 fun AssetRow(
     holding: Holding,
@@ -64,31 +65,41 @@ fun AssetRow(
                 Spacer(Modifier.width(6.dp))
                 StatusPill(networkShortName(token.networkId))
             }
-            Text(token.name, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            val unit = holding.unitPrice
+            val change = holding.change24hPercent
+            when {
+                unit != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        Formatters.unitPrice(unit),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = colors.textSecondary,
+                    )
+                    change?.let {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            Formatters.percent(it),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (it.signum() >= 0) colors.success else colors.error,
+                        )
+                    }
+                }
+                else -> Text(token.name, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+            }
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
             val raw = holding.rawBalance
             when {
+                !token.isAvailable -> Text("Not deployed yet", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
                 raw == null -> Text("Not synced", style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
                 hideBalance -> Text(HIDDEN_BALANCE, style = AmountTextStyle, color = colors.textPrimary)
                 else -> Text(Formatters.tokenAmount(raw, token.decimals), style = AmountTextStyle, color = colors.textPrimary)
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                holding.fiatValue?.let {
-                    Text(
-                        if (hideBalance) HIDDEN_BALANCE else Formatters.fiat(it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = colors.textSecondary,
-                    )
-                }
-                holding.change24hPercent?.let {
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        Formatters.percent(it),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (it.signum() >= 0) colors.success else colors.error,
-                    )
-                }
+            holding.fiatValue?.let {
+                Text(
+                    if (hideBalance) HIDDEN_BALANCE else Formatters.fiat(it),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
             }
         }
     }

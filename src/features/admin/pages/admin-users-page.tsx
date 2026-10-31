@@ -107,11 +107,22 @@ function UserDetailDialog({
 
   const saveProfile = useMutation({
     mutationFn: async () => {
+      const mobileTrim = mobile.trim()
+      const walletTrim = walletAddress.trim()
+      if (
+        mobileTrim &&
+        !/^[+0-9][0-9\s\-()]{7,22}$/.test(mobileTrim)
+      ) {
+        throw new Error('Enter a valid mobile number (with country code) or leave blank')
+      }
+      if (walletTrim && !/^0x[a-fA-F0-9]{40}$/.test(walletTrim)) {
+        throw new Error('Enter a valid BEP-20 wallet (0x + 40 hex) or leave blank')
+      }
       await adminUpdateUser({
         uid,
         displayName: displayName.trim() || undefined,
-        mobile: mobile.trim() || undefined,
-        walletAddress: walletAddress.trim() ? walletAddress.trim() : null,
+        mobile: mobileTrim || undefined,
+        walletAddress: walletTrim || null,
         status: status as 'active' | 'suspended' | 'closed',
         kycStatus: kycStatus as 'none' | 'pending' | 'verified' | 'rejected',
         disabled,
@@ -212,11 +223,11 @@ function UserDetailDialog({
           <div className="mt-4 space-y-6">
             <div className="grid gap-3 rounded-xl border border-line bg-canvas p-4 text-sm sm:grid-cols-2">
               <div>
-                <p className="text-xs text-ink-muted">Referral code</p>
+                <p className="text-xs text-ink-muted">User ID</p>
                 <button
                   type="button"
                   className="mt-1 font-mono font-semibold"
-                  onClick={() => referralCode && copyText('Referral code', referralCode)}
+                  onClick={() => referralCode && copyText('User ID', referralCode)}
                 >
                   {referralCode || '—'}
                 </button>
@@ -457,7 +468,7 @@ export function AdminUsersPage() {
     { key: 'displayName', label: 'Name' },
     { key: 'email', label: 'Email' },
     { key: 'mobile', label: 'Mobile' },
-    { key: 'referralCode', label: 'Referral code' },
+    { key: 'referralCode', label: 'User ID' },
     { key: 'referredByName', label: 'Referred by name' },
     { key: 'referredByCode', label: 'Referred by code' },
     { key: 'walletAddress', label: 'Wallet' },

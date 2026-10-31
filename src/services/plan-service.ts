@@ -100,6 +100,33 @@ export async function transferBetweenWallets(input: {
   return callFunction<typeof input, { ok: true }>('transferBetweenWallets', input)
 }
 
+export async function transferToUser(input: {
+  toUserId: string
+  walletKind: 'vfxt' | 'withdrawal'
+  amountMinor: number
+  note?: string
+  idempotencyKey: string
+}) {
+  return callFunction<
+    typeof input,
+    {
+      ok: true
+      toUserId: string
+      toUid: string
+      walletKind: string
+      amountMinor: number
+      currency: string
+    }
+  >('transferToUser', input)
+}
+
+export async function lookupUserId(userId: string) {
+  return callFunction<
+    { userId: string },
+    { userId: string; displayName: string | null }
+  >('lookupUserId', { userId })
+}
+
 export async function ensureWallets() {
   return callFunction<undefined, { created: string[] }>('ensureWallets')
 }

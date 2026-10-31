@@ -45,4 +45,37 @@ data class MiningOverview(
     val status: MiningStatus,
     val rewards: RewardSummary?,
     val history: List<MiningHistoryItem>,
+    val activeBoosters: List<ActiveMiningBooster> = emptyList(),
+    val effectiveRatePerHour: BigDecimal? = null,
+)
+
+/** Catalog item from admin — paid with USDT BEP-20. */
+data class MiningBooster(
+    val boosterId: String,
+    val name: String,
+    val description: String,
+    val bonusRatePerHour: BigDecimal,
+    val durationSeconds: Long,
+    val priceUsdt: String,
+)
+
+/**
+ * Exact payment instructions for one purchase.
+ * Payment is signed and sent only from the in-app VFXT Wallet (USDT BEP-20).
+ */
+data class BoosterPurchaseOrder(
+    val purchaseId: String,
+    val boosterName: String,
+    val priceUsdt: String,
+    val expectedUsdtWei: String,
+    val paymentWallet: String,
+    val paymentToken: String,
+    val expiresAtMillis: Long,
+)
+
+data class ActiveMiningBooster(
+    val userBoosterId: String,
+    val boosterName: String,
+    val bonusRatePerHour: BigDecimal,
+    val expiresAtMillis: Long,
 )

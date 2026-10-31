@@ -31,6 +31,7 @@ import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.Timer
 import androidx.compose.material.icons.outlined.Savings
 import androidx.compose.material.icons.outlined.WorkspacePremium
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -73,7 +74,10 @@ import com.vfxt.wallet.core.designsystem.components.VfxtSecondaryButton
 import com.vfxt.wallet.core.designsystem.components.VfxtTextButton
 import com.vfxt.wallet.core.designsystem.theme.Spacing
 import com.vfxt.wallet.core.designsystem.theme.VfxtTheme
+import com.vfxt.wallet.domain.models.BoosterPurchaseOrder
+import com.vfxt.wallet.domain.models.MiningBooster
 import com.vfxt.wallet.domain.models.MiningConfig
+import com.vfxt.wallet.domain.models.MiningHistoryItem
 import com.vfxt.wallet.domain.models.MiningOverview
 import com.vfxt.wallet.domain.models.MiningSession
 import com.vfxt.wallet.domain.models.MiningStatus
@@ -89,14 +93,36 @@ fun MiningScreen(
     viewModel: MiningViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    MiningContent(state = state, onRetry = viewModel::load, onNotify = onNotify)
+    LaunchedEffect(state.notice) {
+        state.notice?.let {
+            onNotify(it)
+            viewModel.consumeNotice()
+        }
+    }
+    MiningContent(
+        state = state,
+        onRetry = viewModel::load,
+        onStart = viewModel::startMining,
+        onStop = viewModel::stopMining,
+        onClaim = viewModel::claimRewards,
+        onOpenBoosters = viewModel::openBoosters,
+        onCloseBoosters = viewModel::closeBoosters,
+        onSelectBooster = viewModel::selectBooster,
+        onPayVfxt = viewModel::payWithVfxtWallet,
+    )
 }
 
 @Composable
 fun MiningContent(
     state: MiningUiState,
     onRetry: () -> Unit,
-    onNotify: (String) -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onClaim: () -> Unit,
+    onOpenBoosters: () -> Unit = {},
+    onCloseBoosters: () -> Unit = {},
+    onSelectBooster: (String) -> Unit = {},
+    onPayVfxt: () -> Unit = {},
 ) {
     var showRules by remember { mutableStateOf(false) }
     Column(
@@ -117,29 +143,93 @@ fun MiningContent(
                 else -> {
                     MiningHero(
                         overview.status,
-                        onStart = { onNotify("Starting a session requires the mining service.") },
-                        onStop = { onNotify("Stopping a session requires the mining service.") },
+                        onStart = onStart,
+                        onStop = onStop,
+                        actionInProgress = state.actionInProgress,
                     )
                     Spacer(Modifier.height(Spacing.lg))
                     MiningStats(overview)
                     Spacer(Modifier.height(Spacing.lg))
-                    ClaimCard(overview, onClaim = { onNotify("Claims are processed by the VFXT backend once connected.") })
+                    BoostersCard(
+                        overview = overview,
+                        onOpenBoosters = onOpenBoosters,
+                        actionInProgress = state.actionInProgress,
+                    )
+                    Spacer(Modifier.height(Spacing.lg))
+                    ClaimCard(
+                        overview,
+                        onClaim = onClaim,
+                        actionInProgress = state.actionInProgress,
+                    )
                     Spacer(Modifier.height(Spacing.xxl))
                     SectionHeader("Mining history")
                     Spacer(Modifier.height(Spacing.sm))
-                    VfxtCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.xs)) {
-                        EmptyState(
-                            icon = Icons.Outlined.History,
-                            title = "No sessions yet",
-                            message = "Completed mining sessions and their rewards will be listed here.",
-                        )
-                    }
+                    HistoryCard(overview.history)
                 }
             }
             Spacer(Modifier.height(Spacing.xxl))
         }
     }
     if (showRules) MiningRulesSheet(onDismiss = { showRules = false })
+    if (state.showBoosters) {
+        BoosterShopSheet(
+            state = state,
+            onDismiss = onCloseBoosters,
+            onSelect = onSelectBooster,
+            onPayVfxt = onPayVfxt,
+        )
+    }
+}
+
+@Composable
+private fun HistoryCard(history: List<MiningHistoryItem>) {
+    VfxtCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.xs)) {
+        if (history.isEmpty()) {
+            EmptyState(
+                icon = Icons.Outlined.History,
+                title = "No sessions yet",
+                message = "Completed mining sessions and their rewards will be listed here.",
+            )
+        } else {
+            history.forEachIndexed { index, item ->
+                HistoryRow(item)
+                if (index != history.lastIndex) {
+                    Spacer(Modifier.height(Spacing.sm))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistoryRow(item: MiningHistoryItem) {
+    val colors = VfxtTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconTile(Icons.Outlined.History, colors.primary, size = 36.dp)
+        Spacer(Modifier.width(Spacing.md))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.sessionId.take(8).uppercase(Locale.US),
+                style = MaterialTheme.typography.titleSmall,
+                color = colors.textPrimary,
+            )
+            Text(
+                Formatters.dateTime(item.startTimeMillis),
+                style = MaterialTheme.typography.bodySmall,
+                color = colors.textSecondary,
+            )
+        }
+        Text(
+            item.reward?.let { "+${Formatters.tokenAmount(it, 4)} VFXT" } ?: UNKNOWN_VALUE,
+            style = MaterialTheme.typography.titleSmall,
+            color = colors.success,
+        )
+    }
 }
 
 @Composable
@@ -159,7 +249,12 @@ private fun MiningSkeleton() {
 
 /** Ring + countdown. Progress and countdown are derived from server timestamps only. */
 @Composable
-private fun MiningHero(status: MiningStatus, onStart: () -> Unit, onStop: () -> Unit) {
+private fun MiningHero(
+    status: MiningStatus,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    actionInProgress: Boolean,
+) {
     val colors = VfxtTheme.colors
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
     if (status is MiningStatus.Active) {
@@ -248,20 +343,26 @@ private fun MiningHero(status: MiningStatus, onStart: () -> Unit, onStop: () -> 
         }
 
         Spacer(Modifier.height(Spacing.lg))
-        when (status) {
-            is MiningStatus.Active -> VfxtSecondaryButton(
-                "Stop mining",
-                onStop,
-                Modifier.fillMaxWidth(),
-                enabled = status.config.allowStop,
-            )
-            else -> VfxtPrimaryButton(
-                "Start mining",
-                onStart,
-                Modifier.fillMaxWidth(),
-                enabled = status is MiningStatus.Idle,
-                icon = Icons.Filled.Bolt,
-            )
+        if (actionInProgress) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+            }
+        } else {
+            when (status) {
+                is MiningStatus.Active -> VfxtSecondaryButton(
+                    "Stop mining",
+                    onStop,
+                    Modifier.fillMaxWidth(),
+                    enabled = status.config.allowStop,
+                )
+                else -> VfxtPrimaryButton(
+                    "Start mining",
+                    onStart,
+                    Modifier.fillMaxWidth(),
+                    enabled = status is MiningStatus.Idle,
+                    icon = Icons.Filled.Bolt,
+                )
+            }
         }
     }
 }
@@ -307,11 +408,158 @@ private fun StatTile(icon: ImageVector, label: String, value: String, modifier: 
 }
 
 @Composable
-private fun ClaimCard(overview: MiningOverview, onClaim: () -> Unit) {
+private fun BoostersCard(
+    overview: MiningOverview,
+    onOpenBoosters: () -> Unit,
+    actionInProgress: Boolean,
+) {
+    val colors = VfxtTheme.colors
+    val effective = overview.effectiveRatePerHour
+    VfxtCard(Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            IconTile(Icons.Filled.Bolt, colors.electric, size = 44.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text("Speed boosters", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+                Text(
+                    if (overview.activeBoosters.isEmpty()) {
+                        "Pay with your VFXT Wallet only (USDT BEP-20)."
+                    } else {
+                        "${overview.activeBoosters.size} active · effective ${effective?.let { Formatters.tokenAmount(it, 4) } ?: UNKNOWN_VALUE}/h"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textSecondary,
+                )
+            }
+        }
+        if (overview.activeBoosters.isNotEmpty()) {
+            Spacer(Modifier.height(Spacing.md))
+            overview.activeBoosters.take(3).forEach { b ->
+                Text(
+                    "${b.boosterName} · +${Formatters.tokenAmount(b.bonusRatePerHour, 4)}/h",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = colors.textPrimary,
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.lg))
+        VfxtSecondaryButton(
+            "Buy booster",
+            onOpenBoosters,
+            Modifier.fillMaxWidth(),
+            enabled = !actionInProgress,
+        )
+    }
+}
+
+@Composable
+private fun BoosterShopSheet(
+    state: MiningUiState,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit,
+    onPayVfxt: () -> Unit,
+) {
+    val colors = VfxtTheme.colors
+    val order = state.pendingOrder
+    VfxtBottomSheet(onDismiss) {
+        Text("Buy mining booster", style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary)
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            "Payment is USDT (BEP-20) signed and sent only from your VFXT Wallet in this app.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.textSecondary,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+
+        when {
+            state.boostersLoading -> {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+                }
+            }
+            order != null -> BoosterPaymentPanel(
+                order = order,
+                actionInProgress = state.actionInProgress,
+                onPayVfxt = onPayVfxt,
+            )
+            state.boosters.isEmpty() -> EmptyState(
+                icon = Icons.Filled.Bolt,
+                title = "No boosters listed",
+                message = "Ask an admin to add boosters in the VFXT admin panel.",
+            )
+            else -> {
+                state.boosters.forEach { booster ->
+                    BoosterCatalogRow(
+                        booster = booster,
+                        enabled = !state.actionInProgress,
+                        onBuy = { onSelect(booster.boosterId) },
+                    )
+                    Spacer(Modifier.height(Spacing.md))
+                }
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+    }
+}
+
+@Composable
+private fun BoosterCatalogRow(booster: MiningBooster, enabled: Boolean, onBuy: () -> Unit) {
+    val colors = VfxtTheme.colors
+    VfxtCard(Modifier.fillMaxWidth()) {
+        Text(booster.name, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+        if (booster.description.isNotBlank()) {
+            Text(booster.description, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+        }
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            "+${Formatters.tokenAmount(booster.bonusRatePerHour, 4)} VFXT/h · ${booster.durationSeconds / 3600}h · ${booster.priceUsdt} USDT",
+            style = MaterialTheme.typography.bodyMedium,
+            color = colors.electric,
+        )
+        Spacer(Modifier.height(Spacing.md))
+        VfxtPrimaryButton("Buy with USDT", onBuy, Modifier.fillMaxWidth(), enabled = enabled)
+    }
+}
+
+@Composable
+private fun BoosterPaymentPanel(
+    order: BoosterPurchaseOrder,
+    actionInProgress: Boolean,
+    onPayVfxt: () -> Unit,
+) {
+    val colors = VfxtTheme.colors
+    VfxtCard(Modifier.fillMaxWidth()) {
+        Text(order.boosterName, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
+        Spacer(Modifier.height(Spacing.sm))
+        Text("Amount (USDT BEP-20)", style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
+        Text(order.priceUsdt, style = MaterialTheme.typography.headlineSmall, color = colors.electric)
+        Spacer(Modifier.height(Spacing.md))
+        Text(
+            "Your VFXT Wallet signs and sends this USDT (BEP-20) payment on BNB Smart Chain. Payment from other apps is not available.",
+            style = MaterialTheme.typography.bodySmall,
+            color = colors.textSecondary,
+        )
+        Spacer(Modifier.height(Spacing.lg))
+        if (actionInProgress) {
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(color = colors.primary, strokeWidth = 2.dp, modifier = Modifier.size(28.dp))
+            }
+        } else {
+            VfxtPrimaryButton("Pay with VFXT Wallet", onPayVfxt, Modifier.fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+private fun ClaimCard(overview: MiningOverview, onClaim: () -> Unit, actionInProgress: Boolean) {
     val colors = VfxtTheme.colors
     val config = overview.status.configOrNull()
     val rewards = overview.rewards
-    val canClaim = rewards != null && config != null && rewards.available >= config.minimumClaim && rewards.available.signum() > 0
+    val canClaim = !actionInProgress &&
+        rewards != null &&
+        config != null &&
+        rewards.available >= config.minimumClaim &&
+        rewards.available.signum() > 0
     VfxtCard(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconTile(Icons.Outlined.Redeem, colors.accent, size = 44.dp)
@@ -320,7 +568,7 @@ private fun ClaimCard(overview: MiningOverview, onClaim: () -> Unit) {
                 Text("Claim rewards", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
                 Text(
                     if (rewards == null) {
-                        "Claims open once the mining service is connected."
+                        "Sign in with your wallet to claim mining rewards."
                     } else {
                         "Minimum claim: ${config?.let { Formatters.tokenAmount(it.minimumClaim) } ?: UNKNOWN_VALUE} VFXT"
                     },
@@ -385,7 +633,7 @@ private fun MiningUnavailablePreview() {
         Box(Modifier.background(VfxtTheme.colors.background)) {
             MiningContent(
                 MiningUiState(false, MiningOverview(MiningStatus.ServiceUnavailable("The mining service will be connected in an upcoming update."), null, emptyList())),
-                {}, {},
+                {}, {}, {}, {},
             )
         }
     }
@@ -406,7 +654,7 @@ private fun MiningActivePreview() {
                         emptyList(),
                     ),
                 ),
-                {}, {},
+                {}, {}, {}, {},
             )
         }
     }

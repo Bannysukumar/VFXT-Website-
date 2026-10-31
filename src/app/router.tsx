@@ -20,6 +20,8 @@ import { StakingPage } from '@/features/staking/pages/staking-page'
 import { RanksPage } from '@/features/ranks/pages/ranks-page'
 import { SupportPage } from '@/features/support/pages/support-page'
 import { TransferPage } from '@/features/wallets/pages/transfer-page'
+import { PeerTransferHistoryPage } from '@/features/wallets/pages/peer-transfer-history-page'
+import { AdminPeerTransfersPage } from '@/features/admin/pages/admin-peer-transfers-page'
 import { AdminDashboardPage } from '@/features/admin/pages/admin-dashboard-page'
 import { AdminDepositsPage } from '@/features/admin/pages/admin-deposits-page'
 import { AdminWithdrawalsPage } from '@/features/admin/pages/admin-withdrawals-page'
@@ -27,6 +29,10 @@ import { AdminUsersPage } from '@/features/admin/pages/admin-users-page'
 import { AdminTicketsPage } from '@/features/admin/pages/admin-tickets-page'
 import { AdminAuditPage } from '@/features/admin/pages/admin-audit-page'
 import { AdminStakingPage } from '@/features/admin/pages/admin-staking-page'
+import { AdminMiningPage } from '@/features/admin/pages/admin-mining-page'
+import { AdminMiningBoostersPage } from '@/features/admin/pages/admin-mining-boosters-page'
+import { AdminMiningBoosterHistoryPage } from '@/features/admin/pages/admin-mining-booster-history-page'
+import { AdminMiningBoosterActivePage } from '@/features/admin/pages/admin-mining-booster-active-page'
 import { AdminAffiliatesPage } from '@/features/admin/pages/admin-affiliates-page'
 import { AdminCryptoWalletPage } from '@/features/admin/pages/admin-crypto-wallet-page'
 import { AdminSettingsPage } from '@/features/admin/pages/admin-settings-page'
@@ -75,6 +81,7 @@ export const router = createBrowserRouter([
           { path: 'deposits', element: <DepositsPage /> },
           { path: 'withdrawals', element: <WithdrawalsPage /> },
           { path: 'transfer', element: <TransferPage /> },
+          { path: 'transfers/history', element: <PeerTransferHistoryPage /> },
           { path: 'token', element: <AppTokenPage /> },
           { path: 'referrals', element: <ReferralsPage /> },
           { path: 'referrals/level/:level', element: <ReferralLevelPage /> },
@@ -99,7 +106,12 @@ export const router = createBrowserRouter([
           { path: 'withdrawals', element: <AdminWithdrawalsPage /> },
           { path: 'auto-withdrawals', element: <AdminAutoWithdrawalsPage /> },
           { path: 'income/:incomeType', element: <AdminIncomePage /> },
+          { path: 'peer-transfers', element: <AdminPeerTransfersPage /> },
           { path: 'staking', element: <AdminStakingPage /> },
+          { path: 'mining', element: <AdminMiningPage /> },
+          { path: 'mining/boosters', element: <AdminMiningBoostersPage /> },
+          { path: 'mining/boosters/history', element: <AdminMiningBoosterHistoryPage /> },
+          { path: 'mining/boosters/active', element: <AdminMiningBoosterActivePage /> },
           { path: 'crypto-wallet', element: <AdminCryptoWalletPage /> },
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'affiliates', element: <AdminAffiliatesPage /> },

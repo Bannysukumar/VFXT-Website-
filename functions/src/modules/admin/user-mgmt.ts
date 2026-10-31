@@ -74,25 +74,35 @@ export const getAdminUserDetail = onCall(CALLABLE_OPTS, async (request) => {
   }
 });
 
+const mobileSchema = z
+  .string()
+  .max(24)
+  .optional()
+  .or(z.literal(''))
+  .refine((v) => !v || v.trim() === '' || /^[+0-9][0-9\s\-()]{7,22}$/.test(v.trim()), {
+    message: 'Enter a valid mobile number (with country code) or leave blank',
+  });
+
+const walletAddressSchema = z
+  .union([
+    z
+      .string()
+      .regex(/^0x[a-fA-F0-9]{40}$/, 'Enter a valid BEP-20 wallet (0x + 40 hex) or leave blank'),
+    z.literal(''),
+    z.null(),
+  ])
+  .optional();
+
 const updateUserSchema = z
   .object({
     uid: z.string().min(1).max(128),
     displayName: z.string().min(1).max(80).optional(),
-    mobile: z
-      .string()
-      .min(8)
-      .max(20)
-      .regex(/^[+0-9][0-9\s\-()]{7,19}$/)
-      .optional(),
+    mobile: mobileSchema,
     status: z.enum(['active', 'suspended', 'closed']).optional(),
     kycStatus: z.enum(['none', 'pending', 'verified', 'rejected']).optional(),
     disabled: z.boolean().optional(),
-    withdrawalAddress: z.string().max(128).nullable().optional(),
-    walletAddress: z
-      .string()
-      .regex(/^0x[a-fA-F0-9]{40}$/)
-      .nullable()
-      .optional(),
+    withdrawalAddress: z.string().max(128).nullable().optional().or(z.literal('')),
+    walletAddress: walletAddressSchema,
   })
   .strict();
 
@@ -105,7 +115,12 @@ export const adminUpdateUser = onCall(CALLABLE_OPTS, async (request) => {
     ]);
     const parsed = updateUserSchema.safeParse(request.data ?? {});
     if (!parsed.success) {
-      throw new AppError('invalid-argument', parsed.error.issues[0]?.message ?? 'Invalid payload');
+      const issue = parsed.error.issues[0];
+      const field = issue?.path?.length ? `${issue.path.join('.')}: ` : '';
+      throw new AppError(
+        'invalid-argument',
+        `${field}${issue?.message ?? 'Invalid payload'}`.trim(),
+      );
     }
     const { uid, disabled, ...profilePatch } = parsed.data;
     const db = getDb();
@@ -118,17 +133,17 @@ export const adminUpdateUser = onCall(CALLABLE_OPTS, async (request) => {
     };
     if (profilePatch.displayName !== undefined) updates.displayName = profilePatch.displayName;
     if (profilePatch.mobile !== undefined) {
-      updates.mobile = profilePatch.mobile.replace(/\s+/g, ' ').trim();
+      const mobile = profilePatch.mobile.replace(/\s+/g, ' ').trim();
+      updates.mobile = mobile || null;
     }
     if (profilePatch.status !== undefined) updates.status = profilePatch.status;
     if (profilePatch.kycStatus !== undefined) updates.kycStatus = profilePatch.kycStatus;
     if (profilePatch.withdrawalAddress !== undefined) {
-      updates.withdrawalAddress = profilePatch.withdrawalAddress;
+      updates.withdrawalAddress = profilePatch.withdrawalAddress || null;
     }
     if (profilePatch.walletAddress !== undefined) {
-      updates.walletAddress = profilePatch.walletAddress
-        ? profilePatch.walletAddress.toLowerCase()
-        : null;
+      const wallet = (profilePatch.walletAddress || '').trim();
+      updates.walletAddress = wallet ? wallet.toLowerCase() : null;
     }
 
     await ref.update(updates);

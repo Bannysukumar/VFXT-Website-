@@ -29,8 +29,8 @@ import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.LockClock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Pin
@@ -51,7 +51,6 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.vfxt.wallet.BuildConfig
 import com.vfxt.wallet.core.common.Formatters
-import com.vfxt.wallet.blockchain.networks.Networks
 import com.vfxt.wallet.core.designsystem.components.RowDivider
 import com.vfxt.wallet.core.designsystem.components.ScreenHeader
 import com.vfxt.wallet.core.designsystem.components.SettingsGroup
@@ -70,6 +69,12 @@ fun ProfileScreen(
     onImportWallet: () -> Unit,
     onManageWallets: () -> Unit,
     onSecurity: () -> Unit,
+    onNetwork: () -> Unit,
+    onNotifications: () -> Unit = {},
+    onSupport: () -> Unit = {},
+    onPrivacy: () -> Unit = {},
+    onTerms: () -> Unit = {},
+    onWalletConnect: () -> Unit = {},
     onNotify: (String) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
@@ -124,19 +129,21 @@ fun ProfileScreen(
                 RowDivider()
                 SettingsRow(Icons.Outlined.AttachMoney, "Currency", value = "USD", onClick = later)
                 RowDivider()
-                SettingsRow(Icons.Outlined.Notifications, "Notifications", onClick = later)
+                SettingsRow(Icons.Outlined.Notifications, "Notifications", onClick = onNotifications)
                 RowDivider()
-                SettingsRow(Icons.Outlined.Hub, "Network", value = Networks.BscMainnet.shortName, onClick = later)
+                SettingsRow(Icons.Outlined.Hub, "Network", value = profile.networkName, onClick = onNetwork)
+                RowDivider()
+                SettingsRow(Icons.Outlined.Link, "WalletConnect", subtitle = "Connect to dApps", onClick = { walletOnly(onWalletConnect) })
             }
 
             SettingsGroup("Support") {
-                SettingsRow(Icons.Outlined.SupportAgent, "Customer support", onClick = later)
+                SettingsRow(Icons.Outlined.SupportAgent, "Customer support", onClick = onSupport)
                 RowDivider()
-                SettingsRow(Icons.AutoMirrored.Outlined.HelpOutline, "FAQs", onClick = later)
+                SettingsRow(Icons.AutoMirrored.Outlined.HelpOutline, "FAQs", onClick = onSupport)
                 RowDivider()
-                SettingsRow(Icons.Outlined.Policy, "Privacy policy", onClick = later)
+                SettingsRow(Icons.Outlined.Policy, "Privacy policy", onClick = onPrivacy)
                 RowDivider()
-                SettingsRow(Icons.Outlined.Description, "Terms and conditions", onClick = later)
+                SettingsRow(Icons.Outlined.Description, "Terms and conditions", onClick = onTerms)
                 RowDivider()
                 SettingsRow(Icons.Outlined.Info, "About VFXT", value = "v${BuildConfig.VERSION_NAME}")
             }

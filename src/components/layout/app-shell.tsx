@@ -39,6 +39,7 @@ import {
   ClipboardList,
   Zap,
   CircleDollarSign,
+  Pickaxe,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -83,12 +84,14 @@ const userNav: NavSection[] = [
       { to: '/app/deposits', label: 'Deposit', icon: ArrowDownToLine },
       { to: '/app/withdrawals', label: 'Withdraw', icon: ArrowUpFromLine },
       { to: '/app/transfer', label: 'Transfer', icon: ArrowRightLeft },
+      { to: '/app/transfers/history', label: 'Transfer history', icon: History },
     ],
   },
   {
     title: 'History',
     collapsible: true,
     items: [
+      { to: '/app/transfers/history', label: 'User transfers', icon: ArrowRightLeft },
       { to: '/app/wallets/fund/history', label: 'Fund', icon: Landmark },
       { to: '/app/wallets/staking/history', label: 'Staking', icon: PiggyBank },
       { to: '/app/wallets/daily_roi/history', label: 'Daily ROI', icon: LineChart },
@@ -137,6 +140,8 @@ const adminNav: NavSection[] = [
       { to: '/admin/withdrawals', label: 'Withdrawals', icon: ArrowUpFromLine },
       { to: '/admin/auto-withdrawals', label: 'Auto withdrawals', icon: CircleDollarSign },
       { to: '/admin/staking', label: 'Staking', icon: PiggyBank },
+      { to: '/admin/mining', label: 'Wallet mining', icon: Pickaxe },
+      { to: '/admin/mining/boosters', label: 'Mining boosters', icon: Zap },
       { to: '/admin/crypto-wallet', label: 'Hot wallet', icon: KeyRound },
     ],
   },
@@ -153,6 +158,7 @@ const adminNav: NavSection[] = [
       { to: '/admin/income/locked-maturity', label: 'Locked maturity', icon: Lock },
       { to: '/admin/income/locked-bonus', label: 'Locked bonus', icon: Layers },
       { to: '/admin/income/deposit-credit', label: 'Deposit credits', icon: Landmark },
+      { to: '/admin/peer-transfers', label: 'User transfers', icon: ArrowRightLeft },
     ],
   },
   {
@@ -160,6 +166,7 @@ const adminNav: NavSection[] = [
     items: [
       { to: '/admin/users', label: 'Users', icon: UserCog },
       { to: '/admin/affiliates', label: 'Affiliates', icon: Users },
+      { to: '/admin/peer-transfers', label: 'User transfers', icon: ArrowRightLeft },
     ],
   },
   {
@@ -184,6 +191,7 @@ const titles: Record<string, string> = {
   '/app/deposits': 'Deposit',
   '/app/withdrawals': 'Withdraw',
   '/app/transfer': 'Transfer',
+  '/app/transfers/history': 'Transfer history',
   '/app/token': 'Token',
   '/app/referrals': 'Affiliate',
   '/app/referrals/level/1': 'Level 1',
@@ -214,7 +222,12 @@ const titles: Record<string, string> = {
   '/admin/income/locked-maturity': 'Locked maturity',
   '/admin/income/locked-bonus': 'Locked bonus',
   '/admin/income/deposit-credit': 'Deposit credits',
+  '/admin/peer-transfers': 'User transfers',
   '/admin/staking': 'Staking',
+  '/admin/mining': 'Wallet mining',
+  '/admin/mining/boosters': 'Mining boosters',
+  '/admin/mining/boosters/history': 'Booster history',
+  '/admin/mining/boosters/active': 'Active boosters',
   '/admin/crypto-wallet': 'Hot wallet',
   '/admin/users': 'Users',
   '/admin/affiliates': 'Affiliates',

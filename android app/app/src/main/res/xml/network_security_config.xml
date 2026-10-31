@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    All traffic must be HTTPS and only system-trusted CAs are accepted (user-installed CAs are
+    ignored, so a proxy certificate on the device cannot intercept RPC or price calls).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

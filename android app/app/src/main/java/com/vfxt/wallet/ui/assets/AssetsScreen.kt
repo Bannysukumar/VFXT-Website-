@@ -30,7 +30,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
-import com.vfxt.wallet.blockchain.networks.Networks
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.semantics.Role
+import com.vfxt.wallet.blockchain.networks.EvmNetwork
 import com.vfxt.wallet.blockchain.tokens.TokenRegistry
 import com.vfxt.wallet.core.common.Formatters
 import com.vfxt.wallet.core.common.UNKNOWN_VALUE
@@ -51,11 +53,23 @@ import com.vfxt.wallet.ui.common.AssetRow
 
 @Composable
 fun AssetsScreen(
+    onTokenDetails: (String) -> Unit,
+    onAddToken: () -> Unit,
+    onNetwork: () -> Unit,
     onNotify: (String) -> Unit,
     viewModel: AssetsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    AssetsContent(state, onQueryChange = viewModel::updateQuery, onRetry = viewModel::load, onNotify = onNotify)
+    val hasWallet = state.overview?.account != null
+    AssetsContent(
+        state,
+        onQueryChange = viewModel::updateQuery,
+        onRetry = viewModel::load,
+        onNotify = onNotify,
+        onTokenDetails = { if (hasWallet) onTokenDetails(it) else onNotify("Create or import a wallet first.") },
+        onAddToken = onAddToken,
+        onNetwork = onNetwork,
+    )
 }
 
 @Composable
@@ -64,9 +78,12 @@ fun AssetsContent(
     onQueryChange: (String) -> Unit,
     onRetry: () -> Unit,
     onNotify: (String) -> Unit,
+    onTokenDetails: (String) -> Unit = {},
+    onAddToken: () -> Unit = {},
+    onNetwork: () -> Unit = {},
 ) {
     val colors = VfxtTheme.colors
-    val addToken = { onNotify("Custom BEP-20 tokens can be added once on-chain validation is available.") }
+    val addToken = onAddToken
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = Spacing.xxl)) {
         item {
             ScreenHeader(
@@ -76,7 +93,7 @@ fun AssetsContent(
             )
         }
         item {
-            SummaryCard(state.overview, Modifier.padding(horizontal = Spacing.screen))
+            SummaryCard(state.overview, state.network, onNetwork, Modifier.padding(horizontal = Spacing.screen))
             Spacer(Modifier.height(Spacing.lg))
         }
         item {
@@ -124,7 +141,7 @@ fun AssetsContent(
                         AssetRow(
                             holding,
                             hideBalance = false,
-                            onClick = { onNotify("Token details arrive with BSC integration.") },
+                            onClick = { onTokenDetails(holding.token.key) },
                         )
                     }
                 }
@@ -145,7 +162,12 @@ fun AssetsContent(
 }
 
 @Composable
-private fun SummaryCard(overview: WalletOverview?, modifier: Modifier = Modifier) {
+private fun SummaryCard(
+    overview: WalletOverview?,
+    network: EvmNetwork?,
+    onNetwork: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val colors = VfxtTheme.colors
     VfxtCard(modifier.fillMaxWidth()) {
         Text("Total asset value", style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
@@ -161,8 +183,15 @@ private fun SummaryCard(overview: WalletOverview?, modifier: Modifier = Modifier
         Spacer(Modifier.height(Spacing.lg))
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             StatItem("Tokens", "${overview?.holdings?.size ?: 0}", Modifier.weight(1f))
-            StatItem("Network", Networks.BscMainnet.shortName, Modifier.weight(1f))
-            StatItem("Chain ID", "${Networks.BscMainnet.chainId}", Modifier.weight(1f))
+            StatItem(
+                "Network",
+                network?.shortName ?: UNKNOWN_VALUE,
+                Modifier
+                    .weight(1f)
+                    .clickable(role = Role.Button, onClick = onNetwork),
+                valueColor = colors.primary,
+            )
+            StatItem("Chain ID", network?.chainId?.toString() ?: UNKNOWN_VALUE, Modifier.weight(1f))
         }
     }
 }

@@ -1,16 +1,11 @@
 import * as functionsV1 from 'firebase-functions/v1';
 import { FieldValue } from 'firebase-admin/firestore';
 import { Collections, getDb, initAdmin } from '../../lib/firebase';
+import { allocateUniqueUserId } from '../../lib/user-id';
 import { log } from '../../lib/logger';
 import { UserProfile } from '../../types/models';
 import { createDefaultWallets } from '../wallets/handlers';
 import { maybeApplyPendingReferral } from '../referrals/handlers';
-
-function generateReferralCode(uid: string): string {
-  const suffix = uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `VFXT${suffix}${rand}`.slice(0, 16);
-}
 
 /**
  * Auth onCreate (v1) — create user profile + default wallets.
@@ -26,7 +21,7 @@ export const onUserCreated = functionsV1
 
     log.info('auth_user_created', { uid, email: user.email ?? null });
 
-    const referralCode = generateReferralCode(uid);
+    const referralCode = await allocateUniqueUserId(db);
     const profile: UserProfile = {
       uid,
       email: user.email ?? null,

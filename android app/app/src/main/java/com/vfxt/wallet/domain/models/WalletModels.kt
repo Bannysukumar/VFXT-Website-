@@ -13,7 +13,19 @@ data class TokenInfo(
     val kind: TokenKind,
     /** Null for native coins, and for BEP-20 tokens whose contract is not configured yet. */
     val contractAddress: String?,
-)
+    /** CoinGecko id when a reliable market price exists; null means "no price", never zero. */
+    val priceId: String? = null,
+    val isCustom: Boolean = false,
+) {
+    /**
+     * Stable key unique per network: lower-cased contract address, "native" for the network coin,
+     * or "pending:SYMBOL" for a built-in token whose contract isn't configured yet.
+     */
+    val key: String get() = contractAddress?.lowercase() ?: if (kind == TokenKind.Native) "native" else "pending:${symbol.lowercase()}"
+
+    /** A BEP-20 entry without a configured contract can't be queried or sent. */
+    val isAvailable: Boolean get() = kind == TokenKind.Native || contractAddress != null
+}
 
 data class WalletAccount(
     val id: String,
@@ -32,6 +44,7 @@ data class Holding(
     val rawBalance: BigInteger?,
     val fiatValue: BigDecimal?,
     val change24hPercent: BigDecimal?,
+    val unitPrice: BigDecimal? = null,
 )
 
 enum class ActivityType { Received, Sent, MiningReward, Claim }
@@ -48,6 +61,9 @@ data class ActivityItem(
     val timestampMillis: Long,
     /** Only present for real on-chain transactions. */
     val txHash: String?,
+    val counterparty: String? = null,
+    val networkId: String? = null,
+    val fee: BigDecimal? = null,
 )
 
 data class WalletOverview(
@@ -57,4 +73,6 @@ data class WalletOverview(
     val totalFiatValue: BigDecimal?,
     val change24hPercent: BigDecimal?,
     val fiatCurrency: String = "USD",
+    /** Set when balances couldn't be refreshed (offline, RPC down); UI shows a banner. */
+    val syncError: String? = null,
 )

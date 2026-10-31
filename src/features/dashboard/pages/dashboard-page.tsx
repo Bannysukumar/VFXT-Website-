@@ -193,10 +193,10 @@ export function DashboardPage() {
         <Card>
           <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
             <div>
-              <CardDescription>Your unique referral link</CardDescription>
+              <CardDescription>Your User ID & referral link</CardDescription>
               <CardTitle className="mt-1 flex items-center gap-2 font-sans text-base">
                 <Link2 className="size-4 text-accent" />
-                Invite members under you
+                <span className="font-mono text-lg">{referralCode}</span>
               </CardTitle>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -217,10 +217,13 @@ export function DashboardPage() {
                 onClick={async () => {
                   if (!referralCode) return
                   await navigator.clipboard.writeText(referralCode)
-                  toast.success('Referral code copied')
+                  toast.success('User ID copied')
                 }}
               >
-                Copy code
+                Copy User ID
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/app/transfer">Transfer</Link>
               </Button>
               <Button variant="ghost" size="sm" asChild>
                 <Link to="/app/referrals">Affiliate</Link>
@@ -232,8 +235,8 @@ export function DashboardPage() {
               {referralLink}
             </p>
             <p className="mt-2 text-xs text-ink-subtle">
-              Code <span className="font-mono font-semibold text-ink">{referralCode}</span> (required
-              when someone registers).
+              User ID <span className="font-mono font-semibold text-ink">{referralCode}</span> is
+              required for signup referrals and for receiving member transfers.
             </p>
           </CardContent>
         </Card>

@@ -29,6 +29,17 @@ sealed interface RootRoute {
     @Serializable data object WalletManagement : RootRoute
     @Serializable data object SecuritySettings : RootRoute
     @Serializable data object ChangePin : RootRoute
+    @Serializable data class Send(val tokenKey: String? = null, val recipient: String? = null) : RootRoute
+    @Serializable data object Receive : RootRoute
+    @Serializable data object Activity : RootRoute
+    @Serializable data class TokenDetails(val tokenKey: String) : RootRoute
+    @Serializable data object AddToken : RootRoute
+    @Serializable data object NetworkSelection : RootRoute
+    @Serializable data object Notifications : RootRoute
+    @Serializable data object Support : RootRoute
+    @Serializable data object PrivacyPolicy : RootRoute
+    @Serializable data object Terms : RootRoute
+    @Serializable data object WalletConnect : RootRoute
 }
 
 /** Destinations hosted inside the bottom-navigation shell. */

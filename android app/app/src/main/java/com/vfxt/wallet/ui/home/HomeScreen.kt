@@ -53,6 +53,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
+import androidx.compose.ui.platform.LocalContext
+import com.vfxt.wallet.core.common.QrCodes
+import com.vfxt.wallet.blockchain.networks.EvmNetwork
+import com.vfxt.wallet.domain.models.TokenKind
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -93,12 +97,32 @@ fun HomeScreen(
     onCreateWallet: () -> Unit,
     onImportWallet: () -> Unit,
     onManageWallets: () -> Unit,
+    onSend: (tokenKey: String?, recipient: String?) -> Unit,
+    onReceive: () -> Unit,
+    onActivity: () -> Unit,
+    onTokenDetails: (String) -> Unit,
+    onNetwork: () -> Unit,
     onNotify: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     HomeContent(
+        onSend = { onSend(null, null) },
+        onReceive = onReceive,
+        onActivity = onActivity,
+        onTokenDetails = onTokenDetails,
+        onNetwork = onNetwork,
+        onScan = {
+            QrCodes.scan(context) { raw ->
+                val address = raw?.let(QrCodes::extractAddress)
+                when {
+                    address != null -> onSend(null, address)
+                    raw != null -> onNotify("That QR code doesn't contain a wallet address.")
+                }
+            }
+        },
         state = state,
         accounts = accounts,
         onRefresh = viewModel::refresh,
@@ -125,6 +149,12 @@ fun HomeContent(
     accounts: List<WalletAccount> = emptyList(),
     onSelectAccount: (String) -> Unit = {},
     onManageWallets: () -> Unit = {},
+    onSend: () -> Unit = {},
+    onReceive: () -> Unit = {},
+    onActivity: () -> Unit = {},
+    onTokenDetails: (String) -> Unit = {},
+    onNetwork: () -> Unit = {},
+    onScan: () -> Unit = {},
 ) {
     val colors = VfxtTheme.colors
     val overview = state.overview
@@ -156,7 +186,7 @@ fun HomeContent(
                 HomeTopBar(
                     account = account,
                     onWalletSelector = { if (account == null) onCreateWallet() else showWalletPicker = true },
-                    onScan = { onNotify("QR scanning arrives with Send and WalletConnect.") },
+                    onScan = { if (account == null) onNotify("Create or import a wallet first.") else onScan() },
                     onNotifications = { onNotify("You have no notifications yet.") },
                 )
             }
@@ -177,15 +207,34 @@ fun HomeContent(
                         .padding(horizontal = Spacing.screen, vertical = Spacing.lg),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    QuickActionButton(Icons.AutoMirrored.Filled.CallMade, "Send", if (account == null) needsWallet else { { onNotify("Sending arrives with BSC integration.") } }, Modifier.weight(1f))
-                    QuickActionButton(Icons.AutoMirrored.Filled.CallReceived, "Receive", if (account == null) needsWallet else { { onNotify("Receive screen arrives with BSC integration.") } }, Modifier.weight(1f))
+                    QuickActionButton(Icons.AutoMirrored.Filled.CallMade, "Send", if (account == null) needsWallet else onSend, Modifier.weight(1f))
+                    QuickActionButton(Icons.AutoMirrored.Filled.CallReceived, "Receive", if (account == null) needsWallet else onReceive, Modifier.weight(1f))
                     QuickActionButton(Icons.Filled.SwapHoriz, "Swap", { soonFeature = SoonFeature.Swap }, Modifier.weight(1f), comingSoon = true)
                     QuickActionButton(Icons.Filled.ShoppingCart, "Buy", { soonFeature = SoonFeature.Buy }, Modifier.weight(1f), comingSoon = true)
                 }
             }
 
             item {
-                SectionHeader("My assets", Modifier.padding(horizontal = Spacing.screen))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = Spacing.screen),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    SectionHeader("My assets", Modifier.weight(1f))
+                    state.network?.let { network ->
+                        StatusPill(
+                            network.shortName,
+                            tone = if (network.isTestnet) PillTone.Warning else PillTone.Primary,
+                            showDot = true,
+                            modifier = Modifier.clickable(role = Role.Button, onClick = onNetwork),
+                        )
+                    }
+                }
+                overview?.syncError?.let {
+                    Spacer(Modifier.height(Spacing.sm))
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = colors.warning, modifier = Modifier.padding(horizontal = Spacing.screen))
+                }
                 Spacer(Modifier.height(Spacing.sm))
             }
             item {
@@ -200,7 +249,11 @@ fun HomeContent(
                         state.errorMessage != null && overview == null -> ErrorState(state.errorMessage, onRefresh)
                         else -> overview?.holdings.orEmpty().forEachIndexed { i, holding ->
                             if (i > 0) RowDivider()
-                            AssetRow(holding, hideBalance = state.balanceHidden)
+                            AssetRow(
+                                holding,
+                                hideBalance = state.balanceHidden,
+                                onClick = if (account != null) { { onTokenDetails(holding.token.key) } } else null,
+                            )
                         }
                     }
                 }
@@ -212,7 +265,7 @@ fun HomeContent(
                     "Recent activity",
                     Modifier.padding(horizontal = Spacing.screen),
                     actionLabel = if (overview?.activity.isNullOrEmpty()) null else "View all",
-                    onAction = { onNotify("Full transaction history arrives with BSC integration.") },
+                    onAction = onActivity,
                 )
                 Spacer(Modifier.height(Spacing.sm))
             }
@@ -233,7 +286,7 @@ fun HomeContent(
                         )
                         else -> activity.take(5).forEachIndexed { i, item ->
                             if (i > 0) RowDivider()
-                            ActivityRow(item)
+                            ActivityRow(item, onClick = onActivity)
                         }
                     }
                 }
@@ -357,7 +410,7 @@ private fun PortfolioCard(
                     SkeletonBlock(Modifier.width(90.dp).height(20.dp))
                 }
                 overview?.account == null -> NoWalletHero(onCreateWallet, onImportWallet)
-                else -> BalanceHero(overview, state.balanceHidden, onToggleBalance)
+                else -> BalanceHero(overview, state.network, state.balanceHidden, onToggleBalance)
             }
         }
     }
@@ -398,10 +451,13 @@ private fun HeroButton(text: String, filled: Boolean, onClick: () -> Unit, modif
 }
 
 @Composable
-private fun BalanceHero(overview: WalletOverview, hidden: Boolean, onToggleBalance: () -> Unit) {
+private fun BalanceHero(overview: WalletOverview, network: EvmNetwork?, hidden: Boolean, onToggleBalance: () -> Unit) {
+    // Testnet coins have no market value, so show the native balance itself instead of a fiat total.
+    val testnet = network?.isTestnet == true
+    val nativeHolding = overview.holdings.firstOrNull { it.token.kind == TokenKind.Native }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            "Total balance · ${overview.fiatCurrency}",
+            if (testnet) "${network?.name} balance" else "Total balance · ${overview.fiatCurrency}",
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.8f),
             modifier = Modifier.weight(1f),
@@ -420,6 +476,8 @@ private fun BalanceHero(overview: WalletOverview, hidden: Boolean, onToggleBalan
     Text(
         when {
             hidden -> HIDDEN_BALANCE
+            testnet && nativeHolding?.rawBalance != null ->
+                "${Formatters.tokenAmount(nativeHolding.rawBalance, nativeHolding.token.decimals, 4)} ${nativeHolding.token.symbol}"
             total != null -> Formatters.fiat(total)
             else -> "—"
         },
@@ -441,6 +499,8 @@ private fun BalanceHero(overview: WalletOverview, hidden: Boolean, onToggleBalan
             Spacer(Modifier.width(Spacing.sm))
             Text("24h", style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.75f))
         }
+    } else if (testnet) {
+        StatusPill("Test network · no market value", tone = PillTone.Neutral)
     } else if (total == null) {
         StatusPill("Price data unavailable", tone = PillTone.Neutral)
     }

@@ -1,3 +1,9 @@
+# Android release signing material and local secrets (never commit)
+*.jks
+*.keystore
+/keystore/
+local.properties
+
 # Dependencies
 node_modules/
 functions/node_modules/

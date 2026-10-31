@@ -1,7 +1,9 @@
 package com.vfxt.wallet.blockchain.tokens
 
+import com.vfxt.wallet.BuildConfig
 import com.vfxt.wallet.blockchain.networks.EvmNetwork
 import com.vfxt.wallet.blockchain.networks.Networks
+import com.vfxt.wallet.blockchain.wallet.WalletKeyService
 import com.vfxt.wallet.domain.models.TokenInfo
 import com.vfxt.wallet.domain.models.TokenKind
 
@@ -9,33 +11,100 @@ import com.vfxt.wallet.domain.models.TokenKind
  * Built-in token list, keyed by network. A token is only ever looked up together with its
  * network so a contract address from one chain can never be used on another.
  *
- * BEP-20 contract addresses are left null until they are verified on-chain and configured
- * in Phase 3. A null address means "balance cannot be read yet", never "use a default".
+ * - Stablecoins use CoinGecko ids for live USD quotes.
+ * - VFXT: address supplied at build time (`vfxt.tokenMainnet` / `vfxt.tokenTestnet`).
+ *   Until set the token is listed but marked "not deployed" and never queried.
  */
 object TokenRegistry {
-    private fun nativeOf(network: EvmNetwork) = TokenInfo(
+    private const val USDT_BSC = "0x55d398326f99059fF775485246999027B3197955"
+    private const val USDC_BSC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
+    private const val USDT_ETH = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
+    private const val USDC_ETH = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    private const val USDT_POLYGON = "0xc2132D05D31c914a87C6611C10748AEb04B58e8F"
+    private const val USDC_POLYGON = "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
+    private const val USDT_ARBITRUM = "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9"
+    private const val USDC_ARBITRUM = "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+    private const val USDT_OPTIMISM = "0x94b008aA00579c1307B0EF2c499aD98a8ce58e58"
+    private const val USDC_OPTIMISM = "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85"
+    private const val USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+    private const val USDT_AVALANCHE = "0x9702230A8Ea53601f5cD2dc00fDBc13d4dF4A8c7"
+    private const val USDC_AVALANCHE = "0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E"
+
+    private fun native(network: EvmNetwork) = TokenInfo(
         symbol = network.nativeSymbol,
-        name = if (network.isTestnet) "Test BNB" else "BNB",
+        name = network.nativeName,
         decimals = network.nativeDecimals,
         networkId = network.id,
         kind = TokenKind.Native,
         contractAddress = null,
+        priceId = network.nativePriceId,
     )
 
-    private fun bep20(network: EvmNetwork, symbol: String, name: String, decimals: Int) = TokenInfo(
-        symbol = symbol,
-        name = name,
-        decimals = decimals,
-        networkId = network.id,
-        kind = TokenKind.Bep20,
-        contractAddress = null,
-    )
+    private fun erc20(
+        symbol: String,
+        name: String,
+        decimals: Int,
+        network: EvmNetwork,
+        contract: String,
+        priceId: String?,
+    ) = TokenInfo(symbol, name, decimals, network.id, TokenKind.Bep20, contract, priceId = priceId)
 
-    fun defaultTokens(network: EvmNetwork): List<TokenInfo> = listOf(
-        nativeOf(network),
-        bep20(network, "USDT", "Tether USD", 18),
-        bep20(network, "VFXT", "VFXT Token", 18),
-    )
+    private fun vfxt(network: EvmNetwork): TokenInfo? {
+        // VFXT is a BNB Smart Chain project token; only list it on BSC nets.
+        if (network.id != Networks.BscMainnet.id && network.id != Networks.BscTestnet.id) return null
+        val configured = if (network.isTestnet) BuildConfig.VFXT_TOKEN_TESTNET else BuildConfig.VFXT_TOKEN_MAINNET
+        return TokenInfo(
+            symbol = "VFXT",
+            name = "VFXT Token",
+            decimals = 18,
+            networkId = network.id,
+            kind = TokenKind.Bep20,
+            contractAddress = configured.takeIf { WalletKeyService.isValidAddress(it) },
+            priceId = null,
+        )
+    }
 
-    val defaultNetwork: EvmNetwork = Networks.BscMainnet
+    fun defaultTokens(network: EvmNetwork): List<TokenInfo> {
+        val builtIns = when (network.id) {
+            Networks.BscMainnet.id -> listOf(
+                native(network),
+                erc20("USDT", "Tether USD", 18, network, USDT_BSC, "tether"),
+                erc20("USDC", "USD Coin", 18, network, USDC_BSC, "usd-coin"),
+            )
+            Networks.BscTestnet.id -> listOf(native(network))
+            Networks.Ethereum.id -> listOf(
+                native(network),
+                erc20("USDT", "Tether USD", 6, network, USDT_ETH, "tether"),
+                erc20("USDC", "USD Coin", 6, network, USDC_ETH, "usd-coin"),
+            )
+            Networks.Polygon.id -> listOf(
+                native(network),
+                erc20("USDT", "Tether USD", 6, network, USDT_POLYGON, "tether"),
+                erc20("USDC", "USD Coin", 6, network, USDC_POLYGON, "usd-coin"),
+            )
+            Networks.Arbitrum.id -> listOf(
+                native(network),
+                erc20("USDT", "Tether USD", 6, network, USDT_ARBITRUM, "tether"),
+                erc20("USDC", "USD Coin", 6, network, USDC_ARBITRUM, "usd-coin"),
+            )
+            Networks.Optimism.id -> listOf(
+                native(network),
+                erc20("USDT", "Tether USD", 6, network, USDT_OPTIMISM, "tether"),
+                erc20("USDC", "USD Coin", 6, network, USDC_OPTIMISM, "usd-coin"),
+            )
+            Networks.Base.id -> listOf(
+                native(network),
+                erc20("USDC", "USD Coin", 6, network, USDC_BASE, "usd-coin"),
+            )
+            Networks.Avalanche.id -> listOf(
+                native(network),
+                erc20("USDT", "Tether USD", 6, network, USDT_AVALANCHE, "tether"),
+                erc20("USDC", "USD Coin", 6, network, USDC_AVALANCHE, "usd-coin"),
+            )
+            else -> listOf(native(network))
+        }
+        return builtIns + listOfNotNull(vfxt(network))
+    }
+
+    val defaultNetwork: EvmNetwork = if (BuildConfig.DEBUG) Networks.BscTestnet else Networks.BscMainnet
 }

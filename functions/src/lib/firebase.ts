@@ -91,4 +91,13 @@ export const Collections = {
   /** Server-only secrets (private keys). Rules must deny all client access. */
   secrets: 'secrets',
   usedCryptoTx: 'usedCryptoTx',
+  /** VFXT Wallet Android mining (server-authoritative). */
+  miningConfigs: 'mining_configs',
+  miningSessions: 'mining_sessions',
+  rewardLedger: 'reward_ledger',
+  claimRequests: 'claim_requests',
+  miningBalances: 'mining_balances',
+  miningBoosters: 'mining_boosters',
+  miningBoosterPurchases: 'mining_booster_purchases',
+  miningUserBoosters: 'mining_user_boosters',
 } as const;

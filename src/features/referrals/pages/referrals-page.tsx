@@ -49,12 +49,15 @@ export function ReferralsPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardDescription>Your unique referral link</CardDescription>
-            <CardTitle className="break-all font-mono text-lg">
+            <CardDescription>Your User ID & referral link</CardDescription>
+            <CardTitle className="font-mono text-2xl tracking-wide">
+              {data.referralCode || '—'}
+            </CardTitle>
+            <p className="mt-2 break-all font-mono text-xs text-ink-muted">
               {data.referralCode
                 ? `${typeof window !== 'undefined' ? window.location.origin : ''}/auth/register?ref=${data.referralCode}`
                 : '—'}
-            </CardTitle>
+            </p>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             <Button
@@ -73,10 +76,10 @@ export function ReferralsPage() {
               size="sm"
               onClick={async () => {
                 await navigator.clipboard.writeText(data.referralCode)
-                toast.success('Code copied')
+                toast.success('User ID copied')
               }}
             >
-              Copy code
+              Copy User ID
             </Button>
           </CardContent>
         </Card>

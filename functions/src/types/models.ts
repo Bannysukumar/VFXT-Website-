@@ -76,6 +76,7 @@ export type LedgerEntryType =
   | 'direct_bonus'
   | 'rank_reward'
   | 'wallet_transfer'
+  | 'peer_transfer'
   | 'locked_maturity'
   | 'locked_bonus';
 

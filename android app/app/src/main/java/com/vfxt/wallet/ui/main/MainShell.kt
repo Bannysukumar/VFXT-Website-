@@ -65,6 +65,17 @@ fun MainShell(
     onImportWallet: () -> Unit,
     onManageWallets: () -> Unit,
     onSecurity: () -> Unit,
+    onSend: (tokenKey: String?, recipient: String?) -> Unit,
+    onReceive: () -> Unit,
+    onActivity: () -> Unit,
+    onTokenDetails: (tokenKey: String) -> Unit,
+    onAddToken: () -> Unit,
+    onNetwork: () -> Unit,
+    onNotifications: () -> Unit,
+    onSupport: () -> Unit,
+    onPrivacy: () -> Unit,
+    onTerms: () -> Unit,
+    onWalletConnect: () -> Unit,
 ) {
     val colors = VfxtTheme.colors
     val navController = rememberNavController()
@@ -105,12 +116,24 @@ fun MainShell(
                     onCreateWallet = onCreateWallet,
                     onImportWallet = onImportWallet,
                     onManageWallets = onManageWallets,
+                    onSend = onSend,
+                    onReceive = onReceive,
+                    onActivity = onActivity,
+                    onTokenDetails = onTokenDetails,
+                    onNetwork = onNetwork,
                     onNotify = notify,
                 )
             }
             composable<TabRoute.Mining> { MiningScreen(onNotify = notify) }
             composable<TabRoute.Trade> { TradingScreen() }
-            composable<TabRoute.Assets> { AssetsScreen(onNotify = notify) }
+            composable<TabRoute.Assets> {
+                AssetsScreen(
+                    onTokenDetails = onTokenDetails,
+                    onAddToken = onAddToken,
+                    onNetwork = onNetwork,
+                    onNotify = notify,
+                )
+            }
             composable<TabRoute.Profile> {
                 ProfileScreen(
                     themeMode = themeMode,
@@ -119,6 +142,12 @@ fun MainShell(
                     onImportWallet = onImportWallet,
                     onManageWallets = onManageWallets,
                     onSecurity = onSecurity,
+                    onNetwork = onNetwork,
+                    onNotifications = onNotifications,
+                    onSupport = onSupport,
+                    onPrivacy = onPrivacy,
+                    onTerms = onTerms,
+                    onWalletConnect = onWalletConnect,
                     onNotify = notify,
                 )
             }

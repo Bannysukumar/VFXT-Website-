@@ -1,6 +1,6 @@
 package com.vfxt.wallet.di
 
-import com.vfxt.wallet.data.repository.PendingMiningRepository
+import com.vfxt.wallet.data.repository.FirebaseMiningRepository
 import com.vfxt.wallet.data.repository.VaultWalletRepository
 import com.vfxt.wallet.domain.repository.MiningRepository
 import com.vfxt.wallet.domain.repository.WalletRepository
@@ -18,8 +18,7 @@ abstract class AppModule {
     @Singleton
     abstract fun bindWalletRepository(impl: VaultWalletRepository): WalletRepository
 
-    /** PENDING (Phase 4): replaced by the Cloud Run backed implementation. */
     @Binds
     @Singleton
-    abstract fun bindMiningRepository(impl: PendingMiningRepository): MiningRepository
+    abstract fun bindMiningRepository(impl: FirebaseMiningRepository): MiningRepository
 }

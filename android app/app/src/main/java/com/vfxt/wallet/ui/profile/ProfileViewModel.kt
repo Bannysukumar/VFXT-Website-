@@ -14,11 +14,13 @@ import javax.inject.Inject
 data class ProfileState(
     val activeAccount: WalletAccount? = null,
     val walletCount: Int = 0,
+    val networkName: String = "",
 )
 
 @HiltViewModel
 class ProfileViewModel @Inject constructor(walletRepository: WalletRepository) : ViewModel() {
     val state: StateFlow<ProfileState> =
-        combine(walletRepository.activeAccount, walletRepository.accounts) { active, all -> ProfileState(active, all.size) }
-            .stateIn(viewModelScope, SharingStarted.Eagerly, ProfileState())
+        combine(walletRepository.activeAccount, walletRepository.accounts, walletRepository.network) { active, all, network ->
+            ProfileState(active, all.size, network.shortName)
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, ProfileState())
 }

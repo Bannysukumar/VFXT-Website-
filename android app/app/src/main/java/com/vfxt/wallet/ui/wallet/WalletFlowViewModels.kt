@@ -154,9 +154,17 @@ class ImportWalletViewModel @Inject constructor(
         _state.update { it.copy(error = null) }
         previewJob = viewModelScope.launch {
             delay(250) // debounce typing
+            var insecure = false
             val result = withContext(Dispatchers.Default) {
                 if (isPhrase) {
-                    if (!keys.isValidMnemonic(input)) null else keys.deriveFromMnemonic(input, accountIndex).address
+                    when {
+                        !keys.isValidMnemonic(input) -> null
+                        keys.isKnownInsecureMnemonic(input) -> {
+                            insecure = true
+                            null
+                        }
+                        else -> runCatching { keys.deriveFromMnemonic(input, accountIndex).address }.getOrNull()
+                    }
                 } else {
                     keys.parsePrivateKey(input)?.let { keys.deriveFromPrivateKey(it).address }
                 }
@@ -166,6 +174,11 @@ class ImportWalletViewModel @Inject constructor(
                     previewAddress = result,
                     phraseValid = isPhrase && result != null,
                     keyValid = !isPhrase && result != null,
+                    error = if (insecure) {
+                        "This is a public test recovery phrase. Anyone can spend from it — create a new wallet instead."
+                    } else {
+                        null
+                    },
                 )
             }
         }

@@ -28,6 +28,7 @@ const incomeSchema = listSchema.extend({
     'locked_maturity',
     'locked_bonus',
     'deposit_credit',
+    'peer_transfer',
   ]),
 });
 
@@ -233,6 +234,68 @@ export const adminListIncomeByType = onCall(CALLABLE_OPTS, async (request) => {
 
     const totalMinor = rows.reduce((s, r) => s + Number(r.amountMinor ?? 0), 0);
     return { rows, count: rows.length, totalMinor, type: parsed.data.type };
+  } catch (err) {
+    throw toHttpsError(err);
+  }
+});
+
+/**
+ * Member-to-member transfers (one row per send = debit leg).
+ * Includes sender/recipient public user ids from ledger metadata.
+ */
+export const adminListPeerTransfers = onCall(CALLABLE_OPTS, async (request) => {
+  try {
+    requireAdminRole(request, [...FINANCE_READ]);
+    const parsed = listSchema.safeParse(request.data ?? {});
+    if (!parsed.success) {
+      throw new AppError('invalid-argument', parsed.error.message);
+    }
+    const db = getDb();
+    const snap = await db
+      .collection(Collections.ledger)
+      .where('type', '==', 'peer_transfer')
+      .where('direction', '==', 'debit')
+      .limit(parsed.data.limit)
+      .get();
+
+    const baseRows = snap.docs
+      .map((d) => {
+        const data = d.data();
+        const meta = (data.metadata ?? {}) as Record<string, unknown>;
+        return {
+          id: d.id,
+          entryId: data.entryId ?? d.id,
+          userId: data.userId,
+          fromUserId: meta.fromUserId ?? null,
+          toUserId: meta.toUserId ?? meta.counterpartyUserId ?? null,
+          toUid: meta.counterpartyUid ?? null,
+          walletKind: meta.walletKind ?? null,
+          amountMinor: Number(data.amountMinor ?? 0),
+          currency: data.currency ?? 'USD',
+          description: data.description ?? '',
+          note: meta.note ?? null,
+          referenceId: data.referenceId ?? null,
+          createdAt: tsToIso(data.createdAt),
+        };
+      })
+      .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+
+    const labelIds = [
+      ...baseRows.map((r) => String(r.userId ?? '')),
+      ...baseRows.map((r) => String(r.toUid ?? '')),
+    ];
+    const labels = await loadUserLabels(db, labelIds);
+    const rows = baseRows.map((r) => {
+      const withSender = withUserLabel(r, labels);
+      const toLabel = labels.get(String(r.toUid ?? ''));
+      return {
+        ...withSender,
+        toUserEmail: toLabel?.userEmail ?? null,
+        toUserDisplayName: toLabel?.userDisplayName ?? null,
+      };
+    });
+
+    return { rows, count: rows.length };
   } catch (err) {
     throw toHttpsError(err);
   }

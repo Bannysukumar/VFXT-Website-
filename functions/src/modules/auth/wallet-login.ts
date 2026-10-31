@@ -15,6 +15,7 @@ import {
   findWalletClaim,
   normalizeWalletAddress,
 } from './wallet-ownership';
+import { allocateUniqueUserId } from '../../lib/user-id';
 
 const NONCE_TTL_MS = 10 * 60 * 1000;
 const SIGNUP_TTL_MS = 30 * 60 * 1000;
@@ -28,12 +29,6 @@ function buildLoginMessage(address: string, nonce: string): string {
     '',
     'This signature proves you own this wallet. It does not cost gas.',
   ].join('\n');
-}
-
-function generateReferralCode(uid: string): string {
-  const suffix = uid.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toUpperCase();
-  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `VFXT${suffix}${rand}`.slice(0, 16);
 }
 
 export const getWalletLoginNonce = onCall(CALLABLE_OPTS, async (request) => {
@@ -354,7 +349,7 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
     }
 
     if (!ready) {
-      const ownReferralCode = generateReferralCode(uid);
+      const ownReferralCode = await allocateUniqueUserId(db);
       const profile: UserProfile = {
         uid,
         email,

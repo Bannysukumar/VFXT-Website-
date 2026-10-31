@@ -1,10 +1,38 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
+
+/**
+ * Deployment settings come from local.properties (git-ignored) or -P flags, never from source.
+ *   vfxt.tokenMainnet=0x...
+ *   vfxt.tokenTestnet=0x...
+ *   bscscan.apiKey=...
+ *   vfxt.walletConnectProjectId=...
+ * Production signing (required before distributing a deposit-ready APK):
+ *   vfxt.storeFile=../keystore/vfxt-release.jks
+ *   vfxt.storePassword=...
+ *   vfxt.keyAlias=...
+ *   vfxt.keyPassword=...
+ */
+val localProps = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+fun deploySetting(name: String): String =
+    (providers.gradleProperty(name).orNull ?: localProps.getProperty(name) ?: "").trim()
+
+val releaseStoreFile = deploySetting("vfxt.storeFile")
+val hasReleaseSigning = releaseStoreFile.isNotBlank() &&
+    deploySetting("vfxt.storePassword").isNotBlank() &&
+    deploySetting("vfxt.keyAlias").isNotBlank() &&
+    deploySetting("vfxt.keyPassword").isNotBlank()
 
 android {
     namespace = "com.vfxt.wallet"
@@ -17,13 +45,44 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "VFXT_TOKEN_MAINNET", "\"${deploySetting("vfxt.tokenMainnet")}\"")
+        buildConfigField("String", "VFXT_TOKEN_TESTNET", "\"${deploySetting("vfxt.tokenTestnet")}\"")
+        buildConfigField("String", "BSCSCAN_API_KEY", "\"${deploySetting("bscscan.apiKey")}\"")
+        buildConfigField("String", "WALLETCONNECT_PROJECT_ID", "\"${deploySetting("vfxt.walletConnectProjectId")}\"")
+        buildConfigField("boolean", "HAS_RELEASE_SIGNING", "$hasReleaseSigning")
+    }
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = rootProject.file(releaseStoreFile)
+                storePassword = deploySetting("vfxt.storePassword")
+                keyAlias = deploySetting("vfxt.keyAlias")
+                keyPassword = deploySetting("vfxt.keyPassword")
+            }
+        }
     }
 
     buildTypes {
+        debug {
+            versionNameSuffix = "-debug"
+            isDebuggable = true
+        }
         release {
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            if (hasReleaseSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                 enable = true
                 packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
@@ -76,6 +135,15 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.okhttp)
+    implementation(libs.zxing.core)
+    implementation(libs.play.services.code.scanner)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
+    implementation(libs.firebase.functions)
+    implementation(libs.firebase.firestore)
+    implementation(libs.firebase.messaging)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -88,6 +156,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

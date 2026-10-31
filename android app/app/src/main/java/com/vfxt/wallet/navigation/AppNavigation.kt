@@ -29,6 +29,12 @@ import com.vfxt.wallet.ui.security.BiometricSetupScreen
 import com.vfxt.wallet.ui.security.PinSetupScreen
 import com.vfxt.wallet.ui.security.SecuritySettingsScreen
 import com.vfxt.wallet.ui.splash.SplashScreen
+import com.vfxt.wallet.ui.transfer.ActivityScreen
+import com.vfxt.wallet.ui.transfer.AddTokenScreen
+import com.vfxt.wallet.ui.transfer.NetworkScreen
+import com.vfxt.wallet.ui.transfer.ReceiveScreen
+import com.vfxt.wallet.ui.transfer.SendScreen
+import com.vfxt.wallet.ui.transfer.TokenDetailsScreen
 import com.vfxt.wallet.ui.wallet.CreateWalletScreen
 import com.vfxt.wallet.ui.wallet.ImportWalletScreen
 import com.vfxt.wallet.ui.wallet.RecoveryPhraseScreen
@@ -161,8 +167,36 @@ fun AppNavigation(
                 onImportWallet = { navController.navigate(RootRoute.ImportWallet) },
                 onManageWallets = { navController.navigate(RootRoute.WalletManagement) },
                 onSecurity = { navController.navigate(RootRoute.SecuritySettings) },
+                onSend = { token, recipient -> navController.navigate(RootRoute.Send(token, recipient)) },
+                onReceive = { navController.navigate(RootRoute.Receive) },
+                onActivity = { navController.navigate(RootRoute.Activity) },
+                onTokenDetails = { key -> navController.navigate(RootRoute.TokenDetails(key)) },
+                onAddToken = { navController.navigate(RootRoute.AddToken) },
+                onNetwork = { navController.navigate(RootRoute.NetworkSelection) },
+                onNotifications = { navController.navigate(RootRoute.Notifications) },
+                onSupport = { navController.navigate(RootRoute.Support) },
+                onPrivacy = { navController.navigate(RootRoute.PrivacyPolicy) },
+                onTerms = { navController.navigate(RootRoute.Terms) },
+                onWalletConnect = { navController.navigate(RootRoute.WalletConnect) },
             )
         }
+        composable<RootRoute.Send> {
+            SendScreen(
+                onBack = { navController.popBackStack() },
+                onDone = { navController.popBackStack(RootRoute.Main, inclusive = false) },
+            )
+        }
+        composable<RootRoute.Receive> { ReceiveScreen(onBack = { navController.popBackStack() }) }
+        composable<RootRoute.Activity> { ActivityScreen(onBack = { navController.popBackStack() }) }
+        composable<RootRoute.TokenDetails> {
+            TokenDetailsScreen(
+                onBack = { navController.popBackStack() },
+                onSend = { key -> navController.navigate(RootRoute.Send(tokenKey = key)) },
+                onReceive = { navController.navigate(RootRoute.Receive) },
+            )
+        }
+        composable<RootRoute.AddToken> { AddTokenScreen(onBack = { navController.popBackStack() }) }
+        composable<RootRoute.NetworkSelection> { NetworkScreen(onBack = { navController.popBackStack() }) }
         composable<RootRoute.WalletManagement> {
             WalletManagementScreen(
                 onBack = { navController.popBackStack() },
@@ -181,6 +215,32 @@ fun AppNavigation(
                 title = "Choose a new PIN",
                 onBack = { navController.popBackStack() },
                 onDone = { navController.popBackStack() },
+            )
+        }
+        composable<RootRoute.Notifications> {
+            com.vfxt.wallet.ui.support.NotificationsScreen(onBack = { navController.popBackStack() })
+        }
+        composable<RootRoute.Support> {
+            com.vfxt.wallet.ui.support.SupportScreen(onBack = { navController.popBackStack() })
+        }
+        composable<RootRoute.PrivacyPolicy> {
+            com.vfxt.wallet.ui.support.LegalScreen(
+                title = "Privacy policy",
+                body = "VFXT Wallet is a self-custody application. Recovery phrases and private keys are encrypted on your device with the Android Keystore and are never uploaded to VFXT servers. Mining rewards and claims are processed by authenticated backend services. For questions contact support@virtualfxtrades.com.",
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<RootRoute.Terms> {
+            com.vfxt.wallet.ui.support.LegalScreen(
+                title = "Terms and conditions",
+                body = "By using VFXT Wallet you acknowledge that you control your own keys, that blockchain transactions are irreversible, that mining rewards are subject to server-side rules and payout policy, and that the Trade tab is a demo preview that does not execute real trades or move wallet funds.",
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<RootRoute.WalletConnect> {
+            com.vfxt.wallet.ui.walletconnect.WalletConnectScreen(
+                onBack = { navController.popBackStack() },
+                onScanQr = { /* Home QR scanner already available; Project ID required for pairing. */ },
             )
         }
     }

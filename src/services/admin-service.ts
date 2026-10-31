@@ -237,6 +237,7 @@ export type AdminIncomeType =
   | 'locked_maturity'
   | 'locked_bonus'
   | 'deposit_credit'
+  | 'peer_transfer'
 
 export async function adminListAutoDeposits(limit = 500) {
   return callFunction<
@@ -257,4 +258,199 @@ export async function adminListIncomeByType(type: AdminIncomeType, limit = 500) 
     { type: AdminIncomeType; limit: number },
     { rows: Array<Record<string, unknown>>; count: number; totalMinor: number; type: string }
   >('adminListIncomeByType', { type, limit })
+}
+
+export async function adminListPeerTransfers(limit = 500) {
+  return callFunction<
+    { limit: number },
+    { rows: Array<Record<string, unknown>>; count: number }
+  >('adminListPeerTransfers', { limit })
+}
+
+/** VFXT Wallet Android mining admin */
+export async function adminMiningDashboardStats() {
+  return callFunction<
+    undefined,
+    {
+      config: {
+        enabled: boolean
+        ratePerHour: string
+        durationSeconds: number
+        minimumClaim: string
+        maximumReward: string
+        allowStop: boolean
+        payoutMode: 'admin_approved' | 'automatic'
+        boosterPaymentWallet: string | null
+      }
+      stats: {
+        activeSessions: number
+        pendingClaims: number
+        miningUsers: number
+        totalLifetime: string
+        totalAvailable: string
+        totalClaimed: string
+        totalPaidOut: string
+        activeBoosters?: number
+        activatedBoosterPurchases?: number
+        boosterRevenueUsdt?: string
+      }
+    }
+  >('adminMiningDashboardStats')
+}
+
+export async function adminGetMiningConfig() {
+  return callFunction<
+    undefined,
+    {
+      enabled: boolean
+      ratePerHourMinor: string
+      durationSeconds: number
+      minimumClaimMinor: string
+      maximumRewardMinor: string
+      allowStop: boolean
+      payoutMode: 'admin_approved' | 'automatic'
+    }
+  >('adminGetMiningConfig')
+}
+
+export async function adminUpdateMiningConfig(input: {
+  enabled?: boolean
+  ratePerHour?: string
+  durationSeconds?: number
+  minimumClaim?: string
+  maximumReward?: string
+  allowStop?: boolean
+  payoutMode?: 'admin_approved' | 'automatic'
+  boosterPaymentWallet?: string | null
+}) {
+  return callFunction<typeof input, Record<string, unknown>>('adminUpdateMiningConfig', input)
+}
+
+export async function adminListMiningClaims(input?: { status?: string; limit?: number }) {
+  return callFunction<
+    { status?: string; limit?: number },
+    {
+      items: Array<{
+        claimId: string
+        userId: string
+        amount: string
+        destinationAddress: string
+        network: string
+        status: string
+        transactionHash: string | null
+        rejectReason: string | null
+        createdAtMillis: number | null
+      }>
+    }
+  >('adminListMiningClaims', input ?? {})
+}
+
+export async function adminUpdateClaim(input: {
+  claimId: string
+  status: 'approved' | 'rejected' | 'paid' | 'failed'
+  reason?: string
+  transactionHash?: string
+}) {
+  return callFunction<typeof input, { claimId: string; status: string }>('adminUpdateClaim', input)
+}
+
+export async function adminListMiningBoosters(includeDisabled = false) {
+  return callFunction<
+    { includeDisabled?: boolean },
+    {
+      items: Array<{
+        boosterId: string
+        name: string
+        description: string
+        bonusRatePerHour: string
+        durationSeconds: number
+        priceUsdt: string
+        paymentToken: string
+        enabled: boolean
+        sortOrder: number
+      }>
+    }
+  >('listMiningBoosters', { includeDisabled })
+}
+
+export async function adminUpsertMiningBooster(input: {
+  boosterId?: string
+  name: string
+  description?: string
+  bonusRatePerHour: string
+  durationSeconds: number
+  priceUsdt: string
+  enabled?: boolean
+  sortOrder?: number
+}) {
+  return callFunction<typeof input, Record<string, unknown>>('adminUpsertMiningBooster', input)
+}
+
+export async function adminDeleteMiningBooster(boosterId: string) {
+  return callFunction<{ boosterId: string }, { ok: true }>('adminDeleteMiningBooster', {
+    boosterId,
+  })
+}
+
+export async function adminSetBoosterPaymentWallet(address: string) {
+  return callFunction<{ address: string }, { boosterPaymentWallet: string }>(
+    'adminSetBoosterPaymentWallet',
+    { address },
+  )
+}
+
+export async function adminListBoosterHistory(input?: { status?: string; limit?: number }) {
+  return callFunction<
+    { status?: string; limit?: number },
+    {
+      items: Array<{
+        purchaseId: string
+        userId: string
+        walletAddress: string
+        boosterId: string
+        boosterName: string
+        bonusRatePerHour: string
+        priceUsdt: string
+        paymentWallet: string
+        status: string
+        transactionHash: string | null
+        createdAtMillis: number | null
+        activatedAtMillis: number | null
+      }>
+    }
+  >('adminListBoosterHistory', input ?? {})
+}
+
+export async function adminListActiveUserBoosters() {
+  return callFunction<
+    undefined,
+    {
+      items: Array<{
+        userBoosterId: string
+        userId: string
+        boosterId: string
+        boosterName: string
+        bonusRatePerHour: string
+        purchaseId: string
+        activatedAtMillis: number
+        expiresAtMillis: number
+        status: string
+      }>
+    }
+  >('adminListActiveUserBoosters')
+}
+
+export async function adminGetBoosterStats() {
+  return callFunction<
+    undefined,
+    {
+      catalogCount: number
+      enabledCatalogCount: number
+      activeBoosters: number
+      totalPurchases: number
+      activatedPurchases: number
+      awaitingPayment: number
+      totalRevenueUsdt: string
+    }
+  >('adminGetBoosterStats')
 }

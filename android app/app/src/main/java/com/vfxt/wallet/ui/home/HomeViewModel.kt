@@ -2,14 +2,17 @@ package com.vfxt.wallet.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.vfxt.wallet.blockchain.networks.EvmNetwork
 import com.vfxt.wallet.domain.models.WalletAccount
 import com.vfxt.wallet.domain.models.WalletOverview
 import com.vfxt.wallet.domain.repository.WalletRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -22,6 +25,7 @@ data class HomeUiState(
     val overview: WalletOverview? = null,
     val balanceHidden: Boolean = false,
     val errorMessage: String? = null,
+    val network: EvmNetwork? = null,
 )
 
 @HiltViewModel
@@ -32,10 +36,14 @@ class HomeViewModel @Inject constructor(private val walletRepository: WalletRepo
     val accounts: StateFlow<List<WalletAccount>> =
         walletRepository.accounts.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    private var loadJob: Job? = null
+
     init {
-        // Reload whenever the selected wallet changes (create, import, switch, remove).
+        viewModelScope.launch { walletRepository.network.collect { n -> _uiState.update { it.copy(network = n) } } }
+        // Reload when the wallet, network, token list or local transactions change.
         viewModelScope.launch {
-            walletRepository.activeAccount.distinctUntilChanged().collect { load(isRefresh = false) }
+            combine(walletRepository.activeAccount.distinctUntilChanged(), walletRepository.changes) { a, _ -> a }
+                .collect { load(isRefresh = false) }
         }
     }
 
@@ -48,7 +56,8 @@ class HomeViewModel @Inject constructor(private val walletRepository: WalletRepo
     }
 
     private fun load(isRefresh: Boolean) {
-        viewModelScope.launch {
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             _uiState.update { it.copy(isLoading = !isRefresh && it.overview == null, isRefreshing = isRefresh, errorMessage = null) }
             runCatching { walletRepository.loadOverview() }
                 .onSuccess { overview ->

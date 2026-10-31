@@ -20,23 +20,36 @@ class WalletKeyServiceTest {
         "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 
     @Test
-    fun derivesStandardEthereumAddressForTestVector() {
-        val account = service.deriveFromMnemonic(testMnemonic, 0)
-        assertEquals("0x9858EfFD232B4033E47d90003D41EC34EcaEda94", account.address)
+    fun rejectsPublicTestMnemonicUsedAsRealWallet() {
+        assertTrue(service.isKnownInsecureMnemonic(testMnemonic))
+        assertTrue(
+            runCatching { service.deriveFromMnemonic(testMnemonic, 0) }
+                .exceptionOrNull() is IllegalArgumentException,
+        )
+    }
+
+    @Test
+    fun rejectsKnownInsecurePrivateKey() {
+        assertNull(
+            service.parsePrivateKey("0x1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727"),
+        )
     }
 
     @Test
     fun differentAccountIndexYieldsDifferentAddress() {
-        val first = service.deriveFromMnemonic(testMnemonic, 0).address
-        val second = service.deriveFromMnemonic(testMnemonic, 1).address
+        // Fresh random mnemonic — not a public test vector.
+        val mnemonic = service.generateMnemonic(12)
+        val first = service.deriveFromMnemonic(mnemonic, 0).address
+        val second = service.deriveFromMnemonic(mnemonic, 1).address
         assertNotEquals(first, second)
     }
 
     @Test
     fun derivationIsDeterministicAndNormalizesInput() {
-        val messy = "  ABANDON abandon\nabandon abandon abandon abandon abandon abandon abandon abandon abandon   about "
+        val mnemonic = service.generateMnemonic(12)
+        val messy = "  ${mnemonic.uppercase().replace(" ", "\n ")}  "
         assertEquals(
-            service.deriveFromMnemonic(testMnemonic, 0).address,
+            service.deriveFromMnemonic(mnemonic, 0).address,
             service.deriveFromMnemonic(messy, 0).address,
         )
     }

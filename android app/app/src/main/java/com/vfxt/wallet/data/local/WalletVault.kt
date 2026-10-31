@@ -85,6 +85,9 @@ class WalletVault internal constructor(
         mutex.withLock {
             val normalized = keys.normalizeMnemonic(mnemonic)
             require(keys.isValidMnemonic(normalized)) { "Invalid recovery phrase" }
+            require(!keys.isKnownInsecureMnemonic(normalized)) {
+                "This recovery phrase is a public test phrase. Its private key is known — create a new wallet instead."
+            }
             val address = withContext(io) { keys.deriveFromMnemonic(normalized, accountIndex).address }
             insert(
                 name = name,

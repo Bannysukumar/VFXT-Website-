@@ -62,9 +62,20 @@ class WalletKeyService @Inject constructor() {
         return runCatching { MnemonicUtils.validateMnemonic(normalized) }.getOrDefault(false)
     }
 
+    /**
+     * True for widely published BIP-39 test vectors whose private keys are public
+     * (e.g. "abandon … about"). These must never hold real funds.
+     */
+    fun isKnownInsecureMnemonic(input: String): Boolean =
+        normalizeMnemonic(input) in KNOWN_INSECURE_MNEMONICS
+
     fun deriveFromMnemonic(mnemonic: String, accountIndex: Int): DerivedAccount {
         require(accountIndex in 0 until MAX_ACCOUNT_INDEX) { "Account index out of range" }
-        val seed = MnemonicUtils.generateSeed(normalizeMnemonic(mnemonic), "")
+        val normalized = normalizeMnemonic(mnemonic)
+        require(!isKnownInsecureMnemonic(normalized)) {
+            "This recovery phrase is a public test phrase. Its private key is known — do not use it for real funds."
+        }
+        val seed = MnemonicUtils.generateSeed(normalized, "")
         try {
             val master = Bip32ECKeyPair.generateKeyPair(seed)
             val path = intArrayOf(
@@ -86,13 +97,33 @@ class WalletKeyService @Inject constructor() {
         val hex = input.trim().removePrefix("0x").removePrefix("0X")
         if (!PRIVATE_KEY_HEX.matches(hex)) return null
         val key = BigInteger(hex, 16)
-        return key.takeIf { it.signum() > 0 && it < SECP256K1_N }
+        if (key.signum() <= 0 || key >= SECP256K1_N) return null
+        // Reject the well-known private key for the abandon…about test vector.
+        if (key in KNOWN_INSECURE_PRIVATE_KEYS) return null
+        return key
     }
 
     fun deriveFromPrivateKey(privateKey: BigInteger): DerivedAccount =
         DerivedAccount(addressOf(Sign.publicKeyFromPrivate(privateKey)), privateKey)
 
     fun privateKeyHex(privateKey: BigInteger): String = Numeric.toHexStringWithPrefixZeroPadded(privateKey, 64)
+
+    /**
+     * EIP-191 personal_sign over [message] UTF-8 bytes. Returns 0x-prefixed 65-byte signature.
+     * Used only for wallet ownership proofs (Firebase login); never for sending funds.
+     */
+    fun signPersonalMessage(privateKey: BigInteger, message: String): String {
+        val keyPair = org.web3j.crypto.ECKeyPair.create(privateKey)
+        val signature = Sign.signPrefixedMessage(message.toByteArray(Charsets.UTF_8), keyPair)
+        val r = Numeric.toBytesPadded(Numeric.toBigInt(signature.r), 32)
+        val s = Numeric.toBytesPadded(Numeric.toBigInt(signature.s), 32)
+        val v = signature.v
+        val out = ByteArray(65)
+        System.arraycopy(r, 0, out, 0, 32)
+        System.arraycopy(s, 0, out, 32, 32)
+        out[64] = if (v.size == 1) v[0] else v.last()
+        return Numeric.toHexString(out)
+    }
 
     private fun addressOf(publicKey: BigInteger): String = Keys.toChecksumAddress(Keys.getAddress(publicKey))
 
@@ -104,6 +135,16 @@ class WalletKeyService @Inject constructor() {
 
         /** Order of the secp256k1 group. */
         private val SECP256K1_N = BigInteger("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141", 16)
+
+        private val KNOWN_INSECURE_MNEMONICS = setOf(
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            "test test test test test test test test test test test junk",
+        )
+
+        private val KNOWN_INSECURE_PRIVATE_KEYS = setOf(
+            // Private key for abandon…about → 0x9858EfFD232B4033E47d90003D41EC34EcaEda94
+            BigInteger("1ab42cc412b618bdea3a599e3c9bae199ebf030895b039e9db1e30dafb12b727", 16),
+        )
 
         private val ADDRESS = Regex("^0x[0-9a-fA-F]{40}$")
 
