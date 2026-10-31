@@ -6,7 +6,6 @@ export type UpdateProfileInput = {
   timezone?: string | null
   locale?: string | null
   preferences?: Record<string, unknown>
-  withdrawalAddress?: string | null
 }
 
 export async function updateProfile(input: UpdateProfileInput) {

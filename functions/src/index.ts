@@ -100,6 +100,7 @@ export {
   getAdminUserDetail,
   adminUpdateUser,
   adminAdjustWallet,
+  adminSetUserCredentials,
   impersonateUser,
 } from './modules/admin/user-mgmt';
 
@@ -109,6 +110,12 @@ export {
   getAdminPlatformSettings,
   updatePlatformSettings,
 } from './modules/platform/handlers';
+
+export {
+  getWalletApkRelease,
+  publishWalletApk,
+  unpublishWalletApk,
+} from './modules/platform/wallet-apk';
 
 // Crypto USDT BEP-20 (deposits QR / auto-credit, withdrawals, admin hot wallet)
 export {

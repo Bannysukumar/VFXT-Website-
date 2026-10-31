@@ -75,13 +75,18 @@ export const getAdminUserDetail = onCall(CALLABLE_OPTS, async (request) => {
 });
 
 const mobileSchema = z
-  .string()
-  .max(24)
+  .union([z.string().max(24), z.literal(''), z.null()])
   .optional()
-  .or(z.literal(''))
-  .refine((v) => !v || v.trim() === '' || /^[+0-9][0-9\s\-()]{7,22}$/.test(v.trim()), {
-    message: 'Enter a valid mobile number (with country code) or leave blank',
-  });
+  .refine(
+    (v) =>
+      v == null ||
+      v === '' ||
+      v.trim() === '' ||
+      /^[+0-9][0-9\s\-()]{7,22}$/.test(v.trim()),
+    {
+      message: 'Enter a valid mobile number (with country code) or leave blank',
+    },
+  );
 
 const walletAddressSchema = z
   .union([
@@ -93,10 +98,17 @@ const walletAddressSchema = z
   ])
   .optional();
 
+const displayNameSchema = z
+  .union([z.string().max(80), z.literal(''), z.null()])
+  .optional()
+  .refine((v) => v == null || v === '' || v.trim().length >= 1, {
+    message: 'Display name must be at least 1 character or blank',
+  });
+
 const updateUserSchema = z
   .object({
     uid: z.string().min(1).max(128),
-    displayName: z.string().min(1).max(80).optional(),
+    displayName: displayNameSchema,
     mobile: mobileSchema,
     status: z.enum(['active', 'suspended', 'closed']).optional(),
     kycStatus: z.enum(['none', 'pending', 'verified', 'rejected']).optional(),
@@ -131,19 +143,33 @@ export const adminUpdateUser = onCall(CALLABLE_OPTS, async (request) => {
     const updates: Record<string, unknown> = {
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (profilePatch.displayName !== undefined) updates.displayName = profilePatch.displayName;
+    if (profilePatch.displayName !== undefined) {
+      const name =
+        typeof profilePatch.displayName === 'string'
+          ? profilePatch.displayName.replace(/\s+/g, ' ').trim()
+          : '';
+      updates.displayName = name || null;
+    }
     if (profilePatch.mobile !== undefined) {
-      const mobile = profilePatch.mobile.replace(/\s+/g, ' ').trim();
+      const mobile =
+        typeof profilePatch.mobile === 'string'
+          ? profilePatch.mobile.replace(/\s+/g, ' ').trim()
+          : '';
       updates.mobile = mobile || null;
     }
     if (profilePatch.status !== undefined) updates.status = profilePatch.status;
     if (profilePatch.kycStatus !== undefined) updates.kycStatus = profilePatch.kycStatus;
-    if (profilePatch.withdrawalAddress !== undefined) {
-      updates.withdrawalAddress = profilePatch.withdrawalAddress || null;
-    }
     if (profilePatch.walletAddress !== undefined) {
       const wallet = (profilePatch.walletAddress || '').trim();
-      updates.walletAddress = wallet ? wallet.toLowerCase() : null;
+      const normalized = wallet ? wallet.toLowerCase() : null;
+      updates.walletAddress = normalized;
+      // Keep locked withdrawal destination in sync when admin edits wallet.
+      updates.withdrawalAddress = normalized;
+    } else if (profilePatch.withdrawalAddress !== undefined) {
+      const w = (profilePatch.withdrawalAddress || '').trim();
+      const normalized = w ? w.toLowerCase() : null;
+      updates.withdrawalAddress = normalized;
+      updates.walletAddress = normalized;
     }
 
     await ref.update(updates);
@@ -235,6 +261,87 @@ export const adminAdjustWallet = onCall(CALLABLE_OPTS, async (request) => {
     });
 
     return { ok: true as const, walletId };
+  } catch (err) {
+    throw toHttpsError(err);
+  }
+});
+
+const credentialsSchema = z
+  .object({
+    uid: z.string().min(1).max(128),
+    email: z.string().email().max(254).optional(),
+    password: z.string().min(8).max(128).optional(),
+  })
+  .strict()
+  .refine((v) => Boolean(v.email || v.password), {
+    message: 'Provide a new email and/or password',
+  });
+
+/**
+ * Admin sets member email and/or password without the current password.
+ * Syncs Auth + Firestore email when email changes.
+ */
+export const adminSetUserCredentials = onCall(CALLABLE_OPTS, async (request) => {
+  try {
+    const ctx = requireAdminRole(request, [
+      AdminRole.SuperAdmin,
+      AdminRole.OperationsAdmin,
+    ]);
+    const parsed = credentialsSchema.safeParse(request.data ?? {});
+    if (!parsed.success) {
+      throw new AppError(
+        'invalid-argument',
+        parsed.error.issues[0]?.message ?? 'Invalid credentials payload',
+      );
+    }
+    const { uid, email, password } = parsed.data;
+    const authUpdate: { email?: string; password?: string; emailVerified?: boolean } = {};
+    if (email) {
+      authUpdate.email = email.trim().toLowerCase();
+      authUpdate.emailVerified = false;
+    }
+    if (password) authUpdate.password = password;
+
+    try {
+      await getAdminAuth().updateUser(uid, authUpdate);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (/email.*already|already.*email/i.test(message)) {
+        throw new AppError('already-exists', 'That email is already in use');
+      }
+      if (/not.?found|no user/i.test(message)) {
+        throw new AppError('not-found', 'Auth user not found');
+      }
+      throw err;
+    }
+
+    if (authUpdate.email) {
+      const db = getDb();
+      await db.collection(Collections.users).doc(uid).set(
+        {
+          email: authUpdate.email,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
+    await writeAuditLog({
+      actorId: ctx.uid,
+      action: 'admin.user.credentials',
+      resourceType: 'user',
+      resourceId: uid,
+      metadata: {
+        emailChanged: Boolean(authUpdate.email),
+        passwordChanged: Boolean(password),
+      },
+    });
+
+    return {
+      ok: true as const,
+      email: authUpdate.email ?? null,
+      passwordChanged: Boolean(password),
+    };
   } catch (err) {
     throw toHttpsError(err);
   }

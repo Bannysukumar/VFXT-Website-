@@ -29,6 +29,7 @@ import com.vfxt.wallet.ui.security.BiometricSetupScreen
 import com.vfxt.wallet.ui.security.PinSetupScreen
 import com.vfxt.wallet.ui.security.SecuritySettingsScreen
 import com.vfxt.wallet.ui.splash.SplashScreen
+import com.vfxt.wallet.ui.swap.SwapScreen
 import com.vfxt.wallet.ui.transfer.ActivityScreen
 import com.vfxt.wallet.ui.transfer.AddTokenScreen
 import com.vfxt.wallet.ui.transfer.NetworkScreen
@@ -169,6 +170,7 @@ fun AppNavigation(
                 onSecurity = { navController.navigate(RootRoute.SecuritySettings) },
                 onSend = { token, recipient -> navController.navigate(RootRoute.Send(token, recipient)) },
                 onReceive = { navController.navigate(RootRoute.Receive) },
+                onSwap = { navController.navigate(RootRoute.Swap()) },
                 onActivity = { navController.navigate(RootRoute.Activity) },
                 onTokenDetails = { key -> navController.navigate(RootRoute.TokenDetails(key)) },
                 onAddToken = { navController.navigate(RootRoute.AddToken) },
@@ -187,12 +189,21 @@ fun AppNavigation(
             )
         }
         composable<RootRoute.Receive> { ReceiveScreen(onBack = { navController.popBackStack() }) }
+        composable<RootRoute.Swap> {
+            SwapScreen(
+                onBack = { navController.popBackStack() },
+                onActivity = {
+                    navController.navigate(RootRoute.Activity) { popUpTo(RootRoute.Main) }
+                },
+            )
+        }
         composable<RootRoute.Activity> { ActivityScreen(onBack = { navController.popBackStack() }) }
         composable<RootRoute.TokenDetails> {
             TokenDetailsScreen(
                 onBack = { navController.popBackStack() },
                 onSend = { key -> navController.navigate(RootRoute.Send(tokenKey = key)) },
                 onReceive = { navController.navigate(RootRoute.Receive) },
+                onSwap = { key -> navController.navigate(RootRoute.Swap(fromTokenKey = key)) },
             )
         }
         composable<RootRoute.AddToken> { AddTokenScreen(onBack = { navController.popBackStack() }) }

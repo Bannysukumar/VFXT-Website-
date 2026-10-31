@@ -116,28 +116,16 @@ class TransactionService @Inject constructor(
      */
     suspend fun send(quote: TransferQuote, walletId: String): String {
         quote.problem?.let { throw TransferException(it) }
-        val wallet = vault.wallets.value.orEmpty().firstOrNull { it.id == walletId }
-            ?: throw TransferException("Wallet not found.")
-        if (!wallet.address.equals(quote.from, ignoreCase = true)) throw TransferException("Wallet mismatch.")
-
-        val nonce = rpc.pendingNonce(quote.network, quote.from)
-        val raw = if (quote.data == null) {
-            RawTransaction.createEtherTransaction(nonce, quote.gasPrice, quote.gasLimit, quote.txTo, quote.txValue)
-        } else {
-            RawTransaction.createTransaction(nonce, quote.gasPrice, quote.gasLimit, quote.txTo, quote.txValue, quote.data)
-        }
-
-        val signedHex = withContext(Dispatchers.Default) {
-            val credentials = Credentials.create(vault.revealPrivateKey(walletId))
-            check(credentials.address.equals(quote.from, ignoreCase = true)) { "Key does not match sender" }
-            Numeric.toHexString(TransactionEncoder.signMessage(raw, quote.network.chainId, credentials))
-        }
-
-        val hash = try {
-            rpc.sendRawTransaction(quote.network, signedHex)
-        } catch (e: RpcException) {
-            throw TransferException(friendlyRpcError(e.message))
-        }
+        val hash = signAndBroadcast(
+            network = quote.network,
+            walletId = walletId,
+            from = quote.from,
+            to = quote.txTo,
+            value = quote.txValue,
+            data = quote.data,
+            gasLimit = quote.gasLimit,
+            gasPrice = quote.gasPrice,
+        )
 
         chainStore.upsertTransaction(
             TxRecord(
@@ -154,6 +142,45 @@ class TransactionService @Inject constructor(
             ),
         )
         return hash
+    }
+
+    /**
+     * Signs an arbitrary transaction locally (EIP-155, chain id in the signature) and broadcasts it.
+     * The private key is decrypted only for the duration of the signature and never leaves this
+     * method. Callers are responsible for validating [to]/[data] and re-authenticating the user.
+     */
+    suspend fun signAndBroadcast(
+        network: EvmNetwork,
+        walletId: String,
+        from: String,
+        to: String,
+        value: BigInteger,
+        data: String?,
+        gasLimit: BigInteger,
+        gasPrice: BigInteger,
+    ): String {
+        val wallet = vault.wallets.value.orEmpty().firstOrNull { it.id == walletId }
+            ?: throw TransferException("Wallet not found.")
+        if (!wallet.address.equals(from, ignoreCase = true)) throw TransferException("Wallet mismatch.")
+
+        val nonce = rpc.pendingNonce(network, from)
+        val raw = if (data == null) {
+            RawTransaction.createEtherTransaction(nonce, gasPrice, gasLimit, to, value)
+        } else {
+            RawTransaction.createTransaction(nonce, gasPrice, gasLimit, to, value, data)
+        }
+
+        val signedHex = withContext(Dispatchers.Default) {
+            val credentials = Credentials.create(vault.revealPrivateKey(walletId))
+            check(credentials.address.equals(from, ignoreCase = true)) { "Key does not match sender" }
+            Numeric.toHexString(TransactionEncoder.signMessage(raw, network.chainId, credentials))
+        }
+
+        return try {
+            rpc.sendRawTransaction(network, signedHex)
+        } catch (e: RpcException) {
+            throw TransferException(friendlyRpcError(e.message))
+        }
     }
 
     /** Polls for the receipt until mined or [timeoutMs] passes; updates the local record. */

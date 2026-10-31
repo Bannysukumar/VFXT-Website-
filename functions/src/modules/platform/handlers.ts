@@ -11,6 +11,39 @@ const footerLinkSchema = z.object({
   href: z.string().min(1).max(300),
 });
 
+const socialPlatformSchema = z.enum([
+  'facebook',
+  'instagram',
+  'twitter',
+  'youtube',
+  'linkedin',
+  'telegram',
+  'whatsapp',
+  'discord',
+  'tiktok',
+  'github',
+  'website',
+  'other',
+]);
+
+const socialLinkSchema = z.object({
+  id: z.string().min(1).max(64),
+  platform: socialPlatformSchema,
+  label: z.string().max(80),
+  url: z
+    .string()
+    .min(4)
+    .max(500)
+    .refine(
+      (v) =>
+        /^https?:\/\//i.test(v.trim()) ||
+        /^mailto:/i.test(v.trim()) ||
+        /^tg:/i.test(v.trim()),
+      { message: 'Social URL must start with https:// (or mailto: / tg:)' },
+    ),
+  visible: z.boolean(),
+});
+
 const platformPatchSchema = z
   .object({
     contact: z
@@ -40,6 +73,7 @@ const platformPatchSchema = z
           )
           .max(6)
           .optional(),
+        socials: z.array(socialLinkSchema).max(24).optional(),
       })
       .optional(),
     plan: z

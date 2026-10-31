@@ -23,10 +23,34 @@ export interface FooterColumn {
   links: FooterLink[];
 }
 
+export type SocialPlatform =
+  | 'facebook'
+  | 'instagram'
+  | 'twitter'
+  | 'youtube'
+  | 'linkedin'
+  | 'telegram'
+  | 'whatsapp'
+  | 'discord'
+  | 'tiktok'
+  | 'github'
+  | 'website'
+  | 'other';
+
+export interface SocialLink {
+  id: string;
+  platform: SocialPlatform;
+  label: string;
+  url: string;
+  /** When false, link is hidden from the public footer. */
+  visible: boolean;
+}
+
 export interface FooterSettings {
   tagline: string;
   copyright: string;
   columns: FooterColumn[];
+  socials: SocialLink[];
 }
 
 export interface LockedPackageConfig {
@@ -141,6 +165,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
         ],
       },
     ],
+    socials: [],
   },
   plan: {
     minStakeUsdCents: 10_000,

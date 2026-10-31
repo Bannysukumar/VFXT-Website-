@@ -138,8 +138,8 @@ export async function getAdminUserDetail(uid: string) {
 
 export type AdminUpdateUserInput = {
   uid: string
-  displayName?: string
-  mobile?: string
+  displayName?: string | null
+  mobile?: string | null
   status?: 'active' | 'suspended' | 'closed'
   kycStatus?: 'none' | 'pending' | 'verified' | 'rejected'
   disabled?: boolean
@@ -161,6 +161,18 @@ export async function adminAdjustWallet(input: {
     { uid: string; walletKind: string; amountMinor: number; reason: string },
     { ok: true; walletId: string }
   >('adminAdjustWallet', input)
+}
+
+/** Admin sets member email and/or password (no current password required). */
+export async function adminSetUserCredentials(input: {
+  uid: string
+  email?: string
+  password?: string
+}) {
+  return callFunction<
+    { uid: string; email?: string; password?: string },
+    { ok: true; email: string | null; passwordChanged: boolean }
+  >('adminSetUserCredentials', input)
 }
 
 export async function impersonateUser(uid: string) {
@@ -186,6 +198,8 @@ export interface CryptoHotWalletPoolEntry {
   address: string
   rpcUrl?: string
   enabled: boolean
+  useForDeposits: boolean
+  useForWithdrawals: boolean
 }
 
 export async function listCryptoHotWallets() {
@@ -219,6 +233,8 @@ export async function updateCryptoHotWallet(input: {
   enabled?: boolean
   label?: string
   rpcUrl?: string
+  useForDeposits?: boolean
+  useForWithdrawals?: boolean
 }) {
   return callFunction<typeof input, { ok: true }>('updateCryptoHotWallet', input)
 }

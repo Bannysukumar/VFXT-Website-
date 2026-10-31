@@ -38,10 +38,34 @@ service firebase.storage {
       return request.resource.size < bytes;
     }
 
-    // Public marketing assets (uploaded via Admin SDK / CI only)
+    function canPublishContent() {
+      return isSignedIn()
+        && request.auth.token.adminRole in [
+          'super_admin',
+          'operations_admin',
+          'finance_admin'
+        ];
+    }
+
+    function isApk() {
+      return request.resource.contentType == 'application/vnd.android.package-archive'
+        || request.resource.contentType == 'application/octet-stream';
+    }
+
+    // Public marketing assets (Admin SDK / CI)
     match /public/{allPaths=**} {
       allow read: if true;
       allow write: if false;
+    }
+
+    // VFXT Wallet Android APK — admin upload, public download (max 80 MiB)
+    match /public/wallet-apk/{fileName} {
+      allow read: if true;
+      allow write: if canPublishContent()
+        && isApk()
+        && underLimit(80 * 1024 * 1024)
+        && fileName.matches('.*\\.apk');
+      allow delete: if canPublishContent();
     }
 
     // Profile images — owner upload, 2 MiB

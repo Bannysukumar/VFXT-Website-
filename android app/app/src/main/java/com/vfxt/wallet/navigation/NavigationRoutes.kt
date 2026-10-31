@@ -31,6 +31,7 @@ sealed interface RootRoute {
     @Serializable data object ChangePin : RootRoute
     @Serializable data class Send(val tokenKey: String? = null, val recipient: String? = null) : RootRoute
     @Serializable data object Receive : RootRoute
+    @Serializable data class Swap(val fromTokenKey: String? = null) : RootRoute
     @Serializable data object Activity : RootRoute
     @Serializable data class TokenDetails(val tokenKey: String) : RootRoute
     @Serializable data object AddToken : RootRoute

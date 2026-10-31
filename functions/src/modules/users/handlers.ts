@@ -33,9 +33,6 @@ async function handleUpdateProfile(
   if (data.timezone !== undefined) patch.timezone = data.timezone;
   if (data.locale !== undefined) patch.locale = data.locale;
   if (data.preferences !== undefined) patch.preferences = data.preferences;
-  if (data.withdrawalAddress !== undefined) {
-    patch.withdrawalAddress = data.withdrawalAddress;
-  }
 
   await ref.update(patch);
   log.info('profile_updated', { uid: ctx.uid, fields: Object.keys(data) });

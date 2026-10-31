@@ -13,6 +13,8 @@ import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Redeem
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -113,6 +115,8 @@ fun ActivityRow(item: ActivityItem, modifier: Modifier = Modifier, onClick: (() 
         ActivityType.Sent -> Triple(Icons.AutoMirrored.Filled.CallMade, colors.primary, "Sent")
         ActivityType.MiningReward -> Triple(Icons.Filled.Bolt, colors.electric, "Mining reward")
         ActivityType.Claim -> Triple(Icons.Filled.Redeem, colors.accent, "Reward claim")
+        ActivityType.Swap -> Triple(Icons.Filled.SwapHoriz, colors.accent, "Swap")
+        ActivityType.Approval -> Triple(Icons.Filled.VerifiedUser, colors.textSecondary, "Token approval")
     }
     val (statusText, statusTone) = when (item.status) {
         ActivityStatus.Pending -> "Pending" to PillTone.Warning
@@ -139,11 +143,24 @@ fun ActivityRow(item: ActivityItem, modifier: Modifier = Modifier, onClick: (() 
             )
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                "$sign${Formatters.tokenAmount(item.amount)} ${item.tokenSymbol}",
-                style = AmountTextStyle,
-                color = if (item.type == ActivityType.Sent) colors.textPrimary else colors.success,
-            )
+            when (item.type) {
+                ActivityType.Swap -> {
+                    Text("−${Formatters.tokenAmount(item.amount)} ${item.tokenSymbol}", style = AmountTextStyle, color = colors.textPrimary)
+                    if (item.toSymbol != null) {
+                        Text(
+                            "+${item.toAmount?.let { Formatters.tokenAmount(it) } ?: "…"} ${item.toSymbol}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = colors.success,
+                        )
+                    }
+                }
+                ActivityType.Approval -> Text("${item.tokenSymbol} for swap", style = MaterialTheme.typography.bodySmall, color = colors.textSecondary)
+                else -> Text(
+                    "$sign${Formatters.tokenAmount(item.amount)} ${item.tokenSymbol}",
+                    style = AmountTextStyle,
+                    color = if (item.type == ActivityType.Sent) colors.textPrimary else colors.success,
+                )
+            }
             StatusPill(statusText, tone = statusTone)
         }
     }

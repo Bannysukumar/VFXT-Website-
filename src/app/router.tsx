@@ -47,6 +47,8 @@ import { SupportPublicPage } from '@/features/marketing/support-public-page'
 import { SecurityPage } from '@/features/marketing/security-page'
 import { ContactPage } from '@/features/marketing/contact-page'
 import { PrivacyPage, RiskDisclosurePage, TermsPage } from '@/features/marketing/legal-page'
+import { DownloadPage } from '@/features/marketing/download-page'
+import { AdminWalletApkPage } from '@/features/admin/pages/admin-wallet-apk-page'
 
 export const router = createBrowserRouter([
   {
@@ -58,6 +60,7 @@ export const router = createBrowserRouter([
       { path: 'token', element: <TokenPublicPage /> },
       { path: 'support', element: <SupportPublicPage /> },
       { path: 'security', element: <SecurityPage /> },
+      { path: 'download', element: <DownloadPage /> },
       { path: 'contact', element: <ContactPage /> },
       { path: 'legal/terms', element: <TermsPage /> },
       { path: 'legal/privacy', element: <PrivacyPage /> },
@@ -113,6 +116,7 @@ export const router = createBrowserRouter([
           { path: 'mining/boosters/history', element: <AdminMiningBoosterHistoryPage /> },
           { path: 'mining/boosters/active', element: <AdminMiningBoosterActivePage /> },
           { path: 'crypto-wallet', element: <AdminCryptoWalletPage /> },
+          { path: 'wallet-apk', element: <AdminWalletApkPage /> },
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'affiliates', element: <AdminAffiliatesPage /> },
           { path: 'tickets', element: <AdminTicketsPage /> },

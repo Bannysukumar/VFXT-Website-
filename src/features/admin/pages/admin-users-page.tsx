@@ -23,6 +23,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { AdminFiltersBar } from '@/features/admin/components/admin-filters'
 import {
   adminAdjustWallet,
+  adminSetUserCredentials,
   adminUpdateUser,
   getAdminUserDetail,
   impersonateUser,
@@ -30,6 +31,7 @@ import {
   setAdminRole,
   type AdminUserSummary,
 } from '@/services/admin-service'
+import { PasswordInput } from '@/features/auth/components/auth-layout'
 import { getFirebaseAuth } from '@/lib/firebase'
 import { formatMinor, parseToMinor } from '@/lib/money'
 import { exportRowsToCsv, exportRowsToExcel } from '@/lib/export-table'
@@ -88,6 +90,9 @@ function UserDetailDialog({
   const [kycStatus, setKycStatus] = useState('none')
   const [adminRole, setAdminRoleLocal] = useState<AdminRole | ''>('')
   const [disabled, setDisabled] = useState(false)
+  const [authEmail, setAuthEmail] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [walletKind, setWalletKind] = useState<string>('fund')
   const [adjustDirection, setAdjustDirection] = useState<'credit' | 'debit'>('credit')
   const [adjustAmount, setAdjustAmount] = useState('')
@@ -98,12 +103,22 @@ function UserDetailDialog({
     if (!open || !profile) return
     setDisplayName(String(profile.displayName ?? ''))
     setMobile(String(profile.mobile ?? user?.mobile ?? ''))
-    setWalletAddress(String(profile.walletAddress ?? user?.walletAddress ?? ''))
+    setWalletAddress(
+      String(
+        profile.withdrawalAddress ??
+          profile.walletAddress ??
+          user?.walletAddress ??
+          '',
+      ),
+    )
     setStatus(String(profile.status ?? 'active'))
     setKycStatus(String(profile.kycStatus ?? 'none'))
     setAdminRoleLocal((profile.adminRole as AdminRole | null) ?? '')
     setDisabled(Boolean(detail.data?.auth?.disabled))
-  }, [open, profile, uid, user, detail.data?.auth?.disabled])
+    setAuthEmail(String(detail.data?.auth?.email ?? profile.email ?? user?.email ?? ''))
+    setNewPassword('')
+    setConfirmPassword('')
+  }, [open, profile, uid, user, detail.data?.auth?.disabled, detail.data?.auth?.email])
 
   const saveProfile = useMutation({
     mutationFn: async () => {
@@ -118,10 +133,11 @@ function UserDetailDialog({
       if (walletTrim && !/^0x[a-fA-F0-9]{40}$/.test(walletTrim)) {
         throw new Error('Enter a valid BEP-20 wallet (0x + 40 hex) or leave blank')
       }
+      const nameTrim = displayName.trim()
       await adminUpdateUser({
         uid,
-        displayName: displayName.trim() || undefined,
-        mobile: mobileTrim || undefined,
+        ...(nameTrim ? { displayName: nameTrim } : { displayName: null }),
+        ...(mobileTrim ? { mobile: mobileTrim } : { mobile: null }),
         walletAddress: walletTrim || null,
         status: status as 'active' | 'suspended' | 'closed',
         kycStatus: kycStatus as 'none' | 'pending' | 'verified' | 'rejected',
@@ -200,6 +216,45 @@ function UserDetailDialog({
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const saveCredentials = useMutation({
+    mutationFn: async () => {
+      const email = authEmail.trim().toLowerCase()
+      const password = newPassword.trim()
+      if (!email && !password) {
+        throw new Error('Enter a new email and/or password')
+      }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error('Enter a valid email address')
+      }
+      if (password) {
+        if (password.length < 8) throw new Error('Password must be at least 8 characters')
+        if (password !== confirmPassword.trim()) throw new Error('Passwords do not match')
+      }
+      const currentEmail = String(detail.data?.auth?.email ?? profile?.email ?? '').toLowerCase()
+      const emailChanged = Boolean(email && email !== currentEmail)
+      if (!emailChanged && !password) {
+        throw new Error('Change the email or enter a new password')
+      }
+      return adminSetUserCredentials({
+        uid,
+        ...(emailChanged ? { email } : {}),
+        ...(password ? { password } : {}),
+      })
+    },
+    onSuccess: async (res) => {
+      const bits = [
+        res.email ? 'email updated' : null,
+        res.passwordChanged ? 'password set' : null,
+      ].filter(Boolean)
+      toast.success(bits.length ? bits.join(' · ') : 'Credentials saved')
+      setNewPassword('')
+      setConfirmPassword('')
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'user', uid] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   const title = user?.displayName || user?.email || 'User'
   const referralCode = String(profile?.referralCode ?? user?.referralCode ?? '')
   const referredByLabel =
@@ -258,7 +313,7 @@ function UserDetailDialog({
                 <Input id="ud-mobile" value={mobile} onChange={(e) => setMobile(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ud-wallet">Wallet address</Label>
+                <Label htmlFor="ud-wallet">Withdrawal wallet (locked for member)</Label>
                 <Input
                   id="ud-wallet"
                   className="font-mono text-xs"
@@ -266,6 +321,10 @@ function UserDetailDialog({
                   onChange={(e) => setWalletAddress(e.target.value)}
                   placeholder="0x…"
                 />
+                <p className="text-xs text-ink-muted">
+                  Members cannot change this after their first successful withdrawal. Clearing it
+                  unlocks the address for them again.
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ud-status">Status</Label>
@@ -322,6 +381,56 @@ function UserDetailDialog({
               >
                 <ShieldOff className="size-4" />
                 Suspend account
+              </Button>
+            </div>
+
+            <div className="space-y-4 rounded-xl border border-line bg-canvas p-4">
+              <div>
+                <p className="text-sm font-semibold">Login credentials</p>
+                <p className="text-xs text-ink-muted">
+                  Change email and/or password without the member&apos;s current password (ops /
+                  super admin).
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="ud-email">Email</Label>
+                  <Input
+                    id="ud-email"
+                    type="email"
+                    autoComplete="off"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ud-password">New password</Label>
+                  <PasswordInput
+                    id="ud-password"
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Leave blank to keep"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="ud-password2">Confirm password</Label>
+                  <PasswordInput
+                    id="ud-password2"
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Leave blank to keep"
+                  />
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => saveCredentials.mutate()}
+                disabled={saveCredentials.isPending}
+              >
+                {saveCredentials.isPending ? 'Updating…' : 'Update email / password'}
               </Button>
             </div>
 

@@ -10,6 +10,8 @@ import { PageHeader } from '@/components/shared/page-header'
 import { LoadingState } from '@/components/shared/loading-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { getAdminPlatformSettings, updatePlatformSettings } from '@/services/admin-service'
+import type { SocialLink, SocialPlatform } from '@/services/platform-service'
+import { newSocialId, SOCIAL_PLATFORM_OPTIONS } from '@/lib/social-links'
 import { cn } from '@/lib/utils'
 
 type TabId = 'contact' | 'footer' | 'deposit' | 'hotwallet'
@@ -22,6 +24,7 @@ const DEFAULT_FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Product',
     links: [
       { label: 'Token', href: '/token' },
+      { label: 'Download wallet', href: '/download' },
       { label: 'Security', href: '/security' },
       { label: 'Support', href: '/support' },
     ],
@@ -63,6 +66,7 @@ export function AdminSettingsPage() {
   const [footerTagline, setFooterTagline] = useState('')
   const [footerCopyright, setFooterCopyright] = useState('')
   const [footerColumns, setFooterColumns] = useState<FooterColumn[]>(DEFAULT_FOOTER_COLUMNS)
+  const [footerSocials, setFooterSocials] = useState<SocialLink[]>([])
   const [minDepositUsdCents, setMinDepositUsdCents] = useState('')
   const [tokensPerUsd, setTokensPerUsd] = useState('')
   const [tokenPriceUsd, setTokenPriceUsd] = useState('')
@@ -86,7 +90,12 @@ export function AdminSettingsPage() {
         supportHours: c.supportHours ?? '',
       })
     }
-    const f = s.footer as { tagline?: string; copyright?: string; columns?: FooterColumn[] } | undefined
+    const f = s.footer as {
+      tagline?: string
+      copyright?: string
+      columns?: FooterColumn[]
+      socials?: SocialLink[]
+    } | undefined
     if (f) {
       setFooterTagline(f.tagline ?? '')
       setFooterCopyright(f.copyright ?? '')
@@ -103,6 +112,18 @@ export function AdminSettingsPage() {
                 : [],
             }))
           : DEFAULT_FOOTER_COLUMNS,
+      )
+      const socials = Array.isArray(f.socials) ? f.socials : []
+      setFooterSocials(
+        socials.map((row) => ({
+          id: String(row.id || newSocialId()),
+          platform: (SOCIAL_PLATFORM_OPTIONS.some((o) => o.id === row.platform)
+            ? row.platform
+            : 'other') as SocialPlatform,
+          label: String(row.label ?? ''),
+          url: String(row.url ?? ''),
+          visible: row.visible !== false,
+        })),
       )
     }
     const d = s.deposit as Record<string, unknown> | undefined
@@ -143,9 +164,37 @@ export function AdminSettingsPage() {
       toast.error('Add at least one footer column with a title')
       return
     }
+    const socials = footerSocials
+      .map((s) => ({
+        id: s.id || newSocialId(),
+        platform: s.platform,
+        label: s.label.trim(),
+        url: s.url.trim(),
+        visible: Boolean(s.visible),
+      }))
+      .filter((s) => s.url)
+    for (const s of socials) {
+      if (
+        !/^https?:\/\//i.test(s.url) &&
+        !/^mailto:/i.test(s.url) &&
+        !/^tg:/i.test(s.url)
+      ) {
+        toast.error(`Social URL must start with https:// (${s.platform})`)
+        return
+      }
+    }
     save.mutate({
-      footer: { tagline: footerTagline, copyright: footerCopyright, columns },
+      footer: {
+        tagline: footerTagline,
+        copyright: footerCopyright,
+        columns,
+        socials,
+      },
     })
+  }
+
+  const updateSocial = (index: number, patch: Partial<SocialLink>) => {
+    setFooterSocials((prev) => prev.map((s, i) => (i === index ? { ...s, ...patch } : s)))
   }
 
   const updateColumn = (index: number, patch: Partial<FooterColumn>) => {
@@ -260,7 +309,8 @@ export function AdminSettingsPage() {
           <CardHeader>
             <CardTitle className="font-sans text-lg">Footer</CardTitle>
             <CardDescription>
-              Edit site footer text and link columns. Each column is a heading with links under it.
+              Edit site footer text, link columns, and social media links. Hidden socials stay saved
+              but do not appear on the public site.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -273,6 +323,93 @@ export function AdminSettingsPage() {
                 <Label htmlFor="f-copy">Copyright</Label>
                 <Input id="f-copy" value={footerCopyright} onChange={(e) => setFooterCopyright(e.target.value)} />
               </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-ink">Social media</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setFooterSocials((prev) => [
+                      ...prev,
+                      {
+                        id: newSocialId(),
+                        platform: 'facebook',
+                        label: '',
+                        url: 'https://',
+                        visible: true,
+                      },
+                    ])
+                  }
+                >
+                  <Plus className="size-4" />
+                  Add social link
+                </Button>
+              </div>
+
+              {footerSocials.length === 0 ? (
+                <p className="rounded-xl border border-dashed border-line bg-canvas px-4 py-6 text-sm text-ink-muted">
+                  No social links yet. Add Facebook, Telegram, YouTube, and more — toggle Visible to
+                  show or hide each one in the footer.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {footerSocials.map((social, index) => (
+                    <div
+                      key={social.id}
+                      className="grid gap-2 rounded-xl border border-line bg-canvas p-3 sm:grid-cols-[10rem_1fr_1.4fr_auto_auto]"
+                    >
+                      <NativeSelect
+                        value={social.platform}
+                        onChange={(e) =>
+                          updateSocial(index, { platform: e.target.value as SocialPlatform })
+                        }
+                        aria-label="Platform"
+                      >
+                        {SOCIAL_PLATFORM_OPTIONS.map((opt) => (
+                          <option key={opt.id} value={opt.id}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </NativeSelect>
+                      <Input
+                        value={social.label}
+                        onChange={(e) => updateSocial(index, { label: e.target.value })}
+                        placeholder="Label (optional)"
+                      />
+                      <Input
+                        value={social.url}
+                        onChange={(e) => updateSocial(index, { url: e.target.value })}
+                        placeholder="https://…"
+                        className="font-mono text-xs"
+                      />
+                      <label className="flex items-center gap-2 text-sm text-ink-muted">
+                        <input
+                          type="checkbox"
+                          className="size-4 rounded border-line"
+                          checked={social.visible}
+                          onChange={(e) => updateSocial(index, { visible: e.target.checked })}
+                        />
+                        Visible
+                      </label>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="text-danger"
+                        onClick={() =>
+                          setFooterSocials((prev) => prev.filter((_, i) => i !== index))
+                        }
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">

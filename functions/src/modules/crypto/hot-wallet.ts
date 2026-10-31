@@ -17,6 +17,8 @@ export interface HotWalletRecord {
   updatedBy: string;
 }
 
+export type HotWalletPurpose = 'deposit' | 'withdrawal' | 'any';
+
 export interface HotWalletPoolEntry {
   id: string;
   label: string;
@@ -24,8 +26,26 @@ export interface HotWalletPoolEntry {
   address: string;
   rpcUrl: string;
   enabled: boolean;
+  /** Receive USDT deposits (QR / awaiting_payment). Default true when missing. */
+  useForDeposits: boolean;
+  /** Send USDT withdrawals. Default true when missing. */
+  useForWithdrawals: boolean;
   createdAt?: Timestamp | FieldValue;
   updatedAt?: Timestamp | FieldValue;
+}
+
+function normalizePoolEntry(raw: HotWalletPoolEntry): HotWalletPoolEntry {
+  return {
+    ...raw,
+    useForDeposits: raw.useForDeposits !== false,
+    useForWithdrawals: raw.useForWithdrawals !== false,
+  };
+}
+
+function matchesPurpose(entry: HotWalletPoolEntry, purpose: HotWalletPurpose): boolean {
+  if (purpose === 'any') return true;
+  if (purpose === 'deposit') return entry.useForDeposits;
+  return entry.useForWithdrawals;
 }
 
 function normalizeKey(raw: string): string {
@@ -41,7 +61,9 @@ function walletFromKey(privateKey: string): Wallet {
   }
 }
 
-export async function getHotWallet(): Promise<{
+async function resolveHotWallet(
+  purpose: HotWalletPurpose,
+): Promise<{
   privateKey: string;
   address: string;
   rpcUrl: string;
@@ -50,7 +72,7 @@ export async function getHotWallet(): Promise<{
 }> {
   const poolSettings = await getHotWalletPoolSettings();
   if (poolSettings.multiWalletEnabled) {
-    const picked = await pickRandomEnabledHotWallet();
+    const picked = await pickRandomEnabledHotWallet(purpose);
     if (picked) {
       return {
         privateKey: picked.privateKey,
@@ -64,8 +86,8 @@ export async function getHotWallet(): Promise<{
 
   const snap = await getDb().collection(Collections.secrets).doc(SECRETS_DOC).get();
   if (!snap.exists) {
-    // Fall back to any pool wallet even if multi mode off.
-    const any = await pickRandomEnabledHotWallet();
+    // Fall back to a purpose-matching pool wallet even if multi mode off.
+    const any = await pickRandomEnabledHotWallet(purpose);
     if (any) {
       return {
         privateKey: any.privateKey,
@@ -77,7 +99,11 @@ export async function getHotWallet(): Promise<{
     }
     throw new AppError(
       'failed-precondition',
-      'Crypto hot wallet is not configured. An admin must set the private key first.',
+      purpose === 'deposit'
+        ? 'No deposit hot wallet is configured. Enable a pool wallet for deposits or set the primary key.'
+        : purpose === 'withdrawal'
+          ? 'No withdrawal hot wallet is configured. Enable a pool wallet for withdrawals or set the primary key.'
+          : 'Crypto hot wallet is not configured. An admin must set the private key first.',
     );
   }
   const data = snap.data() as HotWalletRecord;
@@ -90,6 +116,17 @@ export async function getHotWallet(): Promise<{
     rpcUrl: data.rpcUrl || DEFAULT_BSC_RPC_URL,
     autoWithdraw: data.autoWithdraw !== false,
   };
+}
+
+/** Default / withdrawal sender wallet. */
+export async function getHotWallet(): Promise<{
+  privateKey: string;
+  address: string;
+  rpcUrl: string;
+  autoWithdraw: boolean;
+  walletId?: string;
+}> {
+  return resolveHotWallet('withdrawal');
 }
 
 /** Prefer a specific wallet (e.g. deposit was assigned to it). */
@@ -136,18 +173,22 @@ export async function getHotWalletPublicInfo(): Promise<{
   multiWalletEnabled: boolean;
   poolCount: number;
   poolAddresses: string[];
+  depositPoolCount: number;
+  withdrawalPoolCount: number;
 }> {
   const poolSettings = await getHotWalletPoolSettings();
   const pool = await listHotWalletPool();
   const enabled = pool.filter((w) => w.enabled);
+  const depositWallets = enabled.filter((w) => w.useForDeposits);
+  const withdrawalWallets = enabled.filter((w) => w.useForWithdrawals);
 
   const snap = await getDb().collection(Collections.secrets).doc(SECRETS_DOC).get();
   const primary = snap.exists ? (snap.data() as HotWalletRecord) : null;
 
   const address =
-    poolSettings.multiWalletEnabled && enabled.length > 0
-      ? enabled[0]!.address
-      : primary?.address ?? enabled[0]?.address ?? null;
+    poolSettings.multiWalletEnabled && depositWallets.length > 0
+      ? depositWallets[0]!.address
+      : primary?.address ?? depositWallets[0]?.address ?? enabled[0]?.address ?? null;
 
   return {
     configured: Boolean(primary?.privateKey || enabled.length > 0),
@@ -160,6 +201,8 @@ export async function getHotWalletPublicInfo(): Promise<{
     multiWalletEnabled: poolSettings.multiWalletEnabled,
     poolCount: enabled.length,
     poolAddresses: enabled.map((w) => w.address),
+    depositPoolCount: depositWallets.length,
+    withdrawalPoolCount: withdrawalWallets.length,
   };
 }
 
@@ -186,7 +229,7 @@ export async function listHotWalletPool(): Promise<HotWalletPoolEntry[]> {
   const snap = await getDb().collection(Collections.secrets).doc(POOL_DOC).get();
   if (!snap.exists) return [];
   const wallets = (snap.data()?.wallets ?? []) as HotWalletPoolEntry[];
-  return Array.isArray(wallets) ? wallets : [];
+  return Array.isArray(wallets) ? wallets.map(normalizePoolEntry) : [];
 }
 
 export async function addHotWalletToPool(input: {
@@ -204,6 +247,8 @@ export async function addHotWalletToPool(input: {
     address: wallet.address,
     rpcUrl: input.rpcUrl?.trim() || DEFAULT_BSC_RPC_URL,
     enabled: true,
+    useForDeposits: true,
+    useForWithdrawals: true,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -234,6 +279,8 @@ export async function updateHotWalletPoolEntry(input: {
   enabled?: boolean;
   label?: string;
   rpcUrl?: string;
+  useForDeposits?: boolean;
+  useForWithdrawals?: boolean;
   actorId: string;
 }): Promise<void> {
   const ref = getDb().collection(Collections.secrets).doc(POOL_DOC);
@@ -243,14 +290,27 @@ export async function updateHotWalletPoolEntry(input: {
     const wallets = [...((snap.data()?.wallets as HotWalletPoolEntry[]) ?? [])];
     const idx = wallets.findIndex((w) => w.id === input.id);
     if (idx < 0) throw new AppError('not-found', 'Pool wallet not found');
-    const current = wallets[idx]!;
-    wallets[idx] = {
+    const current = normalizePoolEntry(wallets[idx]!);
+    const next = normalizePoolEntry({
       ...current,
       enabled: input.enabled ?? current.enabled,
       label: input.label?.trim() || current.label,
       rpcUrl: input.rpcUrl?.trim() || current.rpcUrl,
+      useForDeposits:
+        input.useForDeposits !== undefined ? input.useForDeposits : current.useForDeposits,
+      useForWithdrawals:
+        input.useForWithdrawals !== undefined
+          ? input.useForWithdrawals
+          : current.useForWithdrawals,
       updatedAt: FieldValue.serverTimestamp(),
-    };
+    });
+    if (next.enabled && !next.useForDeposits && !next.useForWithdrawals) {
+      throw new AppError(
+        'invalid-argument',
+        'Enable deposits and/or withdrawals for this wallet, or disable it',
+      );
+    }
+    wallets[idx] = next;
     tx.set(
       ref,
       { wallets, updatedAt: FieldValue.serverTimestamp(), updatedBy: input.actorId },
@@ -278,19 +338,35 @@ export async function removeHotWalletFromPool(input: {
   });
 }
 
-async function pickRandomEnabledHotWallet(): Promise<HotWalletPoolEntry | null> {
-  const enabled = (await listHotWalletPool()).filter((w) => w.enabled && w.privateKey);
+async function pickRandomEnabledHotWallet(
+  purpose: HotWalletPurpose = 'any',
+): Promise<HotWalletPoolEntry | null> {
+  const enabled = (await listHotWalletPool()).filter(
+    (w) => w.enabled && w.privateKey && matchesPurpose(w, purpose),
+  );
   if (enabled.length === 0) return null;
   const idx = Math.floor(Math.random() * enabled.length);
   return enabled[idx] ?? null;
 }
 
-/** Assign a deposit receiving wallet (random from pool when multi mode on). */
+/** Assign a deposit receiving wallet (random from deposit-enabled pool when multi mode on). */
 export async function pickDepositHotWallet(): Promise<{
   privateKey: string;
   address: string;
   rpcUrl: string;
+  autoWithdraw: boolean;
   walletId?: string;
 }> {
-  return getHotWallet();
+  return resolveHotWallet('deposit');
+}
+
+/** Assign a withdrawal sender wallet. */
+export async function pickWithdrawalHotWallet(): Promise<{
+  privateKey: string;
+  address: string;
+  rpcUrl: string;
+  autoWithdraw: boolean;
+  walletId?: string;
+}> {
+  return resolveHotWallet('withdrawal');
 }

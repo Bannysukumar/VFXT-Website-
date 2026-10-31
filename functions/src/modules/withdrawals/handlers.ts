@@ -99,17 +99,34 @@ async function handleCreateWithdrawalRequest(
   const { findWalletClaim, normalizeWalletAddress } = await import(
     '../auth/wallet-ownership'
   );
-  const toAddress = normalizeWalletAddress(assertBep20Address(destination));
 
   const db = getDb();
   const userSnap = await db.collection(Collections.users).doc(ctx.uid).get();
   const userData = userSnap.data() ?? {};
-  const linkedWallet =
-    typeof userData.walletAddress === 'string'
-      ? normalizeWalletAddress(userData.walletAddress)
-      : null;
+  const lockedRaw =
+    (typeof userData.withdrawalAddress === 'string' && userData.withdrawalAddress) ||
+    (typeof userData.walletAddress === 'string' && userData.walletAddress) ||
+    null;
+  const lockedWallet = lockedRaw
+    ? normalizeWalletAddress(assertBep20Address(lockedRaw))
+    : null;
 
-  // Destination must be unique across the platform (except this user's own linked wallet).
+  // After first successful withdrawal, destination is locked (admin-only change).
+  let toAddress: string;
+  if (lockedWallet) {
+    const requested = normalizeWalletAddress(assertBep20Address(destination));
+    if (requested !== lockedWallet) {
+      throw new AppError(
+        'failed-precondition',
+        'Your withdrawal address is locked. Contact support/admin to change it.',
+      );
+    }
+    toAddress = lockedWallet;
+  } else {
+    toAddress = normalizeWalletAddress(assertBep20Address(destination));
+  }
+
+  // Destination must be unique across the platform (except this user's own locked wallet).
   const claim = await findWalletClaim(db, toAddress, ctx.uid);
   if (claim) {
     throw new AppError(
@@ -117,29 +134,11 @@ async function handleCreateWithdrawalRequest(
       'This wallet address is already linked to another account. Use a unique address.',
     );
   }
-  if (linkedWallet && linkedWallet !== toAddress) {
-    throw new AppError(
-      'failed-precondition',
-      `Withdrawals must go to your linked wallet (${linkedWallet.slice(0, 8)}…).`,
-    );
-  }
 
   await ensureUserWallets(db, ctx.uid);
   const walletId = walletDocId(ctx.uid, 'withdrawal');
   const withdrawalId = uuidv4();
   const resolvedMethod = method || 'usdt_bep20';
-
-  // First withdrawal without a linked wallet → bind this unique address to the account.
-  if (!linkedWallet) {
-    await db.collection(Collections.users).doc(ctx.uid).set(
-      {
-        walletAddress: toAddress,
-        withdrawalAddress: toAddress,
-        updatedAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
-  }
 
   await db.runTransaction(async (tx) => {
     await reserveFunds(tx, db, {

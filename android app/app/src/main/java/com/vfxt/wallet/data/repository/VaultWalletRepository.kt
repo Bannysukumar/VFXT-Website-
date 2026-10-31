@@ -169,7 +169,12 @@ class VaultWalletRepository @Inject constructor(
         val incoming = direction == TxDirection.Incoming || (!from.equals(owner, true) && to.equals(owner, true))
         return ActivityItem(
             id = "$networkId:$hash:$tokenSymbol",
-            type = if (incoming) ActivityType.Received else ActivityType.Sent,
+            type = when {
+                kind == TxRecord.KIND_SWAP -> ActivityType.Swap
+                kind == TxRecord.KIND_APPROVE -> ActivityType.Approval
+                incoming -> ActivityType.Received
+                else -> ActivityType.Sent
+            },
             tokenSymbol = tokenSymbol,
             amount = amount.toBigDecimalOrNull() ?: BigDecimal.ZERO,
             status = when (status) {
@@ -182,6 +187,8 @@ class VaultWalletRepository @Inject constructor(
             counterparty = if (incoming) from else to,
             networkId = networkId,
             fee = fee?.toBigDecimalOrNull(),
+            toSymbol = toSymbol,
+            toAmount = toAmount?.toBigDecimalOrNull(),
         )
     }
 

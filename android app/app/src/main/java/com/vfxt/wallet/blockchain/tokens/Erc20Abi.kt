@@ -10,6 +10,8 @@ object Erc20Abi {
     // First 4 bytes of keccak256 of each function signature.
     private const val BALANCE_OF = "70a08231" // balanceOf(address)
     private const val TRANSFER = "a9059cbb" // transfer(address,uint256)
+    private const val APPROVE = "095ea7b3" // approve(address,uint256)
+    private const val ALLOWANCE = "dd62ed3e" // allowance(address,address)
     const val DECIMALS = "0x313ce567" // decimals()
     const val SYMBOL = "0x95d89b41" // symbol()
     const val NAME = "0x06fdde03" // name()
@@ -20,6 +22,14 @@ object Erc20Abi {
         require(amount.signum() >= 0) { "Negative amount" }
         return "0x$TRANSFER${encodeAddress(to)}${encodeUint(amount)}"
     }
+
+    /** Grants [spender] permission to move exactly [amount] of the caller's tokens. */
+    fun approve(spender: String, amount: BigInteger): String {
+        require(amount.signum() >= 0) { "Negative amount" }
+        return "0x$APPROVE${encodeAddress(spender)}${encodeUint(amount)}"
+    }
+
+    fun allowance(owner: String, spender: String): String = "0x$ALLOWANCE${encodeAddress(owner)}${encodeAddress(spender)}"
 
     fun encodeAddress(address: String): String {
         val hex = address.removePrefix("0x").removePrefix("0X").lowercase()

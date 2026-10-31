@@ -26,9 +26,10 @@ import {
 } from './bsc-usdt';
 import {
   addHotWalletToPool,
-  getHotWallet,
+  getHotWalletByAddress,
   getHotWalletPublicInfo,
   listHotWalletPool,
+  pickDepositHotWallet,
   removeHotWalletFromPool,
   setHotWallet,
   updateHotWalletPoolEntry,
@@ -309,7 +310,15 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       return { status: dep.status as string, txHash: null, depositId };
     }
 
-    const hot = await getHotWallet();
+    const savedDepositAddress =
+      typeof dep.depositAddress === 'string' && dep.depositAddress.startsWith('0x')
+        ? dep.depositAddress
+        : null;
+    const bound = savedDepositAddress
+      ? await getHotWalletByAddress(savedDepositAddress)
+      : null;
+    const hot = bound ?? (await pickDepositHotWallet());
+    const receiveAddress = savedDepositAddress || hot.address;
     const { resolveDepositExpectedWei } = await import('./unique-amount');
     const expectedWei = resolveDepositExpectedWei(dep);
     const createdAt = dep.createdAt?.toMillis?.() ?? Date.now() - DEPOSIT_TTL_MS;
@@ -337,14 +346,14 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
           expectedWei,
           notBeforeMs: createdAt - 60_000,
           isTxUsed,
-          toAddress: (dep.depositAddress as string) || hot.address,
+          toAddress: receiveAddress,
         });
       } else {
         found = await findIncomingUsdtTransfer({
           expectedWei,
           notBeforeMs: createdAt - 60_000,
           isTxUsed,
-          toAddress: (dep.depositAddress as string) || hot.address,
+          toAddress: receiveAddress,
         });
       }
     } catch (scanErr) {
@@ -360,7 +369,7 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         status: 'awaiting_payment' as const,
         txHash: null,
         depositId,
-        depositAddress: hot.address,
+        depositAddress: receiveAddress,
       };
     }
 
@@ -369,7 +378,7 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         status: 'awaiting_payment' as const,
         txHash: null,
         depositId,
-        depositAddress: hot.address,
+        depositAddress: receiveAddress,
       };
     }
 
@@ -484,6 +493,8 @@ export const listCryptoHotWallets = onCall(CALLABLE_OPTS, async (request) => {
         address: w.address,
         rpcUrl: w.rpcUrl,
         enabled: w.enabled,
+        useForDeposits: w.useForDeposits,
+        useForWithdrawals: w.useForWithdrawals,
       })),
     };
   } catch (err) {
@@ -530,6 +541,8 @@ export const updateCryptoHotWallet = onCall(CALLABLE_OPTS, async (request) => {
         enabled: z.boolean().optional(),
         label: z.string().max(80).optional(),
         rpcUrl: z.string().url().max(300).optional(),
+        useForDeposits: z.boolean().optional(),
+        useForWithdrawals: z.boolean().optional(),
       })
       .parse(request.data ?? {});
     await updateHotWalletPoolEntry({ ...body, actorId: ctx.uid });

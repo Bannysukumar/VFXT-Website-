@@ -310,7 +310,12 @@ fun TransactionDetailsSheet(item: ActivityItem, network: com.vfxt.wallet.blockch
     val uri = LocalUriHandler.current
     VfxtBottomSheet(onDismiss) {
         Text(
-            if (item.type == ActivityType.Received) "Received ${item.tokenSymbol}" else "Sent ${item.tokenSymbol}",
+            when (item.type) {
+                ActivityType.Received -> "Received ${item.tokenSymbol}"
+                ActivityType.Swap -> "Swap ${item.tokenSymbol} → ${item.toSymbol ?: "?"}"
+                ActivityType.Approval -> "Approve ${item.tokenSymbol}"
+                else -> "Sent ${item.tokenSymbol}"
+            },
             style = MaterialTheme.typography.headlineSmall,
             color = colors.textPrimary,
         )
@@ -325,15 +330,27 @@ fun TransactionDetailsSheet(item: ActivityItem, network: com.vfxt.wallet.blockch
             showDot = true,
         )
         Spacer(Modifier.height(Spacing.lg))
-        DetailRow("Amount", "${Formatters.tokenAmount(item.amount, 8)} ${item.tokenSymbol}")
-        item.counterparty?.let { DetailRow(if (item.type == ActivityType.Received) "From" else "To", it) }
+        DetailRow(if (item.type == ActivityType.Swap) "You paid" else "Amount", "${Formatters.tokenAmount(item.amount, 8)} ${item.tokenSymbol}")
+        if (item.type == ActivityType.Swap && item.toSymbol != null) {
+            DetailRow("You receive (minimum)", "${item.toAmount?.let { Formatters.tokenAmount(it, 8) } ?: "—"} ${item.toSymbol}")
+        }
+        item.counterparty?.let {
+            DetailRow(
+                when (item.type) {
+                    ActivityType.Received -> "From"
+                    ActivityType.Swap, ActivityType.Approval -> "Swap contract"
+                    else -> "To"
+                },
+                it,
+            )
+        }
         item.fee?.let { DetailRow("Network fee", "${Formatters.tokenAmount(it, 8)} ${network?.nativeSymbol ?: ""}") }
         DetailRow("Date", DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(item.timestampMillis)))
         network?.let { DetailRow("Network", it.name) }
         item.txHash?.let { DetailRow("Transaction hash", it) }
         Spacer(Modifier.height(Spacing.lg))
         if (item.txHash != null && network != null) {
-            VfxtPrimaryButton("View on BscScan", { uri.openUri(network.explorerTxUrl(item.txHash)) }, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Filled.OpenInNew)
+            VfxtPrimaryButton("View on explorer", { uri.openUri(network.explorerTxUrl(item.txHash)) }, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Filled.OpenInNew)
         }
     }
 }
@@ -354,6 +371,7 @@ fun TokenDetailsScreen(
     onBack: () -> Unit,
     onSend: (String) -> Unit,
     onReceive: () -> Unit,
+    onSwap: (String) -> Unit = {},
     viewModel: TokenDetailsViewModel = hiltViewModel(),
 ) {
     val colors = VfxtTheme.colors
@@ -391,6 +409,11 @@ fun TokenDetailsScreen(
                 Row(horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
                     VfxtPrimaryButton("Send", { onSend(token.key) }, Modifier.weight(1f))
                     VfxtSecondaryButton("Receive", onReceive, Modifier.weight(1f))
+                }
+                // Swaps run through LI.FI on supported mainnets only.
+                if (state.network?.let { !it.isTestnet && !it.isCustom } == true) {
+                    Spacer(Modifier.height(Spacing.md))
+                    VfxtSecondaryButton("Swap ${token.symbol}", { onSwap(token.key) }, Modifier.fillMaxWidth())
                 }
                 Spacer(Modifier.height(Spacing.xl))
             }

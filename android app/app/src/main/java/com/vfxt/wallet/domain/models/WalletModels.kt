@@ -47,7 +47,7 @@ data class Holding(
     val unitPrice: BigDecimal? = null,
 )
 
-enum class ActivityType { Received, Sent, MiningReward, Claim }
+enum class ActivityType { Received, Sent, MiningReward, Claim, Swap, Approval }
 
 enum class ActivityStatus { Pending, Confirmed, Failed }
 
@@ -64,6 +64,9 @@ data class ActivityItem(
     val counterparty: String? = null,
     val networkId: String? = null,
     val fee: BigDecimal? = null,
+    /** Swaps only: the token and amount received. */
+    val toSymbol: String? = null,
+    val toAmount: BigDecimal? = null,
 )
 
 data class WalletOverview(

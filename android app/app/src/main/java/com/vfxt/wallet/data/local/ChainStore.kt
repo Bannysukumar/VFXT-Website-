@@ -76,7 +76,21 @@ data class TxRecord(
     val status: String,
     val timestamp: Long,
     val fee: String? = null,
-)
+    /** "transfer" (default) | "swap" | "approve". */
+    val kind: String = KIND_TRANSFER,
+    /** Swaps only: what the user receives, and on which network (differs for bridges). */
+    val toSymbol: String? = null,
+    val toAmount: String? = null,
+    val toNetworkId: String? = null,
+    /** Swaps only: aggregator tool used (needed to query cross-chain status). */
+    val tool: String? = null,
+) {
+    companion object {
+        const val KIND_TRANSFER = "transfer"
+        const val KIND_SWAP = "swap"
+        const val KIND_APPROVE = "approve"
+    }
+}
 
 /**
  * Public, non-secret chain data: active network, custom networks, user-added tokens, hidden tokens

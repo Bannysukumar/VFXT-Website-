@@ -26,6 +26,7 @@ function deepMergePlatform(
       ...base.footer,
       ...(patch.footer ?? {}),
       columns: patch.footer?.columns ?? base.footer.columns,
+      socials: patch.footer?.socials ?? base.footer.socials ?? [],
     },
     plan: {
       ...base.plan,

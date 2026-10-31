@@ -10,6 +10,28 @@ export interface FooterColumn {
   links: FooterLink[]
 }
 
+export type SocialPlatform =
+  | 'facebook'
+  | 'instagram'
+  | 'twitter'
+  | 'youtube'
+  | 'linkedin'
+  | 'telegram'
+  | 'whatsapp'
+  | 'discord'
+  | 'tiktok'
+  | 'github'
+  | 'website'
+  | 'other'
+
+export interface SocialLink {
+  id: string
+  platform: SocialPlatform
+  label: string
+  url: string
+  visible: boolean
+}
+
 export interface ContactSettings {
   companyName: string
   email: string
@@ -27,6 +49,7 @@ export interface FooterSettings {
   tagline: string
   copyright: string
   columns: FooterColumn[]
+  socials?: SocialLink[]
 }
 
 export interface PublicPlatformSettings {

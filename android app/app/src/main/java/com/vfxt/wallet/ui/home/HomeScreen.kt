@@ -99,6 +99,7 @@ fun HomeScreen(
     onManageWallets: () -> Unit,
     onSend: (tokenKey: String?, recipient: String?) -> Unit,
     onReceive: () -> Unit,
+    onSwap: () -> Unit,
     onActivity: () -> Unit,
     onTokenDetails: (String) -> Unit,
     onNetwork: () -> Unit,
@@ -111,6 +112,7 @@ fun HomeScreen(
     HomeContent(
         onSend = { onSend(null, null) },
         onReceive = onReceive,
+        onSwap = onSwap,
         onActivity = onActivity,
         onTokenDetails = onTokenDetails,
         onNetwork = onNetwork,
@@ -135,7 +137,7 @@ fun HomeScreen(
     )
 }
 
-private enum class SoonFeature { Swap, Buy }
+private enum class SoonFeature { Buy }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -151,6 +153,7 @@ fun HomeContent(
     onManageWallets: () -> Unit = {},
     onSend: () -> Unit = {},
     onReceive: () -> Unit = {},
+    onSwap: () -> Unit = {},
     onActivity: () -> Unit = {},
     onTokenDetails: (String) -> Unit = {},
     onNetwork: () -> Unit = {},
@@ -209,7 +212,7 @@ fun HomeContent(
                 ) {
                     QuickActionButton(Icons.AutoMirrored.Filled.CallMade, "Send", if (account == null) needsWallet else onSend, Modifier.weight(1f))
                     QuickActionButton(Icons.AutoMirrored.Filled.CallReceived, "Receive", if (account == null) needsWallet else onReceive, Modifier.weight(1f))
-                    QuickActionButton(Icons.Filled.SwapHoriz, "Swap", { soonFeature = SoonFeature.Swap }, Modifier.weight(1f), comingSoon = true)
+                    QuickActionButton(Icons.Filled.SwapHoriz, "Swap", if (account == null) needsWallet else onSwap, Modifier.weight(1f))
                     QuickActionButton(Icons.Filled.ShoppingCart, "Buy", { soonFeature = SoonFeature.Buy }, Modifier.weight(1f), comingSoon = true)
                 }
             }
@@ -305,12 +308,6 @@ fun HomeContent(
     }
 
     when (soonFeature) {
-        SoonFeature.Swap -> ComingSoonSheet(
-            title = "Swap is coming soon",
-            message = "Token swaps on BNB Smart Chain are planned for a future release.",
-            icon = Icons.Filled.SwapHoriz,
-            onDismiss = { soonFeature = null },
-        )
         SoonFeature.Buy -> ComingSoonSheet(
             title = "Buy crypto is coming soon",
             message = "Card and bank purchases through a licensed provider are planned for a future release.",

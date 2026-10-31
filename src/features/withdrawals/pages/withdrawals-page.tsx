@@ -1,18 +1,22 @@
+import { useEffect } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
-import { AlertTriangle, Loader2, Wallet } from 'lucide-react'
+import { AlertTriangle, Loader2, Lock, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { FieldError, PageHeader } from '@/components/shared/page-header'
 import { AmountInputPrefix, ProcessSteps, SummaryRow } from '@/components/shared/process-steps'
 import { RequestHistory } from '@/components/shared/request-history'
 import { bscScanTxUrl } from '@/components/shared/bsc-tx-link'
 import { useAuth } from '@/features/auth/auth-context'
+import { getDb, isFirebaseReady } from '@/lib/firebase'
 import { formatMinor, parseToMinor } from '@/lib/money'
 import { images } from '@/lib/media'
 import { fetchUserWallets, requestWithdrawal } from '@/services/wallet-service'
@@ -22,7 +26,9 @@ import { splitWithdrawalCommission } from '@/lib/plan'
 
 const schema = z.object({
   amount: z.string().min(1, 'Amount required'),
-  destination: z.string().min(5, 'Destination required').max(200),
+  destination: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/, 'Enter a valid BEP-20 address (0x…)'),
   note: z.string().max(200).optional(),
 })
 
@@ -34,6 +40,17 @@ function previewMinor(input: string) {
   } catch {
     return 0
   }
+}
+
+async function fetchLockedWithdrawalAddress(uid: string): Promise<string | null> {
+  if (!isFirebaseReady()) return null
+  const snap = await getDoc(doc(getDb(), 'users', uid))
+  const data = snap.data()
+  const raw =
+    (typeof data?.withdrawalAddress === 'string' && data.withdrawalAddress) ||
+    (typeof data?.walletAddress === 'string' && data.walletAddress) ||
+    null
+  return raw ? raw.toLowerCase() : null
 }
 
 export function WithdrawalsPage() {
@@ -51,6 +68,11 @@ export function WithdrawalsPage() {
     queryFn: () => fetchUserWallets(user!.uid),
     enabled: Boolean(user?.uid),
   })
+  const lockedAddress = useQuery({
+    queryKey: ['my-withdrawal-address', user?.uid],
+    queryFn: () => fetchLockedWithdrawalAddress(user!.uid),
+    enabled: Boolean(user?.uid),
+  })
   const platform = useQuery({
     queryKey: ['platform', 'public'],
     queryFn: getPublicPlatformSettings,
@@ -58,6 +80,15 @@ export function WithdrawalsPage() {
   const minWithdrawCents = platform.data?.withdraw?.minWithdrawUsdCents ?? 1000
   const commissionBps = platform.data?.withdraw?.commissionBps ?? 0
   const { commissionMinor, netMinor } = splitWithdrawalCommission(amountMinor, commissionBps)
+
+  const addressLocked = Boolean(lockedAddress.data)
+  const destinationValue = form.watch('destination')
+
+  useEffect(() => {
+    if (lockedAddress.data) {
+      form.setValue('destination', lockedAddress.data, { shouldValidate: true })
+    }
+  }, [lockedAddress.data, form])
 
   const withdrawalWallet =
     wallets.data?.find((w) => w.id.endsWith('_withdrawal') || w.kind === 'withdrawal') ??
@@ -79,10 +110,11 @@ export function WithdrawalsPage() {
       if (minor < minWithdrawCents) {
         throw new Error(`Minimum withdrawal is $${(minWithdrawCents / 100).toFixed(2)}`)
       }
+      const destination = (lockedAddress.data || values.destination).trim()
       return requestWithdrawal({
         amountMinor: minor,
         currency: 'USD',
-        destination: values.destination,
+        destination,
         idempotencyKey: crypto.randomUUID(),
         note: values.note,
       })
@@ -103,11 +135,17 @@ export function WithdrawalsPage() {
           description: 'Hot wallet not ready — waiting for admin / funds.',
         })
       }
-      form.reset()
+      form.reset({
+        amount: '',
+        destination: lockedAddress.data || destinationValue || '',
+        note: '',
+      })
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['wallets'] }),
         queryClient.invalidateQueries({ queryKey: ['my-withdrawals'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-withdrawal-address'] }),
         queryClient.invalidateQueries({ queryKey: ['ledger'] }),
+        queryClient.invalidateQueries({ queryKey: ['my-profile'] }),
       ])
     },
     onError: (error: Error) => toast.error(error.message),
@@ -119,7 +157,7 @@ export function WithdrawalsPage() {
     <div className="space-y-8">
       <PageHeader
         title="Withdraw USDT"
-        description="Enter amount and your BEP-20 wallet address. USDT is sent on BNB Smart Chain immediately when the hot wallet is configured."
+        description="Enter amount and your BEP-20 wallet address. After your first successful withdrawal, that address is locked."
       />
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <Card>
@@ -188,10 +226,27 @@ export function WithdrawalsPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="destination">BEP-20 wallet address</Label>
+                {addressLocked ? (
+                  <Alert>
+                    <Lock />
+                    <AlertTitle>Address locked</AlertTitle>
+                    <AlertDescription>
+                      This payout address was saved after your first successful withdrawal. Only an
+                      admin can change it.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <p className="text-xs text-ink-muted">
+                    First successful withdrawal saves this address to your profile. You will not be
+                    able to change it afterward.
+                  </p>
+                )}
                 <Input
                   id="destination"
                   placeholder="0x…"
                   className="font-mono text-sm"
+                  readOnly={addressLocked}
+                  disabled={addressLocked || lockedAddress.isLoading}
                   aria-invalid={Boolean(errors.destination)}
                   {...form.register('destination')}
                 />
@@ -222,7 +277,7 @@ export function WithdrawalsPage() {
                 type="submit"
                 size="lg"
                 className="w-full"
-                disabled={mutation.isPending || exceeds || belowMin}
+                disabled={mutation.isPending || exceeds || belowMin || lockedAddress.isLoading}
               >
                 {mutation.isPending ? <Loader2 className="animate-spin" /> : null}
                 {mutation.isPending ? 'Sending…' : 'Withdraw USDT now'}
@@ -236,7 +291,10 @@ export function WithdrawalsPage() {
           steps={[
             { title: 'Reserve', body: 'Amount is reserved in your Withdrawal Wallet.' },
             { title: 'On-chain send', body: 'Hot wallet transfers USDT BEP-20 to your address.' },
-            { title: 'Confirmed', body: 'Ledger debit finalizes when the BSC transfer succeeds.' },
+            {
+              title: 'Address locked',
+              body: 'After the first success, that wallet is saved and only an admin can change it.',
+            },
           ]}
         />
       </div>

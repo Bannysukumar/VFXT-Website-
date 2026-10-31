@@ -92,10 +92,10 @@ async function handleCreateDepositRequest(
 
   if (useCrypto) {
     try {
-      const { getHotWallet } = await import('../crypto/hot-wallet');
+      const { pickDepositHotWallet } = await import('../crypto/hot-wallet');
       const { allocateUniqueDepositWei } = await import('../crypto/unique-amount');
       const { BSC_CHAIN_ID, USDT_BEP20_ADDRESS } = await import('../../config/bsc');
-      const hot = await getHotWallet();
+      const hot = await pickDepositHotWallet();
       const unique = await allocateUniqueDepositWei(db, amountMinor);
       depositAddress = hot.address;
       expectedWei = unique.expectedWei;

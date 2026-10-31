@@ -119,8 +119,12 @@ export function AdminCryptoWalletPage() {
   })
 
   const togglePoolWallet = useMutation({
-    mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-      updateCryptoHotWallet({ id, enabled }),
+    mutationFn: (input: {
+      id: string
+      enabled?: boolean
+      useForDeposits?: boolean
+      useForWithdrawals?: boolean
+    }) => updateCryptoHotWallet(input),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'crypto-wallet-pool'] })
     },
@@ -323,7 +327,8 @@ export function AdminCryptoWalletPage() {
         <CardHeader>
           <CardTitle className="font-sans text-lg">Hot wallet pool</CardTitle>
           <CardDescription>
-            Additional wallets used when multi-wallet mode is enabled in platform settings.
+            Assign each pool wallet to deposits, withdrawals, or both. Enable multi-wallet mode in
+            Platform settings so deposit QR codes and withdrawals pick from these roles.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -342,45 +347,85 @@ export function AdminCryptoWalletPage() {
                       <tr className="border-b border-line bg-canvas text-left text-xs text-ink-muted">
                         <th className="px-4 py-3">Label</th>
                         <th className="px-4 py-3">Address</th>
-                        <th className="px-4 py-3">Enabled</th>
+                        <th className="px-4 py-3">On</th>
+                        <th className="px-4 py-3">Deposits</th>
+                        <th className="px-4 py-3">Withdrawals</th>
                         <th className="px-4 py-3 w-32" />
                       </tr>
                     </thead>
                     <tbody>
-                      {pool.data!.pool.map((w) => (
-                        <tr key={w.id} className="border-b border-line last:border-0">
-                          <td className="px-4 py-3">{w.label || '—'}</td>
-                          <td className="px-4 py-3 font-mono text-xs">{w.address}</td>
-                          <td className="px-4 py-3">
-                            <Badge variant={w.enabled ? 'success' : 'secondary'}>
-                              {w.enabled ? 'Yes' : 'No'}
-                            </Badge>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  togglePoolWallet.mutate({ id: w.id, enabled: !w.enabled })
-                                }
-                                disabled={togglePoolWallet.isPending}
-                              >
-                                {w.enabled ? 'Disable' : 'Enable'}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-danger"
-                                onClick={() => removePoolWallet.mutate(w.id)}
-                                disabled={removePoolWallet.isPending}
-                              >
-                                <Trash2 className="size-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                      {pool.data!.pool.map((w) => {
+                        const forDeposits = w.useForDeposits !== false
+                        const forWithdrawals = w.useForWithdrawals !== false
+                        return (
+                          <tr key={w.id} className="border-b border-line last:border-0">
+                            <td className="px-4 py-3">{w.label || '—'}</td>
+                            <td className="px-4 py-3 font-mono text-xs">{w.address}</td>
+                            <td className="px-4 py-3">
+                              <Badge variant={w.enabled ? 'success' : 'secondary'}>
+                                {w.enabled ? 'Yes' : 'No'}
+                              </Badge>
+                            </td>
+                            <td className="px-4 py-3">
+                              <label className="inline-flex items-center gap-2 text-xs text-ink-muted">
+                                <input
+                                  type="checkbox"
+                                  className="size-4 rounded border-line"
+                                  checked={forDeposits}
+                                  disabled={togglePoolWallet.isPending || !w.enabled}
+                                  onChange={() =>
+                                    togglePoolWallet.mutate({
+                                      id: w.id,
+                                      useForDeposits: !forDeposits,
+                                    })
+                                  }
+                                />
+                                Receive
+                              </label>
+                            </td>
+                            <td className="px-4 py-3">
+                              <label className="inline-flex items-center gap-2 text-xs text-ink-muted">
+                                <input
+                                  type="checkbox"
+                                  className="size-4 rounded border-line"
+                                  checked={forWithdrawals}
+                                  disabled={togglePoolWallet.isPending || !w.enabled}
+                                  onChange={() =>
+                                    togglePoolWallet.mutate({
+                                      id: w.id,
+                                      useForWithdrawals: !forWithdrawals,
+                                    })
+                                  }
+                                />
+                                Send
+                              </label>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    togglePoolWallet.mutate({ id: w.id, enabled: !w.enabled })
+                                  }
+                                  disabled={togglePoolWallet.isPending}
+                                >
+                                  {w.enabled ? 'Disable' : 'Enable'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-danger"
+                                  onClick={() => removePoolWallet.mutate(w.id)}
+                                  disabled={removePoolWallet.isPending}
+                                >
+                                  <Trash2 className="size-4" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

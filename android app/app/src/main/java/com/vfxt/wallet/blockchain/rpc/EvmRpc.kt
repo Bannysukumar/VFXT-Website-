@@ -29,6 +29,9 @@ class EvmRpc @Inject constructor(private val client: JsonRpcClient) {
     suspend fun tokenBalance(network: EvmNetwork, contract: String, owner: String): BigInteger? =
         Erc20Abi.decodeUint(ethCall(network, contract, Erc20Abi.balanceOf(owner)))
 
+    suspend fun tokenAllowance(network: EvmNetwork, contract: String, owner: String, spender: String): BigInteger =
+        Erc20Abi.decodeUint(ethCall(network, contract, Erc20Abi.allowance(owner, spender))) ?: BigInteger.ZERO
+
     suspend fun tokenDecimals(network: EvmNetwork, contract: String): Int? =
         Erc20Abi.decodeUint(ethCall(network, contract, Erc20Abi.DECIMALS))?.toInt()
 

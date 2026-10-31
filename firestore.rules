@@ -90,7 +90,11 @@ service cloud.firestore {
           'rightVolumeMinor',
           'currentRank',
           'lastRankPaidAt',
-          'rankCycleStart'
+          'rankCycleStart',
+          'withdrawalAddress',
+          'walletAddress',
+          'lastWithdrawalAddress',
+          'firstWithdrawalCompletedAt'
         ])
         && request.resource.data.keys().hasOnly([
           'displayName',
@@ -98,7 +102,6 @@ service cloud.firestore {
           'timezone',
           'locale',
           'preferences',
-          'withdrawalAddress',
           'updatedAt'
         ].concat(resource.data.keys()));
       allow delete: if false;

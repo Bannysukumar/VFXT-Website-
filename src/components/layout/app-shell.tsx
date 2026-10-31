@@ -40,6 +40,7 @@ import {
   Zap,
   CircleDollarSign,
   Pickaxe,
+  Smartphone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -143,6 +144,7 @@ const adminNav: NavSection[] = [
       { to: '/admin/mining', label: 'Wallet mining', icon: Pickaxe },
       { to: '/admin/mining/boosters', label: 'Mining boosters', icon: Zap },
       { to: '/admin/crypto-wallet', label: 'Hot wallet', icon: KeyRound },
+      { to: '/admin/wallet-apk', label: 'Wallet APK', icon: Smartphone },
     ],
   },
   {
@@ -229,6 +231,7 @@ const titles: Record<string, string> = {
   '/admin/mining/boosters/history': 'Booster history',
   '/admin/mining/boosters/active': 'Active boosters',
   '/admin/crypto-wallet': 'Hot wallet',
+  '/admin/wallet-apk': 'Wallet APK',
   '/admin/users': 'Users',
   '/admin/affiliates': 'Affiliates',
   '/admin/tickets': 'Tickets',

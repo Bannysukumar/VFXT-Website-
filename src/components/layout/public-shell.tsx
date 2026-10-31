@@ -6,6 +6,7 @@ import { ArrowRight, Menu, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/shared/logo'
 import { useAuth } from '@/features/auth/auth-context'
+import { SOCIAL_ICONS, socialLabel } from '@/lib/social-links'
 import { cn } from '@/lib/utils'
 import { getPublicPlatformSettings } from '@/services/platform-service'
 
@@ -13,6 +14,7 @@ const links = [
   { to: '/about', label: 'About' },
   { to: '/security', label: 'Security' },
   { to: '/token', label: 'Token' },
+  { to: '/download', label: 'Download' },
   { to: '/support', label: 'Support' },
   { to: '/contact', label: 'Contact' },
 ]
@@ -24,6 +26,7 @@ const footerColumns = [
       { to: '/auth/register', label: 'Open account' },
       { to: '/auth/login', label: 'Sign in' },
       { to: '/token', label: 'VFXT token' },
+      { to: '/download', label: 'Download wallet' },
     ],
   },
   {
@@ -74,6 +77,10 @@ export function PublicShell() {
   const footerCopyright =
     platform.data?.footer?.copyright ??
     `© ${new Date().getFullYear()} Virtual FX Trades. All rights reserved.`
+  const footerSocials = useMemo(() => {
+    const rows = platform.data?.footer?.socials ?? []
+    return rows.filter((s) => s.visible !== false && Boolean(s.url?.trim()))
+  }, [platform.data?.footer?.socials])
   // Every public page except auth opens with a dark full-bleed hero.
   const hasDarkHero = !location.pathname.startsWith('/auth')
 
@@ -213,21 +220,53 @@ export function PublicShell() {
           <div className="max-w-xs">
             <Logo inverted />
             <p className="mt-4 text-sm leading-relaxed text-white/60">{footerTagline}</p>
+            {footerSocials.length > 0 ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {footerSocials.map((social) => {
+                  const Icon = SOCIAL_ICONS[social.platform] ?? SOCIAL_ICONS.other
+                  const title = socialLabel(social.platform, social.label)
+                  return (
+                    <a
+                      key={social.id}
+                      href={social.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={title}
+                      aria-label={title}
+                      className="grid size-10 place-items-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                    >
+                      <Icon className="size-4" />
+                    </a>
+                  )
+                })}
+              </div>
+            ) : null}
           </div>
           {footerColumnsResolved.map((column) => (
             <div key={column.title}>
-              <p className="text-xs font-semiboldr text-white/40">
+              <p className="text-xs font-semibold text-white/40">
                 {column.title}
               </p>
               <ul className="mt-3 space-y-0.5">
                 {column.links.map((link) => (
                   <li key={link.to}>
-                    <Link
-                      to={link.to}
-                      className="inline-block py-1.5 text-sm text-white/70 transition-colors hover:text-white"
-                    >
-                      {link.label}
-                    </Link>
+                    {/^https?:\/\//i.test(link.to) ? (
+                      <a
+                        href={link.to}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-block py-1.5 text-sm text-white/70 transition-colors hover:text-white"
+                      >
+                        {link.label}
+                      </a>
+                    ) : (
+                      <Link
+                        to={link.to}
+                        className="inline-block py-1.5 text-sm text-white/70 transition-colors hover:text-white"
+                      >
+                        {link.label}
+                      </Link>
+                    )}
                   </li>
                 ))}
               </ul>
