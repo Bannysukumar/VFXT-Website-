@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Dark is the default brand theme, so night mode uses the same window theme. -->
+    <style name="Theme.VFXTWallet" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/vfxt_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

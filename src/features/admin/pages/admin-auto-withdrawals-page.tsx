@@ -2,7 +2,8 @@ import { format } from 'date-fns'
 import { AdminHistoryTable, type HistoryColumn } from '@/features/admin/components/admin-history-table'
 import { adminListAutoWithdrawals } from '@/services/admin-service'
 import { formatMinor } from '@/lib/money'
-import { IdCell } from '@/features/admin/components/admin-ui'
+import { ActorCell, StatusPill, UserCell } from '@/features/admin/components/admin-ui'
+import { BscTxLink } from '@/components/shared/bsc-tx-link'
 
 const columns: HistoryColumn[] = [
   {
@@ -13,8 +14,14 @@ const columns: HistoryColumn[] = [
   },
   {
     key: 'userId',
-    label: 'User',
-    render: (r) => <IdCell id={String(r.userId ?? '')} label="User ID" />,
+    label: 'Member',
+    render: (r) => (
+      <UserCell
+        userId={String(r.userId ?? '')}
+        email={r.userEmail ? String(r.userEmail) : null}
+        displayName={r.userDisplayName ? String(r.userDisplayName) : null}
+      />
+    ),
   },
   {
     key: 'amountMinor',
@@ -39,28 +46,30 @@ const columns: HistoryColumn[] = [
   },
   {
     key: 'destination',
-    label: 'To',
+    label: 'Wallet',
     render: (r) =>
       r.destination ? (
-        <span className="font-mono text-xs">{String(r.destination).slice(0, 12)}…</span>
+        <span className="font-mono text-xs" title={String(r.destination)}>
+          {String(r.destination).slice(0, 8)}…{String(r.destination).slice(-6)}
+        </span>
       ) : (
         '—'
       ),
   },
   {
     key: 'txHash',
-    label: 'Tx hash',
-    render: (r) =>
-      r.txHash ? (
-        <span className="font-mono text-xs">{String(r.txHash).slice(0, 14)}…</span>
-      ) : (
-        '—'
-      ),
+    label: 'Transaction',
+    render: (r) => <BscTxLink txHash={r.txHash ? String(r.txHash) : null} compact />,
+  },
+  {
+    key: 'status',
+    label: 'Status',
+    render: () => <StatusPill status="completed" />,
   },
   {
     key: 'reviewedBy',
     label: 'Sent by',
-    render: (r) => <span className="text-xs text-ink-muted">{String(r.reviewedBy ?? '—')}</span>,
+    render: (r) => <ActorCell value={r.reviewedBy} />,
   },
 ]
 

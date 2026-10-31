@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mirrors core/designsystem/theme/Color.kt for XML-only surfaces (window, splash, launcher). -->
+    <color name="vfxt_background">#FF080D19</color>
+    <color name="vfxt_surface">#FF101827</color>
+    <color name="vfxt_primary">#FF2878FF</color>
+    <color name="vfxt_electric">#FF00A6FF</color>
+    <color name="vfxt_purple">#FF8157FF</color>
+    <color name="vfxt_light_background">#FFF5F7FB</color>
+</resources>

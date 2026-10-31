@@ -6,7 +6,7 @@ import {
   type AdminIncomeType,
 } from '@/services/admin-service'
 import { formatMinor } from '@/lib/money'
-import { IdCell } from '@/features/admin/components/admin-ui'
+import { UserCell } from '@/features/admin/components/admin-ui'
 import { ErrorState } from '@/components/shared/error-state'
 
 export const INCOME_PAGES: Record<
@@ -78,8 +78,14 @@ const columnsFor = (currency: 'USD' | 'VFXT'): HistoryColumn[] => [
   },
   {
     key: 'userId',
-    label: 'User',
-    render: (r) => <IdCell id={String(r.userId ?? '')} label="User ID" />,
+    label: 'Member',
+    render: (r) => (
+      <UserCell
+        userId={String(r.userId ?? '')}
+        email={r.userEmail ? String(r.userEmail) : null}
+        displayName={r.userDisplayName ? String(r.userDisplayName) : null}
+      />
+    ),
   },
   {
     key: 'amountMinor',
@@ -93,21 +99,14 @@ const columnsFor = (currency: 'USD' | 'VFXT'): HistoryColumn[] => [
       return formatMinor(n, { scale: 2, currency: 'USD' })
     },
   },
-  { key: 'currency', label: 'Currency' },
   {
     key: 'description',
-    label: 'Description',
-    render: (r) => <span className="max-w-[280px] truncate text-xs">{String(r.description ?? '')}</span>,
-  },
-  {
-    key: 'referenceId',
-    label: 'Reference',
-    render: (r) =>
-      r.referenceId ? (
-        <span className="font-mono text-xs">{String(r.referenceId).slice(0, 12)}…</span>
-      ) : (
-        '—'
-      ),
+    label: 'Details',
+    render: (r) => (
+      <span className="max-w-[320px] text-sm text-ink-muted" title={String(r.description ?? '')}>
+        {String(r.description ?? '—')}
+      </span>
+    ),
   },
 ]
 

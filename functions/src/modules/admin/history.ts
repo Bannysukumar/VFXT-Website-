@@ -1,4 +1,5 @@
 import { onCall } from 'firebase-functions/v2/https';
+import type { Firestore } from 'firebase-admin/firestore';
 import { z } from 'zod';
 import { CALLABLE_OPTS, toHttpsError } from '../../lib/callable';
 import { Collections, getDb } from '../../lib/firebase';
@@ -38,6 +39,47 @@ function tsToIso(value: unknown): string | null {
   return null;
 }
 
+type UserLabel = { userEmail: string | null; userDisplayName: string | null };
+
+async function loadUserLabels(
+  db: Firestore,
+  userIds: string[],
+): Promise<Map<string, UserLabel>> {
+  const unique = [...new Set(userIds.filter(Boolean))];
+  const out = new Map<string, UserLabel>();
+  for (let i = 0; i < unique.length; i += 100) {
+    const chunk = unique.slice(i, i + 100);
+    const refs = chunk.map((id) => db.collection(Collections.users).doc(id));
+    const snaps = await db.getAll(...refs);
+    for (const snap of snaps) {
+      if (!snap.exists) {
+        out.set(snap.id, { userEmail: null, userDisplayName: null });
+        continue;
+      }
+      const data = snap.data() ?? {};
+      out.set(snap.id, {
+        userEmail: typeof data.email === 'string' ? data.email : null,
+        userDisplayName:
+          typeof data.displayName === 'string' ? data.displayName : null,
+      });
+    }
+  }
+  return out;
+}
+
+function withUserLabel(
+  row: Record<string, unknown>,
+  labels: Map<string, UserLabel>,
+): Record<string, unknown> {
+  const uid = String(row.userId ?? '');
+  const label = labels.get(uid);
+  return {
+    ...row,
+    userEmail: label?.userEmail ?? null,
+    userDisplayName: label?.userDisplayName ?? null,
+  };
+}
+
 /** Automatic on-chain USDT deposits (crypto monitor credited). */
 export const adminListAutoDeposits = onCall(CALLABLE_OPTS, async (request) => {
   try {
@@ -54,7 +96,7 @@ export const adminListAutoDeposits = onCall(CALLABLE_OPTS, async (request) => {
       .limit(parsed.data.limit)
       .get();
 
-    const rows = snap.docs
+    const baseRows = snap.docs
       .map((d) => {
         const data = d.data();
         return {
@@ -76,6 +118,12 @@ export const adminListAutoDeposits = onCall(CALLABLE_OPTS, async (request) => {
         };
       })
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+
+    const labels = await loadUserLabels(
+      db,
+      baseRows.map((r) => String(r.userId ?? '')),
+    );
+    const rows = baseRows.map((r) => withUserLabel(r, labels));
 
     return { rows, count: rows.length };
   } catch (err) {
@@ -99,7 +147,7 @@ export const adminListAutoWithdrawals = onCall(CALLABLE_OPTS, async (request) =>
       .limit(parsed.data.limit)
       .get();
 
-    const rows = snap.docs
+    const baseRows = snap.docs
       .map((d) => {
         const data = d.data();
         const amountMinor = Number(data.amountMinor ?? 0);
@@ -127,6 +175,12 @@ export const adminListAutoWithdrawals = onCall(CALLABLE_OPTS, async (request) =>
       })
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
+    const labels = await loadUserLabels(
+      db,
+      baseRows.map((r) => String(r.userId ?? '')),
+    );
+    const rows = baseRows.map((r) => withUserLabel(r, labels));
+
     return { rows, count: rows.length };
   } catch (err) {
     throw toHttpsError(err);
@@ -149,7 +203,7 @@ export const adminListIncomeByType = onCall(CALLABLE_OPTS, async (request) => {
       .limit(parsed.data.limit)
       .get();
 
-    const rows = snap.docs
+    const baseRows = snap.docs
       .map((d) => {
         const data = d.data();
         return {
@@ -171,7 +225,13 @@ export const adminListIncomeByType = onCall(CALLABLE_OPTS, async (request) => {
       })
       .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
 
-    const totalMinor = rows.reduce((s, r) => s + r.amountMinor, 0);
+    const labels = await loadUserLabels(
+      db,
+      baseRows.map((r) => String(r.userId ?? '')),
+    );
+    const rows = baseRows.map((r) => withUserLabel(r, labels));
+
+    const totalMinor = rows.reduce((s, r) => s + Number(r.amountMinor ?? 0), 0);
     return { rows, count: rows.length, totalMinor, type: parsed.data.type };
   } catch (err) {
     throw toHttpsError(err);

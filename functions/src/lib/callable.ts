@@ -28,5 +28,11 @@ export function toHttpsError(err: unknown): HttpsError {
     error: message,
     stack: err instanceof Error ? err.stack : undefined,
   });
+  if (/iam\.serviceAccounts\.signBlob/i.test(message)) {
+    return new HttpsError(
+      'failed-precondition',
+      'Server cannot mint login tokens. Set ADMIN_SERVICE_ACCOUNT_JSON (Admin SDK key) on Cloud Functions, or grant roles/iam.serviceAccountTokenCreator to the Functions runtime service account.',
+    );
+  }
   return new HttpsError('internal', 'Internal error');
 }

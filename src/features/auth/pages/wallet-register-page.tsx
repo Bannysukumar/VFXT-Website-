@@ -16,6 +16,11 @@ import {
   readWalletSignupSession,
 } from '@/lib/wallet-auth'
 import { AuthLayout, PasswordInput } from '@/features/auth/components/auth-layout'
+import {
+  DEFAULT_PHONE_COUNTRY,
+  PhoneInput,
+  composeMobile,
+} from '@/features/auth/components/phone-input'
 
 export function WalletRegisterPage() {
   const navigate = useNavigate()
@@ -27,6 +32,8 @@ export function WalletRegisterPage() {
   const [uplinerName, setUplinerName] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
+  const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY)
+  const [nationalNumber, setNationalNumber] = useState('')
 
   const prefilledRef =
     params.get('ref')?.trim() || session?.referralCode?.trim() || ''
@@ -102,7 +109,7 @@ export function WalletRegisterPage() {
         address,
         referralCode: values.referralCode,
         displayName: values.displayName?.trim() || undefined,
-        mobile: values.mobile?.trim() || undefined,
+        mobile: composeMobile(phoneCountry, nationalNumber) || undefined,
         email: values.includeCredentials ? values.email?.trim() : undefined,
         password: values.includeCredentials ? values.password : undefined,
       })
@@ -180,12 +187,21 @@ export function WalletRegisterPage() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="mobile">Mobile (optional)</Label>
-          <Input
+          <PhoneInput
             id="mobile"
-            autoComplete="tel"
-            placeholder="+91…"
-            aria-invalid={Boolean(errors.mobile)}
-            {...form.register('mobile')}
+            countryCode={phoneCountry}
+            onCountryChange={(code) => {
+              setPhoneCountry(code)
+              form.setValue('mobile', composeMobile(code, nationalNumber))
+            }}
+            nationalNumber={nationalNumber}
+            onNationalChange={(value) => {
+              setNationalNumber(value)
+              form.setValue('mobile', composeMobile(phoneCountry, value), {
+                shouldValidate: true,
+              })
+            }}
+            invalid={Boolean(errors.mobile)}
           />
           <FieldError message={errors.mobile?.message} />
         </div>

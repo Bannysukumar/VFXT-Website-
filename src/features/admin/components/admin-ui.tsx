@@ -62,6 +62,75 @@ export function IdCell({ id, label }: { id: string; label?: string }) {
   )
 }
 
+/** Prefer name/email; fall back to short id with copy. */
+export function UserCell({
+  userId,
+  email,
+  displayName,
+}: {
+  userId?: string | null
+  email?: string | null
+  displayName?: string | null
+}) {
+  const id = String(userId ?? '').trim()
+  const name = String(displayName ?? '').trim()
+  const mail = String(email ?? '').trim()
+  const primary = name || mail || null
+  if (!id && !primary) return <span className="text-ink-muted">—</span>
+  return (
+    <div className="min-w-0">
+      {primary ? <p className="truncate text-sm font-medium text-ink">{primary}</p> : null}
+      {mail && name ? <p className="truncate text-xs text-ink-muted">{mail}</p> : null}
+      {id ? (
+        <IdCell id={id} label="User ID" />
+      ) : null}
+    </div>
+  )
+}
+
+/** Turn system actor strings into short admin-friendly labels. */
+export function formatActorLabel(raw: unknown): string {
+  const v = String(raw ?? '').trim()
+  if (!v) return '—'
+  const map: Record<string, string> = {
+    'system:crypto-monitor': 'Auto (on-chain)',
+    'system:manual-credit': 'Manual credit',
+    'system:auto-withdraw': 'Auto withdraw',
+    'system:process-auto-withdrawals': 'Auto withdraw',
+  }
+  if (map[v]) return map[v]
+  if (v.startsWith('system:')) {
+    return v
+      .slice('system:'.length)
+      .replaceAll('-', ' ')
+      .replaceAll('_', ' ')
+  }
+  if (v.length > 20) return `${v.slice(0, 6)}…${v.slice(-4)}`
+  return v
+}
+
+export function ActorCell({ value }: { value: unknown }) {
+  return <span className="text-sm text-ink-muted">{formatActorLabel(value)}</span>
+}
+
+export function StatusPill({ status }: { status: unknown }) {
+  const s = String(status ?? '').toLowerCase()
+  const tone =
+    s === 'completed' || s === 'approved' || s === 'active'
+      ? 'bg-emerald-500/10 text-emerald-700'
+      : s === 'pending' || s === 'awaiting_payment'
+        ? 'bg-amber-500/10 text-amber-800'
+        : s === 'rejected' || s === 'failed' || s === 'cancelled'
+          ? 'bg-rose-500/10 text-rose-700'
+          : 'bg-panel-elevated text-ink-muted'
+  const label = s ? s.replaceAll('_', ' ') : '—'
+  return (
+    <span className={cn('inline-flex rounded-full px-2 py-0.5 text-xs font-medium capitalize', tone)}>
+      {label}
+    </span>
+  )
+}
+
 export function RejectDialog({
   open,
   onOpenChange,

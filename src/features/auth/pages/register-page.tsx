@@ -17,6 +17,11 @@ import {
   walletConnectConfigured,
 } from '@/lib/wallet-auth'
 import { AuthLayout, PasswordInput } from '@/features/auth/components/auth-layout'
+import {
+  DEFAULT_PHONE_COUNTRY,
+  PhoneInput,
+  composeMobile,
+} from '@/features/auth/components/phone-input'
 
 export function RegisterPage() {
   const navigate = useNavigate()
@@ -25,6 +30,8 @@ export function RegisterPage() {
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [walletBusy, setWalletBusy] = useState(false)
+  const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY)
+  const [nationalNumber, setNationalNumber] = useState('')
 
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
@@ -120,12 +127,17 @@ export function RegisterPage() {
       toast.error('Enter a valid referral code')
       return
     }
+    const mobile = composeMobile(phoneCountry, nationalNumber)
+    if (!mobile || mobile.replace(/\D/g, '').length < 8) {
+      form.setError('mobile', { message: 'Enter a valid mobile number' })
+      return
+    }
     try {
       await registerWithEmail({
         email: values.email,
         password: values.password,
         displayName: values.displayName,
-        mobile: values.mobile,
+        mobile,
         referralCode: values.referralCode,
         walletAddress: values.walletAddress || undefined,
       })
@@ -231,13 +243,24 @@ export function RegisterPage() {
 
         <div className="space-y-2">
           <Label htmlFor="mobile">Mobile number</Label>
-          <Input
+          <PhoneInput
             id="mobile"
-            type="tel"
-            autoComplete="tel"
-            placeholder="+91 98765 43210"
-            aria-invalid={Boolean(errors.mobile)}
-            {...form.register('mobile')}
+            countryCode={phoneCountry}
+            onCountryChange={(code) => {
+              setPhoneCountry(code)
+              form.setValue('mobile', composeMobile(code, nationalNumber), {
+                shouldValidate: Boolean(nationalNumber.trim()),
+              })
+            }}
+            nationalNumber={nationalNumber}
+            onNationalChange={(value) => {
+              setNationalNumber(value)
+              form.setValue('mobile', composeMobile(phoneCountry, value), {
+                shouldValidate: true,
+              })
+              form.clearErrors('mobile')
+            }}
+            invalid={Boolean(errors.mobile)}
           />
           <FieldError message={errors.mobile?.message} />
         </div>

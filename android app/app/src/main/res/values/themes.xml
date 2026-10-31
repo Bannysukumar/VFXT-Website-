@@ -1,0 +1,18 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!--
+        The UI is drawn entirely by Jetpack Compose (see core/designsystem/theme/Theme.kt).
+        This window theme only controls what is visible before the first Compose frame.
+    -->
+    <style name="Theme.VFXTWallet" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/vfxt_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- System splash (Android 12+ and back-ported by core-splashscreen). -->
+    <style name="Theme.VFXTWallet.Splash" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/vfxt_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="postSplashScreenTheme">@style/Theme.VFXTWallet</item>
+    </style>
+</resources>

@@ -2,7 +2,8 @@ import { format } from 'date-fns'
 import { AdminHistoryTable, type HistoryColumn } from '@/features/admin/components/admin-history-table'
 import { adminListAutoDeposits } from '@/services/admin-service'
 import { formatMinor } from '@/lib/money'
-import { IdCell } from '@/features/admin/components/admin-ui'
+import { ActorCell, StatusPill, UserCell } from '@/features/admin/components/admin-ui'
+import { BscTxLink } from '@/components/shared/bsc-tx-link'
 
 const columns: HistoryColumn[] = [
   {
@@ -13,8 +14,14 @@ const columns: HistoryColumn[] = [
   },
   {
     key: 'userId',
-    label: 'User',
-    render: (r) => <IdCell id={String(r.userId ?? '')} label="User ID" />,
+    label: 'Member',
+    render: (r) => (
+      <UserCell
+        userId={String(r.userId ?? '')}
+        email={r.userEmail ? String(r.userEmail) : null}
+        displayName={r.userDisplayName ? String(r.userDisplayName) : null}
+      />
+    ),
   },
   {
     key: 'amountMinor',
@@ -29,24 +36,23 @@ const columns: HistoryColumn[] = [
     align: 'right',
     render: (r) =>
       r.vfxtTokensCredited != null
-        ? Number(r.vfxtTokensCredited).toLocaleString()
+        ? `${Number(r.vfxtTokensCredited).toLocaleString()} VFXT`
         : '—',
   },
   {
     key: 'txHash',
-    label: 'Tx hash',
-    render: (r) =>
-      r.txHash ? (
-        <span className="font-mono text-xs">{String(r.txHash).slice(0, 14)}…</span>
-      ) : (
-        '—'
-      ),
+    label: 'Transaction',
+    render: (r) => <BscTxLink txHash={r.txHash ? String(r.txHash) : null} compact />,
   },
-  { key: 'status', label: 'Status' },
+  {
+    key: 'status',
+    label: 'Status',
+    render: (r) => <StatusPill status={r.status} />,
+  },
   {
     key: 'reviewedBy',
     label: 'Credited by',
-    render: (r) => <span className="text-xs text-ink-muted">{String(r.reviewedBy ?? '—')}</span>,
+    render: (r) => <ActorCell value={r.reviewedBy} />,
   },
 ]
 

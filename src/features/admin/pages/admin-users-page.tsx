@@ -31,7 +31,7 @@ import {
   type AdminUserSummary,
 } from '@/services/admin-service'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { formatMinor } from '@/lib/money'
+import { formatMinor, parseToMinor } from '@/lib/money'
 import { exportRowsToCsv, exportRowsToExcel } from '@/lib/export-table'
 import type { AdminRole } from '@/types/models'
 
@@ -90,8 +90,9 @@ function UserDetailDialog({
   const [disabled, setDisabled] = useState(false)
   const [walletKind, setWalletKind] = useState<string>('fund')
   const [adjustDirection, setAdjustDirection] = useState<'credit' | 'debit'>('credit')
-  const [amountMinor, setAmountMinor] = useState('')
+  const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
+  const adjustIsVfxt = walletKind === 'vfxt' || walletKind === 'direct_referral'
 
   useEffect(() => {
     if (!open || !profile) return
@@ -130,9 +131,19 @@ function UserDetailDialog({
 
   const adjustWallet = useMutation({
     mutationFn: async () => {
-      const raw = Number.parseInt(amountMinor, 10)
-      if (!Number.isFinite(raw) || raw <= 0) throw new Error('Enter a positive amount in minor units')
       if (adjustReason.trim().length < 3) throw new Error('Reason must be at least 3 characters')
+      let raw: number
+      if (adjustIsVfxt) {
+        raw = Number.parseInt(adjustAmount.trim(), 10)
+        if (!Number.isFinite(raw) || raw <= 0) throw new Error('Enter a positive VFXT amount (whole tokens)')
+      } else {
+        try {
+          raw = Number(parseToMinor(adjustAmount.trim() || '0', 2))
+        } catch {
+          throw new Error('Enter a valid USD amount (e.g. 10 or 10.50)')
+        }
+        if (!Number.isFinite(raw) || raw <= 0) throw new Error('Enter a positive USD amount (e.g. 10)')
+      }
       const signed = adjustDirection === 'credit' ? raw : -raw
       return adminAdjustWallet({
         uid,
@@ -143,7 +154,7 @@ function UserDetailDialog({
     },
     onSuccess: async () => {
       toast.success('Wallet adjusted')
-      setAmountMinor('')
+      setAdjustAmount('')
       setAdjustReason('')
       await queryClient.invalidateQueries({ queryKey: ['admin', 'user', uid] })
     },
@@ -361,13 +372,27 @@ function UserDetailDialog({
                   </NativeSelect>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adj-amt">Amount (minor units)</Label>
+                  <Label htmlFor="adj-amt">
+                    {adjustIsVfxt ? 'Amount (VFXT tokens)' : 'Amount (USD)'}
+                  </Label>
                   <Input
                     id="adj-amt"
-                    inputMode="numeric"
-                    value={amountMinor}
-                    onChange={(e) => setAmountMinor(e.target.value.replace(/\D/g, ''))}
+                    inputMode="decimal"
+                    placeholder={adjustIsVfxt ? 'e.g. 10000' : 'e.g. 10 or 10.50'}
+                    value={adjustAmount}
+                    onChange={(e) =>
+                      setAdjustAmount(
+                        adjustIsVfxt
+                          ? e.target.value.replace(/\D/g, '')
+                          : e.target.value.replace(/[^\d.]/g, ''),
+                      )
+                    }
                   />
+                  <p className="text-xs text-ink-muted">
+                    {adjustIsVfxt
+                      ? 'Whole VFXT tokens (not cents).'
+                      : 'Enter dollars — 10 credits $10.00, not $0.10.'}
+                  </p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="adj-reason">Reason</Label>

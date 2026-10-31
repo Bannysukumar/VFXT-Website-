@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Save, Settings2 } from 'lucide-react'
+import { Plus, Save, Settings2, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input, NativeSelect, Textarea } from '@/components/ui/input'
+import { Input, NativeSelect } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PageHeader } from '@/components/shared/page-header'
 import { LoadingState } from '@/components/shared/loading-state'
@@ -13,6 +13,35 @@ import { getAdminPlatformSettings, updatePlatformSettings } from '@/services/adm
 import { cn } from '@/lib/utils'
 
 type TabId = 'contact' | 'footer' | 'deposit' | 'hotwallet'
+
+type FooterLink = { label: string; href: string }
+type FooterColumn = { title: string; links: FooterLink[] }
+
+const DEFAULT_FOOTER_COLUMNS: FooterColumn[] = [
+  {
+    title: 'Product',
+    links: [
+      { label: 'Token', href: '/token' },
+      { label: 'Security', href: '/security' },
+      { label: 'Support', href: '/support' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { label: 'About', href: '/about' },
+      { label: 'Contact', href: '/contact' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Terms', href: '/legal/terms' },
+      { label: 'Privacy', href: '/legal/privacy' },
+      { label: 'Risk', href: '/legal/risk' },
+    ],
+  },
+]
 
 const tabs: { id: TabId; label: string }[] = [
   { id: 'contact', label: 'Contact' },
@@ -33,7 +62,7 @@ export function AdminSettingsPage() {
   const [contact, setContact] = useState<Record<string, string>>({})
   const [footerTagline, setFooterTagline] = useState('')
   const [footerCopyright, setFooterCopyright] = useState('')
-  const [footerColumnsJson, setFooterColumnsJson] = useState('[]')
+  const [footerColumns, setFooterColumns] = useState<FooterColumn[]>(DEFAULT_FOOTER_COLUMNS)
   const [minDepositUsdCents, setMinDepositUsdCents] = useState('')
   const [tokensPerUsd, setTokensPerUsd] = useState('')
   const [tokenPriceUsd, setTokenPriceUsd] = useState('')
@@ -57,11 +86,24 @@ export function AdminSettingsPage() {
         supportHours: c.supportHours ?? '',
       })
     }
-    const f = s.footer as { tagline?: string; copyright?: string; columns?: unknown[] } | undefined
+    const f = s.footer as { tagline?: string; copyright?: string; columns?: FooterColumn[] } | undefined
     if (f) {
       setFooterTagline(f.tagline ?? '')
       setFooterCopyright(f.copyright ?? '')
-      setFooterColumnsJson(JSON.stringify(f.columns ?? [], null, 2))
+      const cols = Array.isArray(f.columns) ? f.columns : []
+      setFooterColumns(
+        cols.length
+          ? cols.map((c) => ({
+              title: String(c.title ?? ''),
+              links: Array.isArray(c.links)
+                ? c.links.map((l) => ({
+                    label: String(l?.label ?? ''),
+                    href: String(l?.href ?? ''),
+                  }))
+                : [],
+            }))
+          : DEFAULT_FOOTER_COLUMNS,
+      )
     }
     const d = s.deposit as Record<string, unknown> | undefined
     if (d) {
@@ -89,14 +131,37 @@ export function AdminSettingsPage() {
 
   const saveContact = () => save.mutate({ contact })
   const saveFooter = () => {
-    try {
-      const columns = JSON.parse(footerColumnsJson) as unknown
-      save.mutate({
-        footer: { tagline: footerTagline, copyright: footerCopyright, columns },
-      })
-    } catch {
-      toast.error('Footer columns must be valid JSON')
+    const columns = footerColumns
+      .map((col) => ({
+        title: col.title.trim(),
+        links: col.links
+          .map((l) => ({ label: l.label.trim(), href: l.href.trim() }))
+          .filter((l) => l.label && l.href),
+      }))
+      .filter((col) => col.title)
+    if (!columns.length) {
+      toast.error('Add at least one footer column with a title')
+      return
     }
+    save.mutate({
+      footer: { tagline: footerTagline, copyright: footerCopyright, columns },
+    })
+  }
+
+  const updateColumn = (index: number, patch: Partial<FooterColumn>) => {
+    setFooterColumns((prev) => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)))
+  }
+  const updateLink = (colIndex: number, linkIndex: number, patch: Partial<FooterLink>) => {
+    setFooterColumns((prev) =>
+      prev.map((c, i) =>
+        i === colIndex
+          ? {
+              ...c,
+              links: c.links.map((l, j) => (j === linkIndex ? { ...l, ...patch } : l)),
+            }
+          : c,
+      ),
+    )
   }
   const saveDepositToken = () => {
     let per = Number.parseInt(tokensPerUsd, 10)
@@ -194,26 +259,107 @@ export function AdminSettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="font-sans text-lg">Footer</CardTitle>
-            <CardDescription>Tagline, copyright, and link columns (JSON array).</CardDescription>
+            <CardDescription>
+              Edit site footer text and link columns. Each column is a heading with links under it.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="f-tag">Tagline</Label>
-              <Input id="f-tag" value={footerTagline} onChange={(e) => setFooterTagline(e.target.value)} />
+          <CardContent className="space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="f-tag">Tagline</Label>
+                <Input id="f-tag" value={footerTagline} onChange={(e) => setFooterTagline(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="f-copy">Copyright</Label>
+                <Input id="f-copy" value={footerCopyright} onChange={(e) => setFooterCopyright(e.target.value)} />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-copy">Copyright</Label>
-              <Input id="f-copy" value={footerCopyright} onChange={(e) => setFooterCopyright(e.target.value)} />
+
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-ink">Link columns</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setFooterColumns((prev) => [...prev, { title: 'New column', links: [{ label: '', href: '/' }] }])
+                  }
+                >
+                  <Plus className="size-4" />
+                  Add column
+                </Button>
+              </div>
+
+              {footerColumns.map((col, colIndex) => (
+                <div key={colIndex} className="space-y-3 rounded-xl border border-line bg-canvas p-4">
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="min-w-[12rem] flex-1 space-y-2">
+                      <Label>Column title</Label>
+                      <Input
+                        value={col.title}
+                        onChange={(e) => updateColumn(colIndex, { title: e.target.value })}
+                        placeholder="e.g. Product"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="text-danger"
+                      onClick={() => setFooterColumns((prev) => prev.filter((_, i) => i !== colIndex))}
+                    >
+                      <Trash2 className="size-4" />
+                      Remove column
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Links</p>
+                    {col.links.map((link, linkIndex) => (
+                      <div key={linkIndex} className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                        <Input
+                          value={link.label}
+                          onChange={(e) => updateLink(colIndex, linkIndex, { label: e.target.value })}
+                          placeholder="Label (e.g. Token)"
+                        />
+                        <Input
+                          value={link.href}
+                          onChange={(e) => updateLink(colIndex, linkIndex, { href: e.target.value })}
+                          placeholder="Path (e.g. /token)"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() =>
+                            updateColumn(colIndex, {
+                              links: col.links.filter((_, j) => j !== linkIndex),
+                            })
+                          }
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() =>
+                        updateColumn(colIndex, {
+                          links: [...col.links, { label: '', href: '' }],
+                        })
+                      }
+                    >
+                      <Plus className="size-4" />
+                      Add link
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="f-cols">Columns JSON</Label>
-              <Textarea
-                id="f-cols"
-                className="min-h-48 font-mono text-xs"
-                value={footerColumnsJson}
-                onChange={(e) => setFooterColumnsJson(e.target.value)}
-              />
-            </div>
+
             <Button onClick={saveFooter} disabled={save.isPending}>
               <Save className="size-4" />
               Save footer
