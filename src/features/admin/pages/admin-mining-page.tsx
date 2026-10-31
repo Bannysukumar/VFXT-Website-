@@ -256,7 +256,7 @@ export function AdminMiningPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="danger"
                     disabled={updateClaim.isPending}
                     onClick={() => {
                       const reason = window.prompt('Rejection reason') ?? ''

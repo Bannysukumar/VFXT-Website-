@@ -305,7 +305,7 @@ export function AdminMiningBoostersPage() {
                   </Button>
                   <Button
                     size="sm"
-                    variant="destructive"
+                    variant="danger"
                     disabled={removeBooster.isPending}
                     onClick={() => {
                       if (!window.confirm(`Delete booster “${b.name}”?`)) return
