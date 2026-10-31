@@ -6,7 +6,11 @@ dotenv.config();
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY ?? "";
 const SEPOLIA_RPC_URL = process.env.SEPOLIA_RPC_URL ?? "";
+const BSC_RPC_URL = process.env.BSC_RPC_URL ?? "";
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY ?? "";
+const BSCSCAN_API_KEY = process.env.BSCSCAN_API_KEY ?? "";
+
+const accounts = PRIVATE_KEY ? [PRIVATE_KEY] : [];
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -16,6 +20,7 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 200,
       },
+      evmVersion: "paris",
     },
   },
   networks: {
@@ -25,11 +30,19 @@ const config: HardhatUserConfig = {
     },
     sepolia: {
       url: SEPOLIA_RPC_URL || "https://rpc.sepolia.org",
-      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+      accounts,
+    },
+    bsc: {
+      url: BSC_RPC_URL || "https://bsc-dataseed.binance.org",
+      chainId: 56,
+      accounts,
     },
   },
   etherscan: {
-    apiKey: ETHERSCAN_API_KEY || undefined,
+    apiKey: {
+      bsc: BSCSCAN_API_KEY || ETHERSCAN_API_KEY || "",
+      sepolia: ETHERSCAN_API_KEY || "",
+    },
   },
 };
 

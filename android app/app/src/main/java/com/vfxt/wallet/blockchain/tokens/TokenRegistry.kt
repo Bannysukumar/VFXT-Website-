@@ -12,10 +12,12 @@ import com.vfxt.wallet.domain.models.TokenKind
  * network so a contract address from one chain can never be used on another.
  *
  * - Stablecoins use CoinGecko ids for live USD quotes.
- * - VFXT: address supplied at build time (`vfxt.tokenMainnet` / `vfxt.tokenTestnet`).
- *   Until set the token is listed but marked "not deployed" and never queried.
+ * - VFXT (BSC mainnet): [VFXT_BSC_MAINNET], overridable via `vfxt.tokenMainnet` /
+ *   `vfxt.tokenTestnet` in local.properties for alternate deployments.
  */
 object TokenRegistry {
+    /** Deployed VFXTToken on BNB Smart Chain mainnet. */
+    private const val VFXT_BSC_MAINNET = "0xb1f5170839CDAde72109fA5C268dC043bf9BfbF4"
     private const val USDT_BSC = "0x55d398326f99059fF775485246999027B3197955"
     private const val USDC_BSC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
     private const val USDT_ETH = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -52,7 +54,9 @@ object TokenRegistry {
     private fun vfxt(network: EvmNetwork): TokenInfo? {
         // VFXT is a BNB Smart Chain project token; only list it on BSC nets.
         if (network.id != Networks.BscMainnet.id && network.id != Networks.BscTestnet.id) return null
-        val configured = if (network.isTestnet) BuildConfig.VFXT_TOKEN_TESTNET else BuildConfig.VFXT_TOKEN_MAINNET
+        val fromBuild = if (network.isTestnet) BuildConfig.VFXT_TOKEN_TESTNET else BuildConfig.VFXT_TOKEN_MAINNET
+        val fallback = if (network.isTestnet) "" else VFXT_BSC_MAINNET
+        val configured = fromBuild.takeIf { it.isNotBlank() } ?: fallback
         return TokenInfo(
             symbol = "VFXT",
             name = "VFXT Token",

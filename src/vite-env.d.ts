@@ -21,6 +21,7 @@ interface ImportMetaEnv {
   readonly VITE_FEATURE_BLOCKCHAIN_ENABLED?: string
   readonly VITE_VFXT_TOKEN_SYMBOL?: string
   readonly VITE_VFXT_TOKEN_DECIMALS?: string
+  readonly VITE_VFXT_CONTRACT_NAME?: string
   readonly VITE_VFXT_CHAIN_ID?: string
   readonly VITE_VFXT_CONTRACT_ADDRESS?: string
   readonly VITE_SUPPORT_EMAIL?: string

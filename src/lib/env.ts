@@ -36,6 +36,7 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   VITE_VFXT_TOKEN_SYMBOL: z.string().default('VFXT'),
   VITE_VFXT_TOKEN_DECIMALS: z.string().default('18'),
+  VITE_VFXT_CONTRACT_NAME: z.string().default('VFXTToken'),
   VITE_VFXT_CHAIN_ID: z.string().optional(),
   VITE_VFXT_CONTRACT_ADDRESS: z.string().optional(),
   VITE_SUPPORT_EMAIL: z

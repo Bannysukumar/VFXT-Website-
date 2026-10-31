@@ -6,6 +6,7 @@ import {
   Circle,
   Coins,
   Copy,
+  FileCode2,
   Gamepad2,
   Hash,
   Link2,
@@ -24,13 +25,15 @@ import { CountUp } from '@/components/motion/reveal'
 import { env } from '@/lib/env'
 import { images, videos } from '@/lib/media'
 
-const roadmap = [
-  { label: 'ERC-20 contract written and unit tested', done: true },
-  { label: 'Off-chain ledger and settlement via Cloud Functions', done: true },
-  { label: 'Chain ID and contract address configured', done: false },
-  { label: 'Contract verification and execution model review', done: false },
-  { label: 'On-chain settlement enabled', done: false },
-]
+function buildRoadmap(contractConfigured: boolean, blockchainEnabled: boolean) {
+  return [
+    { label: 'ERC-20 contract written and unit tested', done: true },
+    { label: 'Off-chain ledger and settlement via Cloud Functions', done: true },
+    { label: 'Chain ID and contract address configured', done: contractConfigured },
+    { label: 'Contract verification and execution model review', done: contractConfigured },
+    { label: 'On-chain settlement enabled', done: blockchainEnabled },
+  ]
+}
 
 const utilities = [
   { icon: Send, title: 'Settlement', body: 'Move value between VFXT wallets on-chain once enabled.' },
@@ -66,11 +69,19 @@ function TokenCoin() {
 function TokenDetails() {
   const enabled = env.VITE_FEATURE_BLOCKCHAIN_ENABLED
   const contract = env.VITE_VFXT_CONTRACT_ADDRESS
+  const chainId = env.VITE_VFXT_CHAIN_ID
+  const contractConfigured = Boolean(contract && chainId)
+  const roadmap = buildRoadmap(contractConfigured, enabled)
   const details = [
+    { icon: FileCode2, label: 'Contract', value: env.VITE_VFXT_CONTRACT_NAME },
     { icon: Coins, label: 'Symbol', value: env.VITE_VFXT_TOKEN_SYMBOL },
     { icon: Hash, label: 'Decimals', value: env.VITE_VFXT_TOKEN_DECIMALS },
-    { icon: Network, label: 'Chain ID', value: env.VITE_VFXT_CHAIN_ID || 'Not configured' },
-    { icon: Link2, label: 'Contract', value: contract || 'Not configured', mono: true },
+    {
+      icon: Network,
+      label: 'Network',
+      value: chainId === '56' ? 'BNB Smart Chain (56)' : chainId || 'Not configured',
+    },
+    { icon: Link2, label: 'Address', value: contract || 'Not configured', mono: true },
   ]
 
   return (
@@ -82,12 +93,18 @@ function TokenDetails() {
               <LogoMark className="size-11 ring-1 ring-white/15 rounded-lg" />
               <div>
                 <p className="font-display text-lg font-bold">Virtual FX Trades</p>
-                <p className="text-sm text-white/60">{env.VITE_VFXT_TOKEN_SYMBOL}, ERC-20</p>
+                <p className="text-sm text-white/60">
+                  {env.VITE_VFXT_CONTRACT_NAME} · {env.VITE_VFXT_TOKEN_SYMBOL} · BEP-20
+                </p>
               </div>
             </div>
-            <Badge variant={enabled ? 'success' : 'warning'} className="border-white/10 bg-white/10 text-white">
-              <span className={enabled ? 'size-1.5 rounded-full bg-accent-bright' : 'size-1.5 rounded-full bg-highlight'} />
-              {enabled ? 'Network live' : 'Pre-launch'}
+            <Badge variant={contractConfigured ? 'success' : 'warning'} className="border-white/10 bg-white/10 text-white">
+              <span
+                className={
+                  contractConfigured ? 'size-1.5 rounded-full bg-accent-bright' : 'size-1.5 rounded-full bg-highlight'
+                }
+              />
+              {contractConfigured ? 'Deployed on BSC' : 'Pre-launch'}
             </Badge>
           </div>
         </div>
@@ -187,10 +204,12 @@ function Utilities({ compact = false }: { compact?: boolean }) {
 }
 
 const intro =
-  'The VFXT ERC-20 contract lives in a separately tested project. Off-chain balances and settlement remain under Cloud Functions until chain ID, contract address, verification, and execution models are reviewed.'
+  'VFXTToken is live on BNB Smart Chain as a fixed-supply BEP-20. App balances still settle off-chain until full on-chain settlement is enabled.'
 
 export function TokenPublicPage() {
   const inApp = useLocation().pathname.startsWith('/app')
+  const contractConfigured = Boolean(env.VITE_VFXT_CONTRACT_ADDRESS && env.VITE_VFXT_CHAIN_ID)
+  const roadmap = buildRoadmap(contractConfigured, env.VITE_FEATURE_BLOCKCHAIN_ENABLED)
 
   if (inApp) {
     return (
@@ -221,7 +240,7 @@ export function TokenPublicPage() {
           { value: Number(env.VITE_VFXT_TOKEN_DECIMALS) || 0, label: 'Token decimals' },
           { value: roadmap.filter((s) => s.done).length, suffix: ` / ${roadmap.length}`, label: 'Launch gates passed' },
           { value: utilities.length, label: 'Planned utilities' },
-          { value: 20, prefix: 'ERC-', label: 'Token standard' },
+          { value: 20, prefix: 'BEP-', label: 'Token standard' },
         ]}
       />
       <section className="container-page py-24">

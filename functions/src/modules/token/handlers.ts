@@ -9,10 +9,10 @@ const DEFAULT_TOKEN_CONFIG: Omit<TokenConfig, 'updatedAt'> & {
   updatedAt: null;
 } = {
   symbol: 'VFXT',
-  name: 'Virtual FX Trades Token',
+  name: 'VFXTToken',
   decimals: 18,
-  chainId: null,
-  contractAddress: null,
+  chainId: 56,
+  contractAddress: '0xB1F5170839CDaDE72109fA5C268dc043bF9bFbF4',
   blockchainEnabled: false,
   updatedAt: null,
 };
