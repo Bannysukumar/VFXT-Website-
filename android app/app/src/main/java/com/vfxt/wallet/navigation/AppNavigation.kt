@@ -211,7 +211,14 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() },
                 onSend = { key -> navController.navigate(RootRoute.Send(tokenKey = key)) },
                 onReceive = { navController.navigate(RootRoute.Receive) },
+                // VFXT pairs are routed to the VFXT swap contract inside the main Swap screen.
                 onSwap = { key -> navController.navigate(RootRoute.Swap(fromTokenKey = key)) },
+            )
+        }
+        composable<RootRoute.VfxtDesk> {
+            com.vfxt.wallet.ui.swap.VfxtDeskScreen(
+                onBack = { navController.popBackStack() },
+                onActivity = { navController.navigate(RootRoute.Activity) { popUpTo(RootRoute.Main) } },
             )
         }
         composable<RootRoute.AddToken> { AddTokenScreen(onBack = { navController.popBackStack() }) }
@@ -259,7 +266,6 @@ fun AppNavigation(
         composable<RootRoute.WalletConnect> {
             com.vfxt.wallet.ui.walletconnect.WalletConnectScreen(
                 onBack = { navController.popBackStack() },
-                onScanQr = { /* Home QR scanner already available; Project ID required for pairing. */ },
             )
         }
     }

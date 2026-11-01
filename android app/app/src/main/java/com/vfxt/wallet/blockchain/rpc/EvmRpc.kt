@@ -94,7 +94,8 @@ class EvmRpc @Inject constructor(private val client: JsonRpcClient) {
         )
     }
 
-    private suspend fun ethCall(network: EvmNetwork, to: String, data: String): String? {
+    /** Read-only contract call at the latest block; returns the raw hex result. */
+    suspend fun ethCall(network: EvmNetwork, to: String, data: String): String? {
         val call = buildJsonObject {
             put("to", to)
             put("data", data)

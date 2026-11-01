@@ -78,7 +78,7 @@ export function PublicShell() {
 
   const footerTagline =
     platform.data?.footer?.tagline ??
-    'Virtual FX Trades — secure wallets, verified settlements, and future on-chain token rails.'
+    'Virtual FX Trades — VFXT / VFXT on BNB Smart Chain, 10 trillion fixed supply, verified settlements.'
   const footerCopyright =
     platform.data?.footer?.copyright ??
     `© ${new Date().getFullYear()} Virtual FX Trades. All rights reserved.`

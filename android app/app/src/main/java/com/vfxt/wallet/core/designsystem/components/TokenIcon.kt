@@ -85,10 +85,11 @@ fun NetworkIcon(network: EvmNetwork, modifier: Modifier = Modifier, size: Dp = 3
 @Composable
 private fun GlyphIcon(upper: String, size: Dp) {
     when (upper) {
+        // Brand tile clipped to a circle; the chart mark fits well inside it.
         "VFXT" -> Box(
-            Modifier.size(size).clip(CircleShape).background(VfxtPalette.Midnight),
+            Modifier.size(size).clip(CircleShape).background(VfxtMarkColors.Tile),
             contentAlignment = Alignment.Center,
-        ) { VfxtLogoMark(size = size * 0.62f) }
+        ) { VfxtLogoMark(size = size, showTile = false) }
 
         "BNB", "TBNB" -> Box(
             Modifier.size(size).clip(CircleShape).background(Color(0xFFF3BA2F)),

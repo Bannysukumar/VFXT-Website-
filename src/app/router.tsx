@@ -35,6 +35,7 @@ import { AdminMiningBoosterHistoryPage } from '@/features/admin/pages/admin-mini
 import { AdminMiningBoosterActivePage } from '@/features/admin/pages/admin-mining-booster-active-page'
 import { AdminAffiliatesPage } from '@/features/admin/pages/admin-affiliates-page'
 import { AdminCryptoWalletPage } from '@/features/admin/pages/admin-crypto-wallet-page'
+import { AdminSwapPage } from '@/features/admin/pages/admin-swap-page'
 import { AdminSettingsPage } from '@/features/admin/pages/admin-settings-page'
 import { AdminPlanPage } from '@/features/admin/pages/admin-plan-page'
 import { AdminWithdrawSettingsPage } from '@/features/admin/pages/admin-withdraw-settings-page'
@@ -120,6 +121,7 @@ export const router = createBrowserRouter([
           { path: 'mining/boosters/history', element: <AdminMiningBoosterHistoryPage /> },
           { path: 'mining/boosters/active', element: <AdminMiningBoosterActivePage /> },
           { path: 'crypto-wallet', element: <AdminCryptoWalletPage /> },
+          { path: 'swap', element: <AdminSwapPage /> },
           { path: 'wallet-apk', element: <AdminWalletApkPage /> },
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'affiliates', element: <AdminAffiliatesPage /> },

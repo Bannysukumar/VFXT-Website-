@@ -25,7 +25,9 @@ import {
 } from '@/features/marketing/marketing-hero'
 import { walletFaqs } from '@/features/marketing/content'
 import { PhonePair, PhoneShowcaseBand } from '@/features/marketing/phone-mockup'
+import { TokenFactsStrip } from '@/features/marketing/token-facts'
 import { images, videos } from '@/lib/media'
+import { VFXT_TOKEN } from '@/lib/vfxt-token'
 
 const capabilities = [
   {
@@ -162,11 +164,23 @@ export function WalletPage() {
         poster={images.cryptoDesk}
         bullets={[
           'USDT and USDC listed on major chains where available.',
-          'VFXT (BEP-20) on BSC mainnet and testnet.',
+          `${VFXT_TOKEN.symbol} (BEP-20) on BSC — ${VFXT_TOKEN.supplyShort} fixed supply.`,
           'Live USD quotes with 25+ fiat display options.',
           'Activity history for sends, swaps, and approvals with explorer links.',
         ]}
       />
+
+      <section className="container-page py-16 sm:py-20">
+        <SectionHeading
+          eyebrow="Official token"
+          title={`${VFXT_TOKEN.name} contract details`}
+          description="Add this verified BEP-20 contract in Assets when you hold VFXT on BNB Smart Chain."
+          className="mb-10"
+        />
+        <Reveal>
+          <TokenFactsStrip />
+        </Reveal>
+      </section>
 
       <section className="border-y border-line bg-panel">
         <div className="container-page py-24 sm:py-28">

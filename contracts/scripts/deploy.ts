@@ -6,13 +6,13 @@ import { ethers, network, run } from "hardhat";
  *
  * Env (optional):
  * - TREASURY_ADDRESS — recipient of initial supply (defaults to deployer)
- * - INITIAL_SUPPLY — human-readable token amount, e.g. "1000000000" (defaults to 1_000_000_000)
+ * - INITIAL_SUPPLY — human-readable token amount, e.g. "10000000000000" (defaults to 10_000_000_000_000 = 10 trillion)
  * - VERIFY_CONTRACT — set to "false" to skip verification
  */
 async function main() {
   const [deployer] = await ethers.getSigners();
   const treasury = process.env.TREASURY_ADDRESS ?? deployer.address;
-  const initialSupplyHuman = process.env.INITIAL_SUPPLY ?? "1000000000";
+  const initialSupplyHuman = process.env.INITIAL_SUPPLY ?? "10000000000000";
   const initialSupply = ethers.parseUnits(initialSupplyHuman, 18);
 
   console.log("Deploying VFXTToken");

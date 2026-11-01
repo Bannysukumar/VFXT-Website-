@@ -63,8 +63,12 @@ vfxt.tokenTestnet=0x...
 bscscan.apiKey=<key>
 ```
 
-- **WalletConnect**: until the Project ID is set, the WalletConnect screen shows a "not configured"
-  notice and pairing is disabled. In Reown Cloud, allow-list the package `com.vfxt.wallet`.
+- **WalletConnect** (Reown WalletKit): until the Project ID is set, the WalletConnect screen shows a
+  "not configured" notice and pairing is disabled. In Reown Cloud, allow-list the package
+  `com.vfxt.wallet`. Supported requests: `eth_sendTransaction`, `personal_sign`,
+  `eth_signTypedData(_v4)`; `eth_sign` is refused on purpose. Every connection and request needs
+  explicit approval, and signing also needs PIN/biometrics. Pairing works by QR scan (WalletConnect
+  screen or Home scanner) and by `wc:` links from dApps on the same phone.
 - **VFXT token**: until set, VFXT shows "Not deployed yet" and is never queried or sendable.
   Before setting it, verify on BscScan that the contract is the deployed `VFXTToken`, then check
   in-app (Add custom token reads symbol/decimals from chain) that it reports `VFXT` / `18`.

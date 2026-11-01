@@ -14,6 +14,15 @@ class TokenConfigTest {
     fun vfxtMainnetAddressPassesChecksum() {
         // A wrong upper/lower-case pattern made the app treat VFXT as "not deployed".
         assertTrue(WalletKeyService.isValidAddress(TokenRegistry.VFXT_BSC_MAINNET))
+        assertTrue(WalletKeyService.isValidAddress(TokenRegistry.VFXT_TREASURY))
+    }
+
+    @Test
+    fun bscMainnetListsCurrentVfxtContract() {
+        val vfxt = TokenRegistry.defaultTokens(com.vfxt.wallet.blockchain.networks.Networks.BscMainnet)
+            .first { it.symbol == "VFXT" }
+        assertEquals("0x4A08EF10e6f4aa077A74496793467d2192061969", vfxt.contractAddress)
+        assertEquals(18, vfxt.decimals)
     }
 
     @Test

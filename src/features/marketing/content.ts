@@ -13,7 +13,7 @@ export const commonFaqs = [
   },
   {
     q: 'Is the VFXT token live?',
-    a: 'VFXT is live as a BEP-20 token on BNB Smart Chain. App balances still settle through the platform ledger until full on-chain settlement is enabled for every product flow.',
+    a: 'Yes. VFXT / VFXT is a fixed-supply BEP-20 on BNB Smart Chain (10,000,000,000,000 — 10 trillion). Contract: 0x4A08EF10e6f4aa077A74496793467d2192061969. Treasury: 0x76b16F59Cfab5DdaE5D149BE98E5d755F939572A. App ledger balances still settle server-side until full on-chain settlement is enabled for every product flow.',
   },
   {
     q: 'Which networks and assets do you support?',

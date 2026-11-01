@@ -9,10 +9,10 @@ const DEFAULT_TOKEN_CONFIG: Omit<TokenConfig, 'updatedAt'> & {
   updatedAt: null;
 } = {
   symbol: 'VFXT',
-  name: 'VFXTToken',
+  name: 'VFXT',
   decimals: 18,
   chainId: 56,
-  contractAddress: '0xB1F5170839CDaDE72109fA5C268dc043bF9bFbF4',
+  contractAddress: '0x4A08EF10e6f4aa077A74496793467d2192061969',
   blockchainEnabled: false,
   updatedAt: null,
 };

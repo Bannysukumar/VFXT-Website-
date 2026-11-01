@@ -21,7 +21,9 @@ import {
   StorySplit,
 } from '@/features/marketing/marketing-hero'
 import { PhoneShowcaseBand, PhoneTrio } from '@/features/marketing/phone-mockup'
+import { TokenFactsStrip } from '@/features/marketing/token-facts'
 import { images, videos } from '@/lib/media'
+import { VFXT_TOKEN } from '@/lib/vfxt-token'
 
 const values = [
   {
@@ -45,7 +47,11 @@ const stack = [
   { icon: KeyRound, title: 'Authentication', body: 'Verified identity for every user and admin.' },
   { icon: Flame, title: 'Cloud Functions', body: 'Trusted execution for all financial workflows.' },
   { icon: Database, title: 'Firestore', body: 'Durable ledger records behind strict security rules.' },
-  { icon: Blocks, title: 'BEP-20 VFXT', body: 'Live on BNB Smart Chain; app settlement expands carefully.' },
+  {
+    icon: Blocks,
+    title: `BEP-20 ${VFXT_TOKEN.symbol}`,
+    body: `Fixed ${VFXT_TOKEN.supplyShort} supply on ${VFXT_TOKEN.networkLabel}; app settlement expands carefully.`,
+  },
 ]
 
 const milestones = [
@@ -176,6 +182,18 @@ export function AboutPage() {
         ]}
         cta={{ to: '/contact', label: 'Talk to the team' }}
       />
+
+      <section className="container-page py-16 sm:py-20">
+        <SectionHeading
+          eyebrow="On-chain"
+          title={`${VFXT_TOKEN.name} token facts`}
+          description={`Name and symbol ${VFXT_TOKEN.name} / ${VFXT_TOKEN.symbol}. Fixed supply ${VFXT_TOKEN.supply} (${VFXT_TOKEN.supplyShort}).`}
+          className="mb-10"
+        />
+        <Reveal>
+          <TokenFactsStrip />
+        </Reveal>
+      </section>
 
       {/* Architecture + timeline */}
       <section className="container-page grid gap-16 py-24 sm:py-32 lg:grid-cols-2">

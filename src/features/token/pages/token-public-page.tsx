@@ -4,17 +4,10 @@ import {
   ArrowLeftRight,
   CheckCircle2,
   Circle,
-  Coins,
-  Copy,
-  FileCode2,
   Gamepad2,
-  Hash,
-  Link2,
-  Network,
   PiggyBank,
   Send,
 } from 'lucide-react'
-import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared/page-header'
@@ -22,9 +15,11 @@ import { LogoMark } from '@/components/shared/logo'
 import { Reveal } from '@/components/motion/reveal'
 import { CtaBand, MarketingHero, SectionHeading, StatsBand } from '@/features/marketing/marketing-hero'
 import { PhoneShowcaseBand, WalletPhone } from '@/features/marketing/phone-mockup'
+import { TokenFactsGrid } from '@/features/marketing/token-facts'
 import { CountUp } from '@/components/motion/reveal'
 import { env } from '@/lib/env'
 import { images, videos } from '@/lib/media'
+import { VFXT_TOKEN } from '@/lib/vfxt-token'
 
 function buildRoadmap(contractConfigured: boolean, blockchainEnabled: boolean) {
   return [
@@ -69,21 +64,10 @@ function TokenCoin() {
 
 function TokenDetails() {
   const enabled = env.VITE_FEATURE_BLOCKCHAIN_ENABLED
-  const contract = env.VITE_VFXT_CONTRACT_ADDRESS
-  const chainId = env.VITE_VFXT_CHAIN_ID
+  const contract = env.VITE_VFXT_CONTRACT_ADDRESS || VFXT_TOKEN.address
+  const chainId = env.VITE_VFXT_CHAIN_ID || String(VFXT_TOKEN.chainId)
   const contractConfigured = Boolean(contract && chainId)
   const roadmap = buildRoadmap(contractConfigured, enabled)
-  const details = [
-    { icon: FileCode2, label: 'Contract', value: env.VITE_VFXT_CONTRACT_NAME },
-    { icon: Coins, label: 'Symbol', value: env.VITE_VFXT_TOKEN_SYMBOL },
-    { icon: Hash, label: 'Decimals', value: env.VITE_VFXT_TOKEN_DECIMALS },
-    {
-      icon: Network,
-      label: 'Network',
-      value: chainId === '56' ? 'BNB Smart Chain (56)' : chainId || 'Not configured',
-    },
-    { icon: Link2, label: 'Address', value: contract || 'Not configured', mono: true },
-  ]
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -93,9 +77,11 @@ function TokenDetails() {
             <div className="flex items-center gap-3">
               <LogoMark className="size-11 ring-1 ring-white/15 rounded-lg" />
               <div>
-                <p className="font-display text-lg font-bold">Virtual FX Trades</p>
+                <p className="font-display text-lg font-bold">
+                  {VFXT_TOKEN.name} / {VFXT_TOKEN.symbol}
+                </p>
                 <p className="text-sm text-white/60">
-                  {env.VITE_VFXT_CONTRACT_NAME} · {env.VITE_VFXT_TOKEN_SYMBOL} · BEP-20
+                  BEP-20 · {VFXT_TOKEN.networkLabel} · {VFXT_TOKEN.decimals} decimals
                 </p>
               </div>
             </div>
@@ -105,37 +91,12 @@ function TokenDetails() {
                   contractConfigured ? 'size-1.5 rounded-full bg-accent-bright' : 'size-1.5 rounded-full bg-highlight'
                 }
               />
-              {contractConfigured ? 'Deployed on BSC' : 'Pre-launch'}
+              {contractConfigured ? 'Verified on BscScan' : 'Pre-launch'}
             </Badge>
           </div>
         </div>
         <CardContent className="p-6">
-          <dl className="divide-y divide-line rounded-xl border border-line">
-            {details.map(({ icon: Icon, label, value, mono }) => (
-              <div key={label} className="flex items-center justify-between gap-4 px-4 py-3.5 text-sm">
-                <dt className="flex items-center gap-2.5 text-ink-muted">
-                  <Icon className="size-4" />
-                  {label}
-                </dt>
-                <dd className="flex min-w-0 items-center gap-2">
-                  <span className={mono ? 'truncate font-mono text-xs font-medium' : 'font-semibold'}>{value}</span>
-                  {mono && contract ? (
-                    <button
-                      type="button"
-                      aria-label="Copy contract address"
-                      className="text-ink-subtle hover:text-ink"
-                      onClick={async () => {
-                        await navigator.clipboard.writeText(contract)
-                        toast.success('Contract address copied')
-                      }}
-                    >
-                      <Copy className="size-3.5" />
-                    </button>
-                  ) : null}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <TokenFactsGrid />
         </CardContent>
       </Card>
       <Card>
@@ -204,12 +165,14 @@ function Utilities({ compact = false }: { compact?: boolean }) {
   )
 }
 
-const intro =
-  'VFXTToken is live on BNB Smart Chain as a fixed-supply BEP-20 token.'
+const intro = `${VFXT_TOKEN.name} is live on ${VFXT_TOKEN.networkLabel} as a fixed-supply BEP-20 token — ${VFXT_TOKEN.supply} (${VFXT_TOKEN.supplyShort}) minted once to the treasury.`
 
 export function TokenPublicPage() {
   const inApp = useLocation().pathname.startsWith('/app')
-  const contractConfigured = Boolean(env.VITE_VFXT_CONTRACT_ADDRESS && env.VITE_VFXT_CHAIN_ID)
+  const contractConfigured = Boolean(
+    (env.VITE_VFXT_CONTRACT_ADDRESS || VFXT_TOKEN.address) &&
+      (env.VITE_VFXT_CHAIN_ID || String(VFXT_TOKEN.chainId)),
+  )
   const roadmap = buildRoadmap(contractConfigured, env.VITE_FEATURE_BLOCKCHAIN_ENABLED)
 
   if (inApp) {
@@ -238,14 +201,19 @@ export function TokenPublicPage() {
       />
       <StatsBand
         items={[
-          { value: Number(env.VITE_VFXT_TOKEN_DECIMALS) || 0, label: 'Token decimals' },
+          { value: VFXT_TOKEN.decimals, label: 'Token decimals' },
+          { value: 10, suffix: 'T', label: 'Fixed total supply' },
           { value: roadmap.filter((s) => s.done).length, suffix: ` / ${roadmap.length}`, label: 'Launch gates passed' },
-          { value: utilities.length, label: 'Planned utilities' },
           { value: 20, prefix: 'BEP-', label: 'Token standard' },
         ]}
       />
       <section className="container-page py-24">
-        <SectionHeading eyebrow="Token details" title="Configuration & launch status" className="mb-14" />
+        <SectionHeading
+          eyebrow="Token details"
+          title={`${VFXT_TOKEN.name} on ${VFXT_TOKEN.networkLabel}`}
+          description={`Fixed supply of ${VFXT_TOKEN.supply} (${VFXT_TOKEN.supplyShort}). Contract and treasury are verified on BscScan.`}
+          className="mb-14"
+        />
         <Reveal>
           <TokenDetails />
         </Reveal>

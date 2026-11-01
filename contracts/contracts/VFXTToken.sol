@@ -17,7 +17,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 contract VFXTToken is ERC20 {
     /// @param initialSupply Total token amount (wei units, 18 decimals) minted to `treasury`.
     /// @param treasury Address that receives the fixed initial supply. Must be non-zero.
-    constructor(uint256 initialSupply, address treasury) ERC20("Virtual FX Trades", "VFXT") {
+    constructor(uint256 initialSupply, address treasury) ERC20("VFXT", "VFXT") {
         require(treasury != address(0), "VFXT: treasury is zero address");
         _mint(treasury, initialSupply);
     }

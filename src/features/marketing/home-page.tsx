@@ -30,8 +30,10 @@ import {
 } from '@/features/marketing/marketing-hero'
 import { commonFaqs } from '@/features/marketing/content'
 import { PhoneShowcaseBand, PhoneTrio, WalletPhone } from '@/features/marketing/phone-mockup'
+import { TokenFactsStrip } from '@/features/marketing/token-facts'
 import { RotatingWords } from '@/components/motion/typing'
 import { images, videos } from '@/lib/media'
+import { VFXT_TOKEN } from '@/lib/vfxt-token'
 
 const ease = [0.22, 1, 0.36, 1] as const
 
@@ -407,12 +409,34 @@ export function HomePage() {
               <span className="grid size-12 place-items-center rounded-xl bg-white/15 backdrop-blur">
                 <Coins className="size-6" />
               </span>
-              <h3 className="mt-auto max-w-[12rem] pt-8 text-xl text-white">VFXT on BNB Chain</h3>
+              <h3 className="mt-auto max-w-[12rem] pt-8 text-xl text-white">
+                {VFXT_TOKEN.name} on BNB Chain
+              </h3>
               <p className="mt-2 max-w-[14rem] text-sm leading-relaxed text-white/80">
-                BEP-20 VFXT is live — hold it in the Android wallet or on the platform ledger.
+                Fixed {VFXT_TOKEN.supplyShort} BEP-20 — hold it in the Android wallet or on the platform ledger.
               </p>
             </div>
           </Reveal>
+        </div>
+      </section>
+
+      <section className="container-page py-16 sm:py-20">
+        <SectionHeading
+          eyebrow="VFXT token"
+          title={`${VFXT_TOKEN.name} / ${VFXT_TOKEN.symbol}`}
+          description={`Fixed supply of ${VFXT_TOKEN.supply} (${VFXT_TOKEN.supplyShort}) on ${VFXT_TOKEN.networkLabel}. Contract and treasury are verified on BscScan.`}
+          className="mb-10"
+        />
+        <Reveal>
+          <TokenFactsStrip />
+        </Reveal>
+        <div className="mt-8 flex justify-center">
+          <Button variant="outline" asChild>
+            <Link to="/token">
+              Full token details
+              <ArrowRight />
+            </Link>
+          </Button>
         </div>
       </section>
 

@@ -24,7 +24,9 @@ import {
 } from '@/features/marketing/marketing-hero'
 import { miningFaqs } from '@/features/marketing/content'
 import { PhonePair, PhoneShowcaseBand, WalletPhone } from '@/features/marketing/phone-mockup'
+import { TokenFactsStrip } from '@/features/marketing/token-facts'
 import { images, videos } from '@/lib/media'
+import { VFXT_TOKEN } from '@/lib/vfxt-token'
 
 const pillars = [
   {
@@ -107,6 +109,18 @@ export function MiningPage() {
         description="Session progress, available rewards, boosters, and claim — laid out for one-handed Android use."
         screens={['mining', 'home', 'assets']}
       />
+
+      <section className="container-page py-16 sm:py-20">
+        <SectionHeading
+          eyebrow="Claim asset"
+          title={`Rewards settle as ${VFXT_TOKEN.symbol}`}
+          description={`${VFXT_TOKEN.name} / ${VFXT_TOKEN.symbol} — fixed ${VFXT_TOKEN.supplyShort} supply on ${VFXT_TOKEN.networkLabel}.`}
+          className="mb-10"
+        />
+        <Reveal>
+          <TokenFactsStrip />
+        </Reveal>
+      </section>
 
       <section className="container-page py-24 sm:py-32">
         <div className="grid items-center gap-14 lg:grid-cols-[0.9fr_1.1fr]">

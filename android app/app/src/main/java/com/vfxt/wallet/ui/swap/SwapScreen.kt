@@ -123,7 +123,7 @@ fun SwapScreen(
                 SwapStage.Edit -> "Swap"
                 SwapStage.Review -> "Review swap"
                 SwapStage.Executing -> "Swapping"
-                SwapStage.Finished -> if (state.progress is SwapProgress.Done) "Swap complete" else "Swap result"
+                SwapStage.Finished -> if (state.progress is SwapProgress.Done || state.vfxtProgress is com.vfxt.wallet.blockchain.swap.VfxtRouteProgress.Done) "Swap complete" else "Swap result"
             },
             onBack = {
                 when (state.stage) {
@@ -138,19 +138,28 @@ fun SwapScreen(
             return@Column
         }
         AnimatedContent(targetState = state.stage, label = "swapStage", modifier = Modifier.weight(1f)) { stage ->
-            when (stage) {
-                SwapStage.Edit -> EditStep(state, viewModel)
-                SwapStage.Review -> ReviewStep(state, viewModel, onConfirm = { authenticating = true })
-                SwapStage.Executing -> ExecutingStep(state)
-                SwapStage.Finished -> FinishedStep(state, onDone = onBack, onActivity = onActivity)
+            val route = state.vfxtRoute
+            when {
+                stage == SwapStage.Edit -> EditStep(state, viewModel)
+                route != null && stage == SwapStage.Review ->
+                    VfxtReviewStep(route, onConfirm = { authenticating = true }, onBack = viewModel::backToEdit)
+                route != null -> VfxtProgressStep(route, state.vfxtProgress, onDone = onBack, onActivity = onActivity)
+                stage == SwapStage.Review -> ReviewStep(state, viewModel, onConfirm = { authenticating = true })
+                stage == SwapStage.Executing -> ExecutingStep(state)
+                else -> FinishedStep(state, onDone = onBack, onActivity = onActivity)
             }
         }
     }
 
     if (authenticating) {
         val p = state.preview
+        val r = state.vfxtRoute
         AuthenticateSheet(
-            reason = "Approve swapping ${p?.quote?.fromAmountDecimal?.let { Formatters.tokenAmount(it) }} ${p?.quote?.fromToken?.symbol} for ${p?.quote?.toToken?.symbol}",
+            reason = if (r != null) {
+                "Approve swapping ${state.amountInput} ${r.fromToken.symbol} for ${r.toToken.symbol}"
+            } else {
+                "Approve swapping ${p?.quote?.fromAmountDecimal?.let { Formatters.tokenAmount(it) }} ${p?.quote?.fromToken?.symbol} for ${p?.quote?.toToken?.symbol}"
+            },
             onAuthenticated = {
                 authenticating = false
                 viewModel.confirmAndExecute()
@@ -291,7 +300,8 @@ private fun EditStep(state: SwapUiState, viewModel: SwapViewModel) {
                     }
                     DetailLine("Minimum received", "${Formatters.tokenAmount(est.toAmountMinDecimal, 6)} $toSym")
                     est.valueLossPercent?.let { DetailLine("Price impact (incl. fees)", percentText(it), lossColor(it)) }
-                    DetailLine("Provider fee", "0.25% (LI.FI, included)")
+                    val isVfxtDirect = est.toolName.startsWith("VFXT Swap")
+                    DetailLine("Provider fee", if (isVfxtDirect) "None (fixed price)" else "0.25% (LI.FI, included)")
                     est.gasCostUsd?.let { DetailLine("Est. network fee", Formatters.fiat(it)) }
                     DetailLine("Route", est.toolName.ifBlank { "Best available" })
                     if (state.isCrossChain && est.executionDurationSeconds > 0) {
@@ -319,7 +329,8 @@ private fun EditStep(state: SwapUiState, viewModel: SwapViewModel) {
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = Spacing.screen, vertical = Spacing.lg),
-            enabled = state.amountRaw != null && !state.insufficient && state.estimate != null && !state.estimating && state.account != null,
+            enabled = state.amountRaw != null && !state.insufficient && state.estimate != null && state.estimateError == null &&
+                !state.estimating && state.account != null,
             loading = state.reviewing,
         )
     }

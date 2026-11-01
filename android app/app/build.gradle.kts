@@ -114,6 +114,13 @@ android {
     }
 }
 
+configurations.configureEach {
+    // web3j's tuweni-bytes drags in Netty/Vert.x (also via Reown, which depends on web3j crypto).
+    // They are server libraries that web3j's key/signing code never calls and conflict on Android.
+    exclude(group = "io.netty")
+    exclude(group = "io.vertx")
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)

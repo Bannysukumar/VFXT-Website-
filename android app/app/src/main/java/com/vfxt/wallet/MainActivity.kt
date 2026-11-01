@@ -1,5 +1,6 @@
 package com.vfxt.wallet
 
+import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
@@ -19,7 +20,10 @@ import com.vfxt.wallet.core.designsystem.theme.VfxtTheme
 import com.vfxt.wallet.navigation.AppNavigation
 import com.vfxt.wallet.ui.main.AppViewModel
 import com.vfxt.wallet.ui.security.LockScreen
+import com.vfxt.wallet.blockchain.walletconnect.WalletConnectSessionManager
+import com.vfxt.wallet.ui.walletconnect.WalletConnectPrompts
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /** FragmentActivity (not ComponentActivity) because BiometricPrompt requires it. */
 @AndroidEntryPoint
@@ -27,11 +31,14 @@ class MainActivity : FragmentActivity() {
 
     private val appViewModel: AppViewModel by viewModels()
 
+    @Inject lateinit var walletConnect: WalletConnectSessionManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
         // Hold the system splash until we know whether to show onboarding, the lock screen or the app.
         splash.setKeepOnScreenCondition { appViewModel.state.value?.ready != true }
+        if (savedInstanceState == null) handleDeepLink(intent)
 
         setContent {
             val state by appViewModel.state.collectAsStateWithLifecycle()
@@ -53,10 +60,24 @@ class MainActivity : FragmentActivity() {
                         onThemeModeChange = appViewModel::setThemeMode,
                         onOnboardingFinished = appViewModel::setOnboardingComplete,
                     )
+                    // dApp connection and signing prompts wait until the wallet is unlocked.
+                    if (state?.ready == true && state?.showLockScreen != true) WalletConnectPrompts()
                     // Drawn above everything, including dialogs' host content.
                     if (state?.showLockScreen == true) LockScreen()
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleDeepLink(intent)
+    }
+
+    private fun handleDeepLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme.equals("wc", ignoreCase = true)) {
+            walletConnect.submitPairingUri(data.toString())
         }
     }
 }

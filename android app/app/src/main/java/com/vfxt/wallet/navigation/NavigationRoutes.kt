@@ -43,6 +43,7 @@ sealed interface RootRoute {
     @Serializable data object WalletConnect : RootRoute
     @Serializable data object Currency : RootRoute
     @Serializable data object Sessions : RootRoute
+    @Serializable data object VfxtDesk : RootRoute
 }
 
 /** Destinations hosted inside the bottom-navigation shell. */

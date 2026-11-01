@@ -1,36 +1,26 @@
-<!-- VFXT "V" mark, kept inside the 66dp adaptive-icon safe zone. -->
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    VFXT chart mark (same artwork as the website favicon, 32x32 viewBox), scaled x2.25 and centred
+    so it stays inside the 66dp adaptive-icon safe zone. Also used as the splash-screen icon.
+-->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Left stroke -->
-    <path android:pathData="M33,37 L44,37 L57,71 L50.5,73 Q48.5,73.5 47.5,71 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="33"
-                android:startY="37"
-                android:endX="54"
-                android:endY="73">
-                <item android:color="#FF00A6FF" android:offset="0.0" />
-                <item android:color="#FF2878FF" android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
-    <!-- Right stroke -->
-    <path android:pathData="M75,37 L64,37 L52.5,67 L56.5,73 Q58.5,73.5 59.5,71 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient
-                android:type="linear"
-                android:startX="75"
-                android:startY="37"
-                android:endX="55"
-                android:endY="73">
-                <item android:color="#FF8157FF" android:offset="0.0" />
-                <item android:color="#FF2878FF" android:offset="1.0" />
-            </gradient>
-        </aapt:attr>
-    </path>
+    <group
+        android:scaleX="2.25"
+        android:scaleY="2.25"
+        android:translateX="18"
+        android:translateY="18">
+        <path
+            android:pathData="M7.5,21.5 L13,11 L17.5,18.5 L20.5,13.5 L24.5,21.5"
+            android:strokeColor="#FF34D399"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round" />
+        <path
+            android:fillColor="#FFC6F56F"
+            android:pathData="M24.5,10 m-2,0 a2,2 0 1,0 4,0 a2,2 0 1,0 -4,0" />
+    </group>
 </vector>

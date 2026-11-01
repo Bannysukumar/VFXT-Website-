@@ -13,6 +13,9 @@ import com.vfxt.wallet.blockchain.swap.SwapPreview
 import com.vfxt.wallet.blockchain.swap.SwapProgress
 import com.vfxt.wallet.blockchain.swap.SwapService
 import com.vfxt.wallet.blockchain.swap.SwapToken
+import com.vfxt.wallet.blockchain.swap.VfxtRoute
+import com.vfxt.wallet.blockchain.swap.VfxtRouteProgress
+import com.vfxt.wallet.blockchain.swap.VfxtRouteService
 import com.vfxt.wallet.blockchain.tokens.TokenRegistry
 import com.vfxt.wallet.blockchain.transactions.TransactionService
 import com.vfxt.wallet.blockchain.wallet.WalletKeyService
@@ -60,6 +63,9 @@ data class SwapUiState(
     val notice: String? = null,
     val highImpactAcknowledged: Boolean = false,
     val progress: SwapProgress? = null,
+    /** Set when the pair involves VFXT, which trades on the fixed-price VFXT swap instead of LI.FI. */
+    val vfxtRoute: VfxtRoute? = null,
+    val vfxtProgress: VfxtRouteProgress? = null,
 ) {
     val amountRaw: BigInteger? get() = fromToken?.let { TransactionService.parseAmount(amountInput, it.decimals) }?.takeIf { it.signum() > 0 }
     val insufficient: Boolean get() = amountRaw != null && fromBalance != null && amountRaw!! > fromBalance
@@ -73,6 +79,7 @@ class SwapViewModel @Inject constructor(
     private val chainStore: ChainStore,
     private val swaps: SwapService,
     private val rpc: EvmRpc,
+    private val vfxtRoutes: VfxtRouteService,
 ) : ViewModel() {
 
     private val initialTokenKey: String? = savedStateHandle["fromTokenKey"]
@@ -246,6 +253,12 @@ class SwapViewModel @Inject constructor(
         estimateJob = viewModelScope.launch {
             _state.update { it.copy(estimating = true, estimateError = null) }
             delay(450) // debounce typing
+            if (vfxtRoutes.involvesVfxt(from, to)) {
+                runCatching { vfxtRoutes.quote(from, to, amount, owner, s.slippage) }
+                    .onSuccess { route -> _state.update { it.copy(estimating = false, estimate = route.toEstimate(), estimateError = route.problem) } }
+                    .onFailure { e -> _state.update { it.copy(estimating = false, estimate = null, estimateError = e.message ?: "Couldn't price VFXT.") } }
+                return@launch
+            }
             runCatching { swaps.estimate(fromNet, toNet, from, to, amount, owner, s.slippage) }
                 .onSuccess { est ->
                     _state.update {
@@ -268,6 +281,22 @@ class SwapViewModel @Inject constructor(
         val owner = s.account?.address ?: return
         if (s.insufficient) return _state.update { it.copy(error = "Insufficient ${from.symbol} balance.") }
         _state.update { it.copy(reviewing = true, error = null, notice = null) }
+        if (vfxtRoutes.involvesVfxt(from, to)) {
+            viewModelScope.launch {
+                runCatching { vfxtRoutes.quote(from, to, amount, owner, s.slippage) }
+                    .onSuccess { route ->
+                        _state.update {
+                            if (route.problem != null) {
+                                it.copy(reviewing = false, error = route.problem)
+                            } else {
+                                it.copy(reviewing = false, vfxtRoute = route, preview = null, stage = SwapStage.Review)
+                            }
+                        }
+                    }
+                    .onFailure { e -> _state.update { it.copy(reviewing = false, error = e.message ?: "Couldn't prepare the VFXT swap.") } }
+            }
+            return
+        }
         viewModelScope.launch {
             runCatching { swaps.preview(s.fromNetwork!!, s.toNetwork!!, from, to, amount, owner, s.slippage) }
                 .onSuccess { preview ->
@@ -287,13 +316,28 @@ class SwapViewModel @Inject constructor(
 
     fun acknowledgeHighImpact(value: Boolean) = _state.update { it.copy(highImpactAcknowledged = value) }
 
-    fun backToEdit() = _state.update { it.copy(stage = SwapStage.Edit, preview = null, notice = null) }
+    fun backToEdit() = _state.update { it.copy(stage = SwapStage.Edit, preview = null, vfxtRoute = null, notice = null) }
 
     /** Call only after the user re-authenticated with PIN or biometrics. */
     fun confirmAndExecute() {
         val s = _state.value
-        val preview = s.preview ?: return
         val account = s.account ?: return
+        s.vfxtRoute?.let { route ->
+            executeJob?.cancel()
+            _state.update { it.copy(stage = SwapStage.Executing, vfxtProgress = null, error = null) }
+            executeJob = viewModelScope.launch {
+                vfxtRoutes.execute(route, account.id, account.address).collect { p ->
+                    _state.update {
+                        it.copy(
+                            vfxtProgress = p,
+                            stage = if (p is VfxtRouteProgress.Done || p is VfxtRouteProgress.Failed) SwapStage.Finished else SwapStage.Executing,
+                        )
+                    }
+                }
+            }
+            return
+        }
+        val preview = s.preview ?: return
         executeJob?.cancel()
         _state.update { it.copy(stage = SwapStage.Executing, progress = null, error = null) }
         executeJob = viewModelScope.launch {

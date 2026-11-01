@@ -34,6 +34,7 @@ data class HomeUiState(
 class HomeViewModel @Inject constructor(
     private val walletRepository: WalletRepository,
     notifications: com.vfxt.wallet.data.repository.NotificationsRepository,
+    private val walletConnect: com.vfxt.wallet.blockchain.walletconnect.WalletConnectSessionManager,
 ) : ViewModel() {
 
     /** Unread server notifications for the bell badge; 0 when signed out or unavailable. */
@@ -62,6 +63,9 @@ class HomeViewModel @Inject constructor(
     fun refresh() = load(isRefresh = true)
 
     fun toggleBalanceVisibility() = _uiState.update { it.copy(balanceHidden = !it.balanceHidden) }
+
+    /** Starts WalletConnect pairing from a scanned QR; returns an error message, or null on success. */
+    fun pairWalletConnect(uri: String): String? = walletConnect.submitPairingUri(uri).exceptionOrNull()?.message
 
     fun selectAccount(id: String) {
         viewModelScope.launch { walletRepository.selectAccount(id) }

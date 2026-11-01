@@ -22,7 +22,9 @@ import {
 } from '@/features/marketing/marketing-hero'
 import { LoadingState } from '@/components/shared/loading-state'
 import { PhonePair, PhoneShowcaseBand, WalletPhone } from '@/features/marketing/phone-mockup'
+import { TokenFactsStrip } from '@/features/marketing/token-facts'
 import { images, videos } from '@/lib/media'
+import { VFXT_TOKEN } from '@/lib/vfxt-token'
 import { formatApkSize, getWalletApkRelease } from '@/services/wallet-apk-service'
 
 const installSteps = [
@@ -238,11 +240,23 @@ export function DownloadPage() {
         bullets={[
           'Web app: server-authoritative balances and reviewed payouts.',
           'Android wallet: keys generated and stored on your device.',
-          'Use BNB Smart Chain for USDT and VFXT token transfers.',
+          `Use BNB Smart Chain for USDT and ${VFXT_TOKEN.symbol} (${VFXT_TOKEN.address.slice(0, 10)}…).`,
           'Never paste your seed into a website or chat.',
         ]}
         cta={{ to: '/auth/register', label: 'Open a web account' }}
       />
+
+      <section className="container-page py-16 sm:py-20">
+        <SectionHeading
+          eyebrow="VFXT on BSC"
+          title={`${VFXT_TOKEN.name} / ${VFXT_TOKEN.symbol}`}
+          description={`Fixed supply ${VFXT_TOKEN.supply} (${VFXT_TOKEN.supplyShort}). Verified contract and treasury.`}
+          className="mb-10"
+        />
+        <Reveal>
+          <TokenFactsStrip />
+        </Reveal>
+      </section>
 
       <CinematicBand
         title="Keys stay on your phone"

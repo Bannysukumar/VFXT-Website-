@@ -16,13 +16,18 @@ import com.vfxt.wallet.domain.models.TokenKind
  *   `vfxt.tokenTestnet` in local.properties for alternate deployments.
  */
 object TokenRegistry {
-    /** Deployed VFXTToken on BNB Smart Chain mainnet. */
     /**
-     * VFXT "Virtual FX Trades" BEP-20 on BSC mainnet. Verified on-chain: symbol VFXT, 18 decimals,
-     * fixed 1,000,000,000 supply, plain OpenZeppelin v5 ERC-20 (no owner, mint, pause, blacklist or
-     * fee functions in the bytecode). Must be the exact EIP-55 checksum or it is rejected.
+     * VFXT BEP-20 on BSC mainnet. Verified on-chain: name/symbol VFXT, 18 decimals,
+     * fixed 10,000,000,000,000 (10 trillion) supply minted to treasury, plain OpenZeppelin v5
+     * ERC-20 (no owner, mint, pause, blacklist or fee functions). EIP-55 checksum required.
      */
-    const val VFXT_BSC_MAINNET = "0xB1F5170839CDaDE72109fA5C268dc043bF9bFbF4"
+    const val VFXT_BSC_MAINNET = "0x4A08EF10e6f4aa077A74496793467d2192061969"
+
+    /** Treasury wallet that received the full VFXT supply at deployment. */
+    const val VFXT_TREASURY = "0x76b16F59Cfab5DdaE5D149BE98E5d755F939572A"
+
+    /** Retired first deployment (1B supply). Builds still configured with it use the current contract. */
+    private const val VFXT_BSC_RETIRED = "0xB1F5170839CDaDE72109fA5C268dc043bF9bFbF4"
     private const val USDT_BSC = "0x55d398326f99059fF775485246999027B3197955"
     private const val USDC_BSC = "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"
     private const val USDT_ETH = "0xdAC17F958D2ee523a2206206994597C13D831ec7"
@@ -62,14 +67,15 @@ object TokenRegistry {
         val fromBuild = if (network.isTestnet) BuildConfig.VFXT_TOKEN_TESTNET else BuildConfig.VFXT_TOKEN_MAINNET
         val fallback = if (network.isTestnet) "" else VFXT_BSC_MAINNET
         val configured = fromBuild.trim().takeIf { it.isNotBlank() }?.let { value ->
-            // Same contract as the verified constant but written with the wrong letter case (an
-            // invalid EIP-55 checksum): use the verified checksummed form. Any *other* address with
-            // a bad checksum is still rejected below, since the checksum exists to catch typos.
-            if (!network.isTestnet && value.equals(VFXT_BSC_MAINNET, ignoreCase = true)) VFXT_BSC_MAINNET else value
+            // The current contract written with the wrong letter case (an invalid EIP-55 checksum),
+            // or the retired first deployment: use the verified current address. Any *other*
+            // address with a bad checksum is still rejected below, since the checksum catches typos.
+            val known = value.equals(VFXT_BSC_MAINNET, ignoreCase = true) || value.equals(VFXT_BSC_RETIRED, ignoreCase = true)
+            if (!network.isTestnet && known) VFXT_BSC_MAINNET else value
         } ?: fallback
         return TokenInfo(
             symbol = "VFXT",
-            name = "VFXT Token",
+            name = "VFXT",
             decimals = 18,
             networkId = network.id,
             kind = TokenKind.Bep20,

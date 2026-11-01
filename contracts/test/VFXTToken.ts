@@ -4,7 +4,7 @@ import { HardhatEthersSigner } from "@nomicfoundation/hardhat-ethers/signers";
 import { VFXTToken } from "../typechain-types";
 
 describe("VFXTToken", function () {
-  const INITIAL_SUPPLY = ethers.parseUnits("1000000000", 18); // 1B VFXT
+  const INITIAL_SUPPLY = ethers.parseUnits("10000000000000", 18); // 10 trillion VFXT
 
   let token: VFXTToken;
   let deployer: HardhatEthersSigner;
@@ -21,7 +21,7 @@ describe("VFXTToken", function () {
 
   describe("metadata", function () {
     it("has the correct name", async function () {
-      expect(await token.name()).to.equal("Virtual FX Trades");
+      expect(await token.name()).to.equal("VFXT");
     });
 
     it("has the correct symbol", async function () {

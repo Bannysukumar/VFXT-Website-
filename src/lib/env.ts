@@ -36,9 +36,18 @@ const envSchema = z.object({
     .transform((v) => v === 'true'),
   VITE_VFXT_TOKEN_SYMBOL: z.string().default('VFXT'),
   VITE_VFXT_TOKEN_DECIMALS: z.string().default('18'),
-  VITE_VFXT_CONTRACT_NAME: z.string().default('VFXTToken'),
-  VITE_VFXT_CHAIN_ID: z.string().optional(),
-  VITE_VFXT_CONTRACT_ADDRESS: z.string().optional(),
+  VITE_VFXT_CONTRACT_NAME: z.string().default('VFXT'),
+  VITE_VFXT_CHAIN_ID: z.string().default('56'),
+  VITE_VFXT_CONTRACT_ADDRESS: z
+    .string()
+    .default('0x4A08EF10e6f4aa077A74496793467d2192061969'),
+  VITE_VFXT_TREASURY_ADDRESS: z
+    .string()
+    .default('0x76b16F59Cfab5DdaE5D149BE98E5d755F939572A'),
+  VITE_VFXT_TOTAL_SUPPLY: z.string().default('10000000000000'),
+  VITE_VFXT_SWAP_ADDRESS: z
+    .string()
+    .default('0xD0fe8d149D4Cb91Bc30036f8c0C799859C0A1F24'),
   VITE_SUPPORT_EMAIL: z
     .string()
     .optional()

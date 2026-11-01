@@ -24,6 +24,9 @@ interface ImportMetaEnv {
   readonly VITE_VFXT_CONTRACT_NAME?: string
   readonly VITE_VFXT_CHAIN_ID?: string
   readonly VITE_VFXT_CONTRACT_ADDRESS?: string
+  readonly VITE_VFXT_TREASURY_ADDRESS?: string
+  readonly VITE_VFXT_TOTAL_SUPPLY?: string
+  readonly VITE_VFXT_SWAP_ADDRESS?: string
   readonly VITE_SUPPORT_EMAIL?: string
 }
 

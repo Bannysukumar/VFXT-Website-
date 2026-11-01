@@ -15,7 +15,8 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.VFXTWallet">
+        android:theme="@style/Theme.VFXTWallet"
+        tools:replace="android:dataExtractionRules,android:fullBackupContent,android:allowBackup">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -25,6 +26,23 @@
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- WalletConnect links opened from a dApp on this phone. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="wc" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data android:scheme="vfxtwallet" />
             </intent-filter>
         </activity>
 
