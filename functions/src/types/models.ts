@@ -258,6 +258,7 @@ export type StakingPositionStatus = 'active' | 'completed' | 'cancelled';
  *
  * Daily yield:
  * - Credits 1%/day to daily_roi until days>=200 or totalPaid>=cap.
+ * - Each credit is due exactly 24h after stake createdAt (and every +24h after).
  * - Cap = 2X principal (non-working) or 3X (working = ≥1 direct).
  *
  * Locked packages (300/500/700):

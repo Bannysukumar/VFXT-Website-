@@ -22,10 +22,12 @@ hiltAndroidx = "1.4.0"
 ksp = "2.3.13"
 biometric = "1.1.0"
 okhttp = "5.5.1"
+coil = "3.6.3"
 zxing = "3.5.4"
 codeScanner = "16.1.0"
 googleServices = "4.4.4"
 firebaseBom = "34.7.0"
+reownBom = "1.6.17"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -59,6 +61,8 @@ androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navig
 androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycle" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+coil-compose = { group = "io.coil-kt.coil3", name = "coil-compose", version.ref = "coil" }
+coil-network-okhttp = { group = "io.coil-kt.coil3", name = "coil-network-okhttp", version.ref = "coil" }
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 play-services-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "codeScanner" }
@@ -68,6 +72,9 @@ firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-functions = { group = "com.google.firebase", name = "firebase-functions" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging" }
+reown-bom = { group = "com.reown", name = "android-bom", version.ref = "reownBom" }
+reown-core = { group = "com.reown", name = "android-core" }
+reown-walletkit = { group = "com.reown", name = "walletkit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

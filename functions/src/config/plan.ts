@@ -28,6 +28,35 @@ export const DAILY_YIELD = {
   workingCapX: 3,
 } as const;
 
+/** One yield day = exactly 24 hours from the stake timestamp (wall-clock / IST-local). */
+export const DAILY_YIELD_INTERVAL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * When the next 1% ROI credit is due for a daily_yield position.
+ * Anchor is stake `createdAt`: day 1 at +24h, day 2 at +48h, etc.
+ */
+export function nextDailyYieldDueAtMs(
+  createdAtMs: number,
+  daysPaid: number,
+): number {
+  return createdAtMs + (daysPaid + 1) * DAILY_YIELD_INTERVAL_MS;
+}
+
+/** True when now is at/after the next 24h anniversary of the stake. */
+export function isDailyYieldDue(params: {
+  createdAtMs: number;
+  daysPaid: number;
+  nowMs: number;
+}): boolean {
+  if (!Number.isFinite(params.createdAtMs) || params.createdAtMs <= 0) {
+    return false;
+  }
+  return (
+    params.nowMs >=
+    nextDailyYieldDueAtMs(params.createdAtMs, params.daysPaid)
+  );
+}
+
 export type LockedPackageId = 'locked_300' | 'locked_500' | 'locked_700';
 
 export const LOCKED_PACKAGES = [

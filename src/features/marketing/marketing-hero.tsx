@@ -86,6 +86,7 @@ export function MarketingHero({
             initial={{ opacity: 0, scale: 0.96, y: 24 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.2, ease }}
+            className="mx-auto w-full max-w-md lg:mx-0 lg:max-w-none"
           >
             {aside}
           </motion.div>
@@ -168,6 +169,140 @@ export function CtaBand({
           </div>
         </div>
       </Reveal>
+    </section>
+  )
+}
+
+/** Full-bleed cinematic story band with looping video behind copy. */
+export function CinematicBand({
+  title,
+  description,
+  video,
+  poster,
+  points,
+  cta,
+  invertOverlay = false,
+}: {
+  title: string
+  description: string
+  video: string
+  poster: string
+  points?: string[]
+  cta?: { to: string; label: string }
+  invertOverlay?: boolean
+}) {
+  return (
+    <section className="relative isolate overflow-hidden bg-brand py-24 text-white sm:py-32">
+      <VideoBackground
+        src={video}
+        poster={poster}
+        overlayClassName={
+          invertOverlay
+            ? 'bg-gradient-to-l from-brand via-brand/88 to-brand/55'
+            : 'bg-gradient-to-r from-brand via-brand/88 to-brand/55'
+        }
+      />
+      <div className="container-page relative max-w-3xl">
+        <SectionHeading align="left" inverted title={title} description={description} />
+        {points?.length ? (
+          <Reveal delay={0.08}>
+            <ul className="mt-8 grid gap-3 sm:grid-cols-2">
+              {points.map((point) => (
+                <li
+                  key={point}
+                  className="rounded-2xl border border-white/12 bg-white/[0.06] px-4 py-3 text-sm text-white/80 backdrop-blur-sm"
+                >
+                  {point}
+                </li>
+              ))}
+            </ul>
+          </Reveal>
+        ) : null}
+        {cta ? (
+          <Reveal delay={0.12}>
+            <Button size="lg" variant="accent" asChild className="mt-10">
+              <Link to={cta.to}>
+                {cta.label}
+                <ArrowRight />
+              </Link>
+            </Button>
+          </Reveal>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
+/** Alternating media + story row (video or image). */
+export function StorySplit({
+  title,
+  description,
+  bullets,
+  video,
+  poster,
+  image,
+  imageAlt,
+  reverse = false,
+  cta,
+}: {
+  title: string
+  description: string
+  bullets: string[]
+  video?: string
+  poster: string
+  image?: string
+  imageAlt?: string
+  reverse?: boolean
+  cta?: { to: string; label: string }
+}) {
+  return (
+    <section className="overflow-hidden border-y border-line bg-panel">
+      <div
+        className={cn(
+          'container-page grid items-center gap-12 py-20 sm:gap-16 sm:py-28 lg:grid-cols-2',
+          reverse && 'lg:[&>*:first-child]:order-2',
+        )}
+      >
+        <Reveal className="relative isolate overflow-hidden rounded-3xl shadow-lift">
+          <div className="relative aspect-[4/3]">
+            {video ? (
+              <VideoBackground
+                src={video}
+                poster={poster}
+                overlayClassName="bg-gradient-to-t from-brand/55 via-brand/15 to-transparent"
+              />
+            ) : (
+              <img
+                src={image ?? poster}
+                alt={imageAlt ?? ''}
+                loading="lazy"
+                className="size-full object-cover"
+              />
+            )}
+          </div>
+        </Reveal>
+        <div>
+          <SectionHeading align="left" title={title} description={description} />
+          <Reveal delay={0.08}>
+            <ul className="mt-8 space-y-3">
+              {bullets.map((item) => (
+                <li key={item} className="flex gap-3 text-sm leading-relaxed text-ink-muted">
+                  <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+            {cta ? (
+              <Button asChild size="lg" className="mt-10">
+                <Link to={cta.to}>
+                  {cta.label}
+                  <ArrowRight />
+                </Link>
+              </Button>
+            ) : null}
+          </Reveal>
+        </div>
+      </div>
     </section>
   )
 }

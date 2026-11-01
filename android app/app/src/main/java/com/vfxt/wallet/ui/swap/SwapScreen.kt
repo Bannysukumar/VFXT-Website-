@@ -79,6 +79,7 @@ import com.vfxt.wallet.core.designsystem.components.IconTile
 import com.vfxt.wallet.core.designsystem.components.PillTone
 import com.vfxt.wallet.core.designsystem.components.StatusPill
 import com.vfxt.wallet.core.designsystem.components.TokenIcon
+import com.vfxt.wallet.core.designsystem.components.NetworkIcon
 import com.vfxt.wallet.core.designsystem.components.VfxtBottomSheet
 import com.vfxt.wallet.core.designsystem.components.VfxtCard
 import com.vfxt.wallet.core.designsystem.components.VfxtChip
@@ -387,7 +388,7 @@ private fun SwapCard(
                     .padding(start = 6.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TokenIcon(token?.symbol ?: "?", size = 28.dp)
+                TokenIcon(token?.symbol ?: "?", size = 28.dp, logoUrl = token?.logoUrl)
                 Spacer(Modifier.width(6.dp))
                 Text(token?.symbol ?: "Select", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary, maxLines = 1)
                 Icon(Icons.Filled.KeyboardArrowDown, contentDescription = "Change token", tint = colors.textSecondary)
@@ -445,11 +446,11 @@ private fun ReviewStep(state: SwapUiState, viewModel: SwapViewModel, onConfirm: 
                 Spacer(Modifier.height(Spacing.md))
             }
             VfxtCard(Modifier.fillMaxWidth()) {
-                LegRow("You pay", q.fromToken.symbol, Formatters.tokenAmount(q.fromAmountDecimal, 8), preview.fromNetwork.name, q.fromAmountUsd)
+                LegRow("You pay", q.fromToken.symbol, Formatters.tokenAmount(q.fromAmountDecimal, 8), preview.fromNetwork.name, q.fromAmountUsd, q.fromToken.logoUrl)
                 Box(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), contentAlignment = Alignment.Center) {
                     Icon(Icons.Filled.SwapVert, null, tint = colors.textMuted)
                 }
-                LegRow("You receive (est.)", q.toToken.symbol, Formatters.tokenAmount(q.toAmountDecimal, 8), preview.toNetwork.name, q.toAmountUsd)
+                LegRow("You receive (est.)", q.toToken.symbol, Formatters.tokenAmount(q.toAmountDecimal, 8), preview.toNetwork.name, q.toAmountUsd, q.toToken.logoUrl)
             }
             Spacer(Modifier.height(Spacing.md))
             VfxtCard(Modifier.fillMaxWidth()) {
@@ -534,12 +535,12 @@ private fun ReviewStep(state: SwapUiState, viewModel: SwapViewModel, onConfirm: 
 }
 
 @Composable
-private fun LegRow(label: String, symbol: String, amount: String, network: String, usd: BigDecimal?) {
+private fun LegRow(label: String, symbol: String, amount: String, network: String, usd: BigDecimal?, logoUrl: String?) {
     val colors = VfxtTheme.colors
     Text(label, style = MaterialTheme.typography.labelMedium, color = colors.textSecondary)
     Spacer(Modifier.height(Spacing.xs))
     Row(verticalAlignment = Alignment.CenterVertically) {
-        TokenIcon(symbol, size = 36.dp)
+        TokenIcon(symbol, size = 36.dp, logoUrl = logoUrl)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
             Text("$amount $symbol", style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
@@ -783,7 +784,7 @@ private fun TokenRow(token: SwapToken, onPick: (SwapToken) -> Unit) {
             .padding(vertical = Spacing.sm, horizontal = Spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TokenIcon(token.symbol, size = 36.dp)
+        TokenIcon(token.symbol, size = 36.dp, logoUrl = token.logoUrl)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -829,7 +830,7 @@ private fun NetworkPickerSheet(
                     .padding(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TokenIcon(net.nativeSymbol, size = 32.dp)
+                NetworkIcon(net, size = 32.dp)
                 Spacer(Modifier.width(Spacing.md))
                 Column(Modifier.weight(1f)) {
                     Text(net.name, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)

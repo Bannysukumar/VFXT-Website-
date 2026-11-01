@@ -18,6 +18,14 @@ export const images = {
   analyticsLaptop: unsplash('1460925895917-afdab827c52f', 1200),
   phoneMarkets: unsplash('1621761191319-c6fb62004040', 1000),
   phoneAndLaptop: unsplash('1563986768609-322da13575f3', 1200),
+  /** Hand holding smartphone — lifestyle bands. */
+  phoneInHand: unsplash('1512941937669-90a1b58e7e9c', 1200),
+  /** Person using phone at desk. */
+  phoneDesk: unsplash('1556656793-08538906a9f8', 1200),
+  /** Mobile charts / finance on phone. */
+  phoneCharts: unsplash('1563986768494-4dee2763ff36', 1200),
+  /** Dark phone UI vibe. */
+  phoneDark: unsplash('1511707171634-5f897ff02aa9', 1200),
   blockchain: unsplash('1639762681485-074b7f938ba0'),
   cryptoDesk: unsplash('1642790106117-e829e14a795f', 1200),
   skyscrapers: unsplash('1486406146926-c627a92ad1ab'),
@@ -39,4 +47,16 @@ export const videos = {
   analystRealtime: mixkit(47214),
   floatingIndicators: mixkit(14114),
   marketCloseUp: mixkit(47016),
+  /** Aerial city night skyline — cinematic bands. */
+  cityNight: mixkit(42342),
+  /** Digital trading indicators loop. */
+  dataPulse: mixkit(26747),
+  /** Animated market UI / graphs. */
+  marketUi: mixkit(5461),
+  /** Aerial panorama over illuminated towers. */
+  skylinePan: mixkit(42352),
+  /** Hands typing at a workstation. */
+  workstation: mixkit(41652),
+  /** Suit at office desk — support / contact atmosphere. */
+  deskActivity: mixkit(1816),
 }

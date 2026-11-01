@@ -1,10 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { doc, getDoc } from 'firebase/firestore'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
+import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Loader2, Lock, Wallet } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,7 +15,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { FieldError, PageHeader } from '@/components/shared/page-header'
 import { AmountInputPrefix, ProcessSteps, SummaryRow } from '@/components/shared/process-steps'
 import { RequestHistory } from '@/components/shared/request-history'
-import { bscScanTxUrl } from '@/components/shared/bsc-tx-link'
+import { BscTxLink, bscScanTxUrl } from '@/components/shared/bsc-tx-link'
+import { SuccessReceipt } from '@/components/shared/success-receipt'
 import { useAuth } from '@/features/auth/auth-context'
 import { getDb, isFirebaseReady } from '@/lib/firebase'
 import { formatMinor, parseToMinor } from '@/lib/money'
@@ -53,9 +55,19 @@ async function fetchLockedWithdrawalAddress(uid: string): Promise<string | null>
   return raw ? raw.toLowerCase() : null
 }
 
+type WithdrawSuccess = {
+  amountMinor: number
+  destination: string
+  status: string
+  txHash: string | null
+}
+
 export function WithdrawalsPage() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
+  const previewSuccess = import.meta.env.DEV && searchParams.get('previewSuccess') === '1'
   const queryClient = useQueryClient()
+  const [success, setSuccess] = useState<WithdrawSuccess | null>(null)
   const form = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: { amount: '', destination: '', note: '' },
@@ -117,27 +129,24 @@ export function WithdrawalsPage() {
         destination,
         idempotencyKey: crypto.randomUUID(),
         note: values.note,
-      })
+      }).then((res) => ({
+        ...(res as { status?: string; txHash?: string | null }),
+        amountMinor: minor,
+        destination,
+      }))
     },
     onSuccess: async (res) => {
-      const data = res as { status?: string; txHash?: string | null }
-      if (data.status === 'completed' && data.txHash) {
-        const hash = data.txHash
-        toast.success('USDT sent on BSC', {
-          description: `${hash.slice(0, 12)}…, open BscScan`,
-          action: {
-            label: 'BscScan',
-            onClick: () => window.open(bscScanTxUrl(hash), '_blank', 'noopener,noreferrer'),
-          },
-        })
-      } else {
-        toast.success('Withdrawal queued', {
-          description: 'Hot wallet not ready — waiting for admin / funds.',
-        })
-      }
+      const status = res.status ?? 'processing'
+      const txHash = res.txHash ?? null
+      setSuccess({
+        amountMinor: res.amountMinor,
+        destination: res.destination,
+        status,
+        txHash,
+      })
       form.reset({
         amount: '',
-        destination: lockedAddress.data || destinationValue || '',
+        destination: lockedAddress.data || destinationValue || res.destination || '',
         note: '',
       })
       await Promise.all([
@@ -153,18 +162,78 @@ export function WithdrawalsPage() {
 
   const usdMoney = (minor: number) => formatMinor(minor, { scale: 2, currency: 'USD' })
 
+  if (success || previewSuccess) {
+    const shown =
+      success ??
+      ({
+        amountMinor: 5_000,
+        destination: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb1',
+        status: 'completed',
+        txHash: '0xabc123def4567890abc123def4567890abc123def4567890abc123def4567890',
+      } satisfies WithdrawSuccess)
+    const sent = shown.status === 'completed' && Boolean(shown.txHash)
+    const shortAddr = `${shown.destination.slice(0, 8)}…${shown.destination.slice(-6)}`
+    return (
+      <div className="mx-auto max-w-xl space-y-6">
+        <SuccessReceipt
+          title={sent ? 'Withdrawal successful' : 'Withdrawal submitted'}
+          amount={usdMoney(shown.amountMinor)}
+          subtitle={
+            sent
+              ? 'USDT has been sent to your wallet on BNB Smart Chain.'
+              : 'Your payout is being processed. You can track it in history below.'
+          }
+          details={[
+            { label: 'To', value: shortAddr },
+            { label: 'Status', value: sent ? 'Sent' : 'Processing' },
+            ...(shown.txHash
+              ? [
+                  {
+                    label: 'Transaction',
+                    value: <BscTxLink txHash={shown.txHash} compact />,
+                  },
+                ]
+              : []),
+          ]}
+          primaryAction={{
+            label: 'Done',
+            onClick: () => {
+              setSuccess(null)
+              if (previewSuccess) window.history.replaceState({}, '', '/app/withdrawals')
+            },
+          }}
+          secondaryAction={
+            shown.txHash
+              ? {
+                  label: 'View on BscScan',
+                  onClick: () =>
+                    window.open(bscScanTxUrl(shown.txHash!), '_blank', 'noopener,noreferrer'),
+                }
+              : {
+                  label: 'Withdraw again',
+                  onClick: () => {
+                    setSuccess(null)
+                    if (previewSuccess) window.history.replaceState({}, '', '/app/withdrawals')
+                  },
+                }
+          }
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-8">
       <PageHeader
         title="Withdraw USDT"
-        description="Enter amount and your BEP-20 wallet address. After your first successful withdrawal, that address is locked."
+        description="Send USDT from your Withdrawal Wallet to your own crypto address on BNB Smart Chain."
       />
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <Card>
           <CardHeader className="flex-row flex-wrap items-start justify-between gap-4">
             <div>
               <CardTitle>Send to wallet</CardTitle>
-              <CardDescription>Debits your Withdrawal Wallet in USDT (BEP-20 on BSC).</CardDescription>
+              <CardDescription>USDT on BNB Smart Chain (BEP-20).</CardDescription>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-line bg-canvas px-3.5 py-2">
               <Wallet className="size-4 text-accent" />
@@ -229,16 +298,16 @@ export function WithdrawalsPage() {
                 {addressLocked ? (
                   <Alert>
                     <Lock />
-                    <AlertTitle>Address locked</AlertTitle>
+                    <AlertTitle>Saved payout address</AlertTitle>
                     <AlertDescription>
-                      This payout address was saved after your first successful withdrawal. Only an
-                      admin can change it.
+                      For your security, withdrawals go to this address. Contact support if you need
+                      it updated.
                     </AlertDescription>
                   </Alert>
                 ) : (
                   <p className="text-xs text-ink-muted">
-                    First successful withdrawal saves this address to your profile. You will not be
-                    able to change it afterward.
+                    Double-check your address. After your first successful payout, this address is
+                    saved for future withdrawals.
                   </p>
                 )}
                 <Input
@@ -267,11 +336,11 @@ export function WithdrawalsPage() {
                   />
                 ) : null}
                 <SummaryRow
-                  label="Available after reserve"
+                  label="Left in Withdrawal Wallet"
                   value={usdMoney(Math.max(available - amountMinor, 0))}
                 />
                 <div className="border-t border-line" />
-                <SummaryRow strong label="You will receive (on-chain)" value={usdMoney(netMinor)} />
+                <SummaryRow strong label="You will receive" value={usdMoney(netMinor)} />
               </div>
               <Button
                 type="submit"
@@ -289,11 +358,17 @@ export function WithdrawalsPage() {
           title="How withdrawals work"
           image={images.phoneAndLaptop}
           steps={[
-            { title: 'Reserve', body: 'Amount is reserved in your Withdrawal Wallet.' },
-            { title: 'On-chain send', body: 'Hot wallet transfers USDT BEP-20 to your address.' },
             {
-              title: 'Address locked',
-              body: 'After the first success, that wallet is saved and only an admin can change it.',
+              title: 'Request',
+              body: 'Enter the amount and your USDT wallet address, then confirm.',
+            },
+            {
+              title: 'We send USDT',
+              body: 'Your payout is sent to that address on BNB Smart Chain.',
+            },
+            {
+              title: 'Track it',
+              body: 'Status appears in your withdrawal history. First payout saves your address for next time.',
             },
           ]}
         />

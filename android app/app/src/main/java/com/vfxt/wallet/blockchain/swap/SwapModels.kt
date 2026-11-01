@@ -17,7 +17,17 @@ data class SwapToken(
     val priceUsd: BigDecimal? = null,
     /** True when LI.FI's security screening marked it verified, or it comes from the wallet's own list. */
     val verified: Boolean = true,
+    /** Logo from the aggregator list; only shown if on a trusted host. */
+    val listLogoUrl: String? = null,
 ) {
+    /**
+     * Aggregator logo when it's on a trusted host (CoinGecko), otherwise Trust Wallet artwork keyed by
+     * contract address. Both are address-bound, so a look-alike token never inherits a real logo.
+     */
+    val logoUrl: String? get() =
+        com.vfxt.wallet.core.common.TokenLogos.trusted(listLogoUrl)
+            ?: com.vfxt.wallet.core.common.TokenLogos.token(chainId, address)
+
     val isNative: Boolean get() = address.equals(NATIVE_TOKEN_ADDRESS, ignoreCase = true)
     val key: String get() = "$chainId:${address.lowercase()}"
 }

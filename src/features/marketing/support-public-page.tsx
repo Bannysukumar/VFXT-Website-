@@ -10,9 +10,18 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ParallaxImage, Reveal } from '@/components/motion/reveal'
-import { Faq, MarketingHero, SectionHeading, StatsBand } from '@/features/marketing/marketing-hero'
-import { commonFaqs } from '@/features/marketing/content'
-import { images } from '@/lib/media'
+import {
+  CinematicBand,
+  CtaBand,
+  Faq,
+  MarketingHero,
+  SectionHeading,
+  StatsBand,
+  StorySplit,
+} from '@/features/marketing/marketing-hero'
+import { commonFaqs, miningFaqs, walletFaqs } from '@/features/marketing/content'
+import { PhonePair, PhoneTrio } from '@/features/marketing/phone-mockup'
+import { images, videos } from '@/lib/media'
 
 const options = [
   {
@@ -41,14 +50,34 @@ const options = [
   },
 ]
 
+const topics = [
+  'Deposit status and references',
+  'Daily income / stake timing',
+  'Transfers between wallets or members',
+  'Withdrawal address updates',
+  'Login and password recovery',
+  'Android wallet install help',
+  'Mining sessions and claims',
+  'Lost recovery phrase (we cannot restore keys)',
+]
+
+const helpGuides = [
+  { to: '/wallet', title: 'Wallet guide', body: 'Self-custody features, networks, swaps, and device security.' },
+  { to: '/mining', title: 'Mining guide', body: 'Sessions, rewards, boosters, and how mining differs from stakes.' },
+  { to: '/download', title: 'Official APK', body: 'Download only from this site. Never trust sideloaded copies.' },
+  { to: '/security', title: 'Security model', body: 'How the web ledger stays server-authoritative.' },
+]
+
 export function SupportPublicPage() {
   return (
     <>
       <MarketingHero
         eyebrow="Support centre"
         title="How can we help you today?"
-        description="Find the fastest route to an answer, or reach our support team directly from your dashboard."
+        description="Find the fastest route to an answer — tickets for account issues, password reset for access, and FAQs covering deposits, stakes, transfers, withdrawals, and the Android wallet."
+        video={videos.deskActivity}
         poster={images.workingLaptop}
+        aside={<PhonePair front="home" back="mining" />}
       >
         <div className="mt-10 flex flex-wrap gap-3">
           <Button size="lg" variant="accent" asChild>
@@ -101,6 +130,21 @@ export function SupportPublicPage() {
           { value: 24, suffix: '/7', label: 'Ticket submission' },
         ]}
       />
+
+      <CinematicBand
+        title="Account help without leaving VFXT"
+        description="Support tickets live inside your signed-in dashboard so we can see the right context — without asking you to paste passwords or private keys into email."
+        video={videos.cityNight}
+        poster={images.supportDesk}
+        points={[
+          'Open → In progress → Resolved',
+          'Dedicated support admins',
+          'Never share passwords or seeds',
+          'Contact form for general topics',
+        ]}
+        cta={{ to: '/contact', label: 'Contact the team' }}
+      />
+
       <section className="border-b border-line bg-panel">
         <div className="container-page grid items-center gap-16 py-24 lg:grid-cols-2">
           <Reveal>
@@ -130,12 +174,71 @@ export function SupportPublicPage() {
         </div>
       </section>
 
-      <section id="faq" className="container-page scroll-mt-20 py-24">
-        <SectionHeading eyebrow="FAQ" title="Frequently asked questions" />
-        <Reveal delay={0.1} className="mx-auto mt-12 max-w-3xl">
-          <Faq items={commonFaqs} />
-        </Reveal>
+      <StorySplit
+        reverse
+        title="Common topics we help with"
+        description="Most questions fall into a few clear buckets. Start with the FAQ — if you need a human, open a ticket with your User ID and what you already tried."
+        video={videos.workstation}
+        poster={images.workingLaptop}
+        bullets={topics}
+        cta={{ to: '/app/support', label: 'Open a ticket' }}
+      />
+
+      <section className="border-y border-line bg-panel py-16">
+        <div className="container-page">
+          <PhoneTrio screens={['security', 'receive', 'assets']} />
+        </div>
       </section>
+
+      <section className="container-page py-20">
+        <SectionHeading
+          eyebrow="Guides"
+          title="Browse product guides before you open a ticket"
+          description="Many questions are already answered on the public pages for the Android wallet and mining tab."
+        />
+        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {helpGuides.map(({ to, title, body }, i) => (
+            <Reveal key={to} delay={i * 0.05}>
+              <Link
+                to={to}
+                className="flex h-full flex-col rounded-3xl border border-line bg-panel p-6 transition-[transform,border-color] duration-300 hover:-translate-y-1 hover:border-accent/40"
+              >
+                <h3 className="font-semibold">{title}</h3>
+                <p className="mt-2 flex-1 text-sm text-ink-muted">{body}</p>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-accent">
+                  Open
+                  <ArrowRight className="size-4" />
+                </span>
+              </Link>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      <section id="faq" className="container-page scroll-mt-20 py-24">
+        <SectionHeading eyebrow="FAQ" title="Platform, wallet, and mining questions" />
+        <div className="mx-auto mt-12 grid max-w-5xl gap-10 lg:grid-cols-1">
+          <Reveal delay={0.05}>
+            <p className="mb-4 text-sm font-semibold text-ink">Platform</p>
+            <Faq items={commonFaqs} />
+          </Reveal>
+          <Reveal delay={0.1}>
+            <p className="mb-4 text-sm font-semibold text-ink">VFXT Wallet</p>
+            <Faq items={walletFaqs} />
+          </Reveal>
+          <Reveal delay={0.15}>
+            <p className="mb-4 text-sm font-semibold text-ink">Mining</p>
+            <Faq items={miningFaqs} />
+          </Reveal>
+        </div>
+      </section>
+
+      <CtaBand
+        title="Still stuck? We are one ticket away"
+        description="Create or sign in to your account, open Support, and describe what you need — we will take it from there."
+        video={videos.skylinePan}
+        poster={images.officeTalk}
+      />
     </>
   )
 }

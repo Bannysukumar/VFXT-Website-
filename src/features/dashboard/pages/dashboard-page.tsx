@@ -14,9 +14,9 @@ import {
   Circle,
   Clock,
   Copy,
-  LifeBuoy,
   Link2,
   Lock,
+  PiggyBank,
   Receipt,
   Wallet,
 } from 'lucide-react'
@@ -157,15 +157,19 @@ export function DashboardPage() {
             )}
             <p className="mt-2 flex items-center gap-2 text-sm text-white/60">
               <Lock className="size-3.5" />
-              {primary ? `${money(primary.reservedMinor)} reserved` : 'Wallet not yet provisioned'}
+              {primary
+                ? primary.reservedMinor > 0
+                  ? `${money(primary.reservedMinor)} on hold`
+                  : 'Ready to use'
+                : 'Wallet not ready yet'}
             </p>
           </div>
           <div className="grid w-full grid-cols-4 gap-2 sm:w-auto sm:gap-3">
             {[
               { to: '/app/deposits', label: 'Deposit', icon: ArrowDownToLine, primary: true },
+              { to: '/app/staking', label: 'Stake', icon: PiggyBank },
+              { to: '/app/transfer', label: 'Transfer', icon: ArrowRight },
               { to: '/app/withdrawals', label: 'Withdraw', icon: ArrowUpFromLine },
-              { to: '/app/wallets', label: 'Wallets', icon: Wallet },
-              { to: '/app/support', label: 'Support', icon: LifeBuoy },
             ].map(({ to, label, icon: Icon, primary: isPrimary }) => (
               <Link
                 key={to}
@@ -249,7 +253,7 @@ export function DashboardPage() {
         ) : (
           <>
             <StatCard index={0} label="Available" icon={Wallet} value={primary ? primary.availableMinor : '—'} format={money} hint={primary ? `${primary.currency} wallet` : 'No wallet yet'} />
-            <StatCard index={1} label="Reserved" icon={Lock} tone="warning" value={primary ? primary.reservedMinor : '—'} format={money} hint="Held for in-flight withdrawals" />
+            <StatCard index={1} label="Pending hold" icon={Lock} tone="warning" value={primary ? primary.reservedMinor : '—'} format={money} hint="Held while a withdrawal is processing" />
             <StatCard index={2} label="Pending requests" icon={Clock} tone="info" value={pending.length} hint="Awaiting admin review" />
             <StatCard index={3} label="Ledger entries" icon={Receipt} tone="neutral" value={ledger.length} hint="Most recent 30 loaded" />
           </>

@@ -72,6 +72,8 @@ import com.vfxt.wallet.core.designsystem.components.PillTone
 import com.vfxt.wallet.core.designsystem.components.SkeletonListRow
 import com.vfxt.wallet.core.designsystem.components.StatusPill
 import com.vfxt.wallet.core.designsystem.components.TokenIcon
+import com.vfxt.wallet.core.designsystem.components.NetworkIcon
+import com.vfxt.wallet.core.common.TokenLogos
 import com.vfxt.wallet.core.designsystem.components.VfxtBottomSheet
 import com.vfxt.wallet.core.designsystem.components.VfxtCard
 import com.vfxt.wallet.core.designsystem.components.VfxtPrimaryButton
@@ -395,7 +397,7 @@ fun TokenDetailsScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(Spacing.lg))
-            TokenIcon(token.symbol, size = 72.dp)
+            TokenIcon(token.symbol, size = 72.dp, logoUrl = token.logoUrl)
             Spacer(Modifier.height(Spacing.md))
             Text(
                 holding.rawBalance?.let { "${Formatters.tokenAmount(it, token.decimals, 8)} ${token.symbol}" } ?: "Balance unavailable",
@@ -503,7 +505,7 @@ fun AddTokenScreen(onBack: () -> Unit, viewModel: AddTokenViewModel = hiltViewMo
                 state.preview?.let { token ->
                     VfxtCard(Modifier.fillMaxWidth()) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            TokenIcon(token.symbol, size = 40.dp)
+                            TokenIcon(token.symbol, size = 40.dp, logoUrl = TokenLogos.token(token.networkId, token.contract))
                             Spacer(Modifier.width(Spacing.md))
                             Column {
                                 Text(token.symbol, style = MaterialTheme.typography.titleMedium, color = colors.textPrimary)
@@ -633,7 +635,7 @@ private fun NetworkRow(
             .padding(Spacing.lg),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TokenIcon(network.nativeSymbol.removePrefix("t"), size = 40.dp)
+        NetworkIcon(network, size = 40.dp)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f)) {
             Text(network.name, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)

@@ -28,7 +28,6 @@ import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
@@ -75,11 +74,12 @@ fun ProfileScreen(
     onPrivacy: () -> Unit = {},
     onTerms: () -> Unit = {},
     onWalletConnect: () -> Unit = {},
+    onCurrency: () -> Unit = {},
+    onSessions: () -> Unit = {},
     onNotify: (String) -> Unit,
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     val profile by viewModel.state.collectAsStateWithLifecycle()
-    val later = { onNotify("Coming in a later update.") }
     val needsWallet = { onNotify("Create or import a wallet first.") }
     val hasWallet = profile.activeAccount != null
     val walletOnly = { action: () -> Unit -> if (hasWallet) action() else needsWallet() }
@@ -114,7 +114,7 @@ fun ProfileScreen(
             SettingsGroup("Security") {
                 SettingsRow(Icons.Outlined.Pin, "PIN, biometrics & auto-lock", onClick = { walletOnly(onSecurity) })
                 RowDivider()
-                SettingsRow(Icons.Outlined.Devices, "Active sessions", subtitle = "Available with account sign-in", onClick = later)
+                SettingsRow(Icons.Outlined.Devices, "Active sessions", subtitle = "This device and connected dApps", onClick = onSessions)
             }
 
             SettingsGroup("Preferences") {
@@ -125,9 +125,7 @@ fun ProfileScreen(
                     onCheckedChange = { onThemeModeChange(if (it) ThemeMode.Dark else ThemeMode.Light) },
                 )
                 RowDivider()
-                SettingsRow(Icons.Outlined.Language, "Language", value = "English", onClick = later)
-                RowDivider()
-                SettingsRow(Icons.Outlined.AttachMoney, "Currency", value = "USD", onClick = later)
+                SettingsRow(Icons.Outlined.AttachMoney, "Currency", value = com.vfxt.wallet.core.common.FiatDisplay.selected.code, onClick = onCurrency)
                 RowDivider()
                 SettingsRow(Icons.Outlined.Notifications, "Notifications", onClick = onNotifications)
                 RowDivider()

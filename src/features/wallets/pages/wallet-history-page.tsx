@@ -6,6 +6,7 @@ import { ArrowDownLeft, ArrowLeft, ArrowUpRight, Receipt } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Table, TBody, TD, TH, THead, TR } from '@/components/ui/table'
+import { PageHeader } from '@/components/shared/page-header'
 import { LoadingState } from '@/components/shared/loading-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { EmptyState } from '@/components/shared/empty-state'
@@ -105,8 +106,8 @@ export function WalletHistoryPage() {
   const withdrawalRows = withdrawalsQuery.data ?? []
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="mx-auto max-w-4xl space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Button variant="ghost" size="sm" asChild className="-ml-2 mb-2">
             <Link to="/app/wallets" className="no-underline">
@@ -114,16 +115,18 @@ export function WalletHistoryPage() {
               All wallets
             </Link>
           </Button>
-          <h1 className="text-4xl">{meta.label} history</h1>
-          <p className="text-ink-muted">{meta.description}</p>
+          <PageHeader title={meta.label} description={meta.description} />
         </div>
         <div className="rounded-2xl border border-line bg-panel px-4 py-3 text-right">
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">Available</p>
-          <p className="tabular font-display text-2xl font-bold text-ink">
-            {wallet
-              ? formatAmount(wallet.availableMinor, meta.currency, scale)
-              : '—'}
+          <p className="text-xs text-ink-muted">Available now</p>
+          <p className="tabular text-2xl font-bold text-ink">
+            {wallet ? formatAmount(wallet.availableMinor, meta.currency, scale) : '—'}
           </p>
+          {wallet && wallet.reservedMinor > 0 ? (
+            <p className="mt-1 text-xs text-ink-muted">
+              On hold {formatAmount(wallet.reservedMinor, meta.currency, scale)}
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -11,11 +11,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input, NativeSelect, Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { FieldError } from '@/components/shared/page-header'
+import { FieldError, PageHeader } from '@/components/shared/page-header'
 import { useAuth } from '@/features/auth/auth-context'
 import { getDb, isFirebaseReady } from '@/lib/firebase'
-import { images } from '@/lib/media'
-import { TypeText } from '@/components/motion/typing'
 import { fetchMyTickets } from '@/services/records-service'
 import type { SupportTicket } from '@/types/models'
 
@@ -81,18 +79,11 @@ export function SupportPage() {
   })
 
   return (
-    <div className="space-y-8">
-      <section className="relative isolate overflow-hidden rounded-3xl bg-brand p-8 text-white">
-        <img src={images.supportDesk} alt="" className="absolute inset-0 -z-10 size-full object-cover opacity-35" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-brand via-brand/90 to-brand/30" />
-        <p className="text-xs font-semiboldr text-accent-bright">Support centre</p>
-        <h1 className="mt-2 text-3xl font-bold text-white">
-          <TypeText text="How can we help?" speed={45} delay={250} />
-        </h1>
-        <p className="mt-2 max-w-lg text-white/70">
-          Open a ticket and follow its progress here. Status changes are made by our support admins.
-        </p>
-      </section>
+    <div className="mx-auto max-w-3xl space-y-8">
+      <PageHeader
+        title="Support"
+        description="Open a ticket for deposits, withdrawals, or account help. Track status below — we never ask for your password."
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <Card>

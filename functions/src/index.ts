@@ -138,6 +138,11 @@ export {
   verifyWalletAppLogin,
 } from './modules/mining/wallet-app-auth';
 export {
+  registerWalletDevice,
+  listWalletDevices,
+  signOutOtherWalletDevices,
+} from './modules/mining/wallet-app-devices';
+export {
   getMiningConfigPublic,
   miningStatus,
   miningStart,

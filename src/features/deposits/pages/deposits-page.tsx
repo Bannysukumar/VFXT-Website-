@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { QRCodeSVG } from 'qrcode.react'
-import { CheckCircle2, Copy, Loader2, ShieldCheck, Wallet } from 'lucide-react'
+import { Copy, Loader2, ShieldCheck, Wallet } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -15,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { FieldError, PageHeader } from '@/components/shared/page-header'
 import { AmountInputPrefix, ProcessSteps, SummaryRow } from '@/components/shared/process-steps'
 import { RequestHistory } from '@/components/shared/request-history'
+import { SuccessReceipt } from '@/components/shared/success-receipt'
 import { useAuth } from '@/features/auth/auth-context'
 import { parseToMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
@@ -71,6 +73,9 @@ function toPayParams(active: CreateDepositResult): CryptoPayParams | null {
 
 export function DepositsPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const previewSuccess = import.meta.env.DEV && searchParams.get('previewSuccess') === '1'
   const queryClient = useQueryClient()
   const [active, setActive] = useState<CreateDepositResult | null>(null)
   const [payStatus, setPayStatus] = useState<string>('awaiting_payment')
@@ -156,7 +161,6 @@ export function DepositsPage() {
         )
         setPayStatus(res.status)
         if (res.status === 'completed') {
-          toast.success('Payment successful — USD + VFXT credited (ready to stake)')
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['wallets'] }),
             queryClient.invalidateQueries({ queryKey: ['ledger'] }),
@@ -226,26 +230,58 @@ export function DepositsPage() {
         description="Enter an amount, open your wallet (or scan the QR), send USDT on BNB Smart Chain (BEP-20). We verify the transfer and credit your Fund Wallet automatically."
       />
 
-      {active?.depositAddress && payStatus === 'completed' ? (
-        <Card className="overflow-hidden border-success/30 bg-gradient-to-b from-success/10 to-panel">
-          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-            <div className="grid size-24 place-items-center rounded-full bg-success/15 text-success">
-              <CheckCircle2 className="size-14" />
-            </div>
-            <div className="space-y-1">
-              <h2 className="font-display text-2xl font-bold text-ink">Payment successful</h2>
-              <p className="text-ink-muted">
-                {active.amountUsdt} USDT credited
-                {openedWallet ? ` via ${openedWallet}` : ''}. Fund Wallet updated and{' '}
-                {usdCentsToVfxtTokens(active.amountMinor, tokensPerUsd).toLocaleString()} VFXT added.
-                You can stake now.
-              </p>
-            </div>
-            <Button size="lg" onClick={() => setActive(null)}>
-              Make another deposit
-            </Button>
-          </CardContent>
-        </Card>
+      {(previewSuccess || (active?.depositAddress && payStatus === 'completed')) ? (
+        <div className="mx-auto max-w-xl space-y-4">
+          <SuccessReceipt
+            title="Payment successful"
+            amount={
+              previewSuccess
+                ? '100.00 USDT'
+                : `${active!.amountUsdt} USDT`
+            }
+            subtitle={
+              previewSuccess
+                ? 'Fund Wallet credited — you can stake now.'
+                : openedWallet
+                  ? `Paid via ${openedWallet}. Fund Wallet credited — you can stake now.`
+                  : 'Fund Wallet credited — you can stake now.'
+            }
+            details={[
+              {
+                label: 'VFXT credited',
+                value: `${usdCentsToVfxtTokens(
+                  previewSuccess ? 10_000 : active!.amountMinor,
+                  tokensPerUsd,
+                ).toLocaleString()} VFXT`,
+              },
+              {
+                label: 'Network',
+                value: previewSuccess ? 'BNB Smart Chain' : active!.network || 'BNB Smart Chain',
+              },
+            ]}
+            primaryAction={{
+              label: 'Stake now',
+              onClick: () => {
+                setActive(null)
+                navigate(previewSuccess ? '/app/staking?previewSuccess=1' : '/app/staking')
+              },
+            }}
+            secondaryAction={{
+              label: 'Make another deposit',
+              onClick: () => {
+                if (previewSuccess) navigate('/app/deposits')
+                else setActive(null)
+              },
+            }}
+          />
+          <p className="text-center text-sm text-ink-muted">
+            Or go to{' '}
+            <Link to="/app/wallets" className="font-medium text-accent underline-offset-2 hover:underline">
+              Wallets
+            </Link>{' '}
+            to see balances.
+          </p>
+        </div>
       ) : null}
 
       {active?.depositAddress && payStatus !== 'completed' ? (

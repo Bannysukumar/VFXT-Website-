@@ -180,7 +180,15 @@ fun AppNavigation(
                 onPrivacy = { navController.navigate(RootRoute.PrivacyPolicy) },
                 onTerms = { navController.navigate(RootRoute.Terms) },
                 onWalletConnect = { navController.navigate(RootRoute.WalletConnect) },
+                onCurrency = { navController.navigate(RootRoute.Currency) },
+                onSessions = { navController.navigate(RootRoute.Sessions) },
             )
+        }
+        composable<RootRoute.Currency> {
+            com.vfxt.wallet.ui.profile.CurrencyScreen(onBack = { navController.popBackStack() })
+        }
+        composable<RootRoute.Sessions> {
+            com.vfxt.wallet.ui.profile.SessionsScreen(onBack = { navController.popBackStack() })
         }
         composable<RootRoute.Send> {
             SendScreen(

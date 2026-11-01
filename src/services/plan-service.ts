@@ -13,6 +13,8 @@ export interface StakingPosition {
   workingAccount: boolean
   capMinor: number
   createdAt: string
+  lastYieldAt?: string | null
+  nextYieldAt?: string | null
   maturesAt?: string | null
 }
 

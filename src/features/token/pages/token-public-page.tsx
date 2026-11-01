@@ -19,8 +19,9 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared/page-header'
 import { LogoMark } from '@/components/shared/logo'
-import { ParallaxImage, Reveal } from '@/components/motion/reveal'
+import { Reveal } from '@/components/motion/reveal'
 import { CtaBand, MarketingHero, SectionHeading, StatsBand } from '@/features/marketing/marketing-hero'
+import { PhoneShowcaseBand, WalletPhone } from '@/features/marketing/phone-mockup'
 import { CountUp } from '@/components/motion/reveal'
 import { env } from '@/lib/env'
 import { images, videos } from '@/lib/media'
@@ -28,7 +29,7 @@ import { images, videos } from '@/lib/media'
 function buildRoadmap(contractConfigured: boolean, blockchainEnabled: boolean) {
   return [
     { label: 'ERC-20 contract written and unit tested', done: true },
-    { label: 'Off-chain ledger and settlement via Cloud Functions', done: true },
+    { label: 'App balances settle securely on the platform', done: true },
     { label: 'Chain ID and contract address configured', done: contractConfigured },
     { label: 'Contract verification and execution model review', done: contractConfigured },
     { label: 'On-chain settlement enabled', done: blockchainEnabled },
@@ -204,7 +205,7 @@ function Utilities({ compact = false }: { compact?: boolean }) {
 }
 
 const intro =
-  'VFXTToken is live on BNB Smart Chain as a fixed-supply BEP-20. App balances still settle off-chain until full on-chain settlement is enabled.'
+  'VFXTToken is live on BNB Smart Chain as a fixed-supply BEP-20 token.'
 
 export function TokenPublicPage() {
   const inApp = useLocation().pathname.startsWith('/app')
@@ -249,6 +250,12 @@ export function TokenPublicPage() {
           <TokenDetails />
         </Reveal>
       </section>
+      <PhoneShowcaseBand
+        title="Hold VFXT in the Android wallet"
+        description="Add the BEP-20 token on BNB Smart Chain, track it in Assets, and send or swap when you are ready."
+        screens={['assets', 'home', 'send']}
+      />
+
       <section className="border-y border-line bg-panel">
         <div className="container-page grid items-center gap-16 py-24 sm:py-32 lg:grid-cols-2">
           <div>
@@ -261,8 +268,9 @@ export function TokenPublicPage() {
             />
             <Utilities />
           </div>
-          <Reveal delay={0.1}>
-            <ParallaxImage src={images.blockchain} alt="Blockchain network illustration" className="aspect-[4/5] rounded-3xl shadow-lift" />
+          <Reveal delay={0.1} className="relative mx-auto">
+            <WalletPhone screen="assets" float />
+            <div className="pointer-events-none absolute -inset-10 -z-10 rounded-full bg-accent/15 blur-3xl" />
           </Reveal>
         </div>
       </section>

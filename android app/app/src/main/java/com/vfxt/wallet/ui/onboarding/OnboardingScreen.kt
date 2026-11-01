@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.vfxt.wallet.core.designsystem.components.TokenIcon
+import com.vfxt.wallet.core.common.TokenLogos
 import com.vfxt.wallet.core.designsystem.components.VfxtLogoMark
 import com.vfxt.wallet.core.designsystem.components.VfxtPrimaryButton
 import com.vfxt.wallet.core.designsystem.components.VfxtSecondaryButton
@@ -210,6 +211,12 @@ private fun PageIndicator(count: Int, current: Int, modifier: Modifier = Modifie
 
 // --- Illustrations -------------------------------------------------------------------------
 
+private fun onboardingLogo(symbol: String): String? = when (symbol) {
+    "BNB" -> TokenLogos.network(56)
+    "USDT" -> TokenLogos.token(56, "0x55d398326f99059fF775485246999027B3197955")
+    else -> null
+}
+
 @Composable
 private fun rememberSlowRotation(durationMs: Int = 24000): Float {
     val transition = rememberInfiniteTransition(label = "orbit")
@@ -253,7 +260,7 @@ private fun WelcomeIllustration() {
                         .align(Alignment.Center)
                         .offset(x = (129 * kotlin.math.cos(rad)).dp, y = (129 * kotlin.math.sin(rad)).dp)
                         .rotate(-angle),
-                ) { TokenIcon(symbol, size = 40.dp) }
+                ) { TokenIcon(symbol, size = 40.dp, logoUrl = onboardingLogo(symbol)) }
             }
         }
     }
@@ -345,7 +352,7 @@ private fun AssetsIllustration() {
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        TokenIcon(symbol, size = 34.dp)
+                        TokenIcon(symbol, size = 34.dp, logoUrl = onboardingLogo(symbol))
                         Spacer(Modifier.width(10.dp))
                         Column(Modifier.weight(1f)) {
                             Text(symbol, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)

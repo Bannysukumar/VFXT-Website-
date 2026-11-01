@@ -48,6 +48,8 @@ import { SecurityPage } from '@/features/marketing/security-page'
 import { ContactPage } from '@/features/marketing/contact-page'
 import { PrivacyPage, RiskDisclosurePage, TermsPage } from '@/features/marketing/legal-page'
 import { DownloadPage } from '@/features/marketing/download-page'
+import { WalletPage } from '@/features/marketing/wallet-page'
+import { MiningPage } from '@/features/marketing/mining-page'
 import { AdminWalletApkPage } from '@/features/admin/pages/admin-wallet-apk-page'
 
 export const router = createBrowserRouter([
@@ -61,6 +63,8 @@ export const router = createBrowserRouter([
       { path: 'support', element: <SupportPublicPage /> },
       { path: 'security', element: <SecurityPage /> },
       { path: 'download', element: <DownloadPage /> },
+      { path: 'wallet', element: <WalletPage /> },
+      { path: 'mining', element: <MiningPage /> },
       { path: 'contact', element: <ContactPage /> },
       { path: 'legal/terms', element: <TermsPage /> },
       { path: 'legal/privacy', element: <PrivacyPage /> },

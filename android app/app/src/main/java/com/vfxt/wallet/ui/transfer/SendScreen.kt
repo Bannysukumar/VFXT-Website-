@@ -189,7 +189,7 @@ private fun EditStep(state: SendUiState, viewModel: SendViewModel) {
                     .padding(Spacing.md),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                state.token?.let { TokenIcon(it.symbol, size = 36.dp) }
+                state.token?.let { TokenIcon(it.symbol, size = 36.dp, logoUrl = it.logoUrl) }
                 Spacer(Modifier.width(Spacing.md))
                 Column(Modifier.weight(1f)) {
                     Text(state.token?.symbol ?: "Select", style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)
@@ -288,7 +288,7 @@ private fun ReviewStep(state: SendUiState, onConfirm: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(Modifier.height(Spacing.lg))
-            TokenIcon(quote.token.symbol, size = 64.dp)
+            TokenIcon(quote.token.symbol, size = 64.dp, logoUrl = quote.token.logoUrl)
             Spacer(Modifier.height(Spacing.md))
             Text(
                 "${Formatters.tokenAmount(quote.amount, 8)} ${quote.token.symbol}",
@@ -422,7 +422,7 @@ private fun TokenPickerSheet(tokens: List<TokenInfo>, onPick: (TokenInfo) -> Uni
                     .padding(vertical = Spacing.md, horizontal = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                TokenIcon(token.symbol, size = 36.dp)
+                TokenIcon(token.symbol, size = 36.dp, logoUrl = token.logoUrl)
                 Spacer(Modifier.width(Spacing.md))
                 Column {
                     Text(token.symbol, style = MaterialTheme.typography.titleSmall, color = colors.textPrimary)

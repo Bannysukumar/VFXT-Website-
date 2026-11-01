@@ -23,6 +23,13 @@ data class TokenInfo(
      */
     val key: String get() = contractAddress?.lowercase() ?: if (kind == TokenKind.Native) "native" else "pending:${symbol.lowercase()}"
 
+    /** Verified logo (Trust Wallet assets, keyed by contract address); null when none is known. */
+    val logoUrl: String? get() = when {
+        kind == TokenKind.Native -> com.vfxt.wallet.core.common.TokenLogos.token(networkId, null)
+        contractAddress != null -> com.vfxt.wallet.core.common.TokenLogos.token(networkId, contractAddress)
+        else -> null
+    }
+
     /** A BEP-20 entry without a configured contract can't be queried or sent. */
     val isAvailable: Boolean get() = kind == TokenKind.Native || contractAddress != null
 }

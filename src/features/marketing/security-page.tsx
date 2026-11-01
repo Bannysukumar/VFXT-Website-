@@ -20,8 +20,17 @@ import {
   XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { VideoBackground } from '@/components/motion/video-background'
 import { ParallaxImage, Reveal } from '@/components/motion/reveal'
-import { MarketingHero, SectionHeading, StatsBand } from '@/features/marketing/marketing-hero'
+import {
+  CinematicBand,
+  CtaBand,
+  MarketingHero,
+  SectionHeading,
+  StatsBand,
+  StorySplit,
+} from '@/features/marketing/marketing-hero'
+import { PhonePair, WalletPhone } from '@/features/marketing/phone-mockup'
 import { images, videos } from '@/lib/media'
 import { cn } from '@/lib/utils'
 
@@ -177,6 +186,7 @@ export function SecurityPage() {
         description="Here is exactly how VFXT protects balances: who is allowed to change them, how every request is reviewed, and how every privileged action is recorded."
         video={videos.marketCloseUp}
         poster={images.candlesticks}
+        aside={<PhonePair front="security" back="home" />}
       >
         <div className="mt-10 flex flex-wrap gap-3">
           <Button size="lg" variant="accent" asChild>
@@ -197,6 +207,19 @@ export function SecurityPage() {
           { value: 5, label: 'Least-privilege admin roles' },
           { value: 0, label: 'Client writes to balances' },
           { value: 100, suffix: '%', label: 'Privileged actions audited' },
+        ]}
+      />
+
+      <CinematicBand
+        title="Trust the server, not the screen"
+        description="Balances you see in the app are a projection of server state. Changing what renders in the browser cannot invent credits, skip reservations, or approve a withdrawal."
+        video={videos.dataPulse}
+        poster={images.blockchain}
+        points={[
+          'Firestore rules block client wallet writes',
+          'Cloud Functions own every money move',
+          'App Check rejects forged clients',
+          'Audit log is append-only',
         ]}
       />
 
@@ -308,11 +331,28 @@ export function SecurityPage() {
         </div>
       </section>
 
+      <StorySplit
+        title="Deposits and withdrawals are reviewed state machines"
+        description="Nothing jumps from requested to completed. Each transition is validated server-side, and illegal jumps are refused — even for admins with the wrong role."
+        video={videos.workstation}
+        poster={images.analyticsLaptop}
+        bullets={[
+          'Deposits credit only after finance approval.',
+          'Withdrawals reserve first so balances cannot be double-spent.',
+          'Rejected withdrawals release reserved funds back to available.',
+          'Every transition leaves a ledger and audit trail.',
+        ]}
+        cta={{ to: '/auth/register', label: 'Create a protected account' }}
+      />
+
       {/* Roles matrix */}
       <section className="relative isolate overflow-hidden bg-brand py-24 text-white sm:py-32">
-        <img src={images.skyscrapers} alt="" className="absolute inset-0 -z-10 size-full object-cover opacity-15" />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-b from-brand via-brand/95 to-brand" />
-        <div className="container-page">
+        <VideoBackground
+          src={videos.cityNight}
+          poster={images.skyscrapers}
+          overlayClassName="bg-gradient-to-b from-brand via-brand/92 to-brand"
+        />
+        <div className="container-page relative">
           <SectionHeading
             inverted
             eyebrow="Least privilege"
@@ -396,7 +436,7 @@ export function SecurityPage() {
       </section>
 
       {/* Responsible disclosure */}
-      <section className="container-page pb-24">
+      <section className="container-page pb-16">
         <Reveal className="flex flex-col items-start justify-between gap-6 rounded-3xl border border-line bg-panel p-8 shadow-card sm:flex-row sm:items-center sm:p-10">
           <div className="flex gap-5">
             <span className="grid size-14 shrink-0 place-items-center rounded-2xl bg-warning/10 text-warning">
@@ -418,6 +458,51 @@ export function SecurityPage() {
           </Button>
         </Reveal>
       </section>
+
+      <section className="overflow-hidden border-y border-line bg-panel">
+        <div className="container-page grid items-center gap-12 py-20 sm:py-28 lg:grid-cols-2">
+          <div className="relative mx-auto">
+            <WalletPhone screen="security" float />
+            <div className="pointer-events-none absolute -inset-12 -z-10 rounded-full bg-accent/10 blur-3xl" />
+          </div>
+          <div>
+            <SectionHeading
+              align="left"
+              eyebrow="On-device custody"
+              title="Android wallet security is a different layer"
+              description="Self-custody keys never touch the web ledger. VFXT Wallet encrypts phrases on device, blocks screenshots on secret screens, and requires PIN or biometrics before sensitive actions."
+            />
+            <Reveal delay={0.08}>
+              <ul className="mt-8 space-y-3">
+                {[
+                  'Android Keystore–backed vault; app backup disabled.',
+                  'BIP-39 create/verify and import flows.',
+                  'Auto-lock intervals and Lock now.',
+                  'WalletConnect signing always needs your explicit review.',
+                ].map((item) => (
+                  <li key={item} className="flex gap-3 text-sm leading-relaxed text-ink-muted">
+                    <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button asChild size="lg" className="mt-10">
+                <Link to="/wallet">
+                  Wallet security details
+                  <ArrowRight />
+                </Link>
+              </Button>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      <CtaBand
+        title="Open an account on rails you can inspect"
+        description="Email verification, server-side balances, and audited admin actions — before you move a single unit."
+        video={videos.floatingIndicators}
+        poster={images.tradingChartDark}
+      />
     </>
   )
 }

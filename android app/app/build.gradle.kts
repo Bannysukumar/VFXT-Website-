@@ -136,6 +136,8 @@ dependencies {
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.okhttp)
+    implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
     implementation(libs.zxing.core)
     implementation(libs.play.services.code.scanner)
 
@@ -144,6 +146,11 @@ dependencies {
     implementation(libs.firebase.functions)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
+
+    // WalletConnect v2 (Reown WalletKit): pairing and relay only; all signing stays in-app.
+    implementation(platform(libs.reown.bom))
+    implementation(libs.reown.core)
+    implementation(libs.reown.walletkit)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)

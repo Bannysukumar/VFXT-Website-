@@ -12,6 +12,8 @@ import { getPublicPlatformSettings } from '@/services/platform-service'
 
 const links = [
   { to: '/about', label: 'About' },
+  { to: '/wallet', label: 'Wallet' },
+  { to: '/mining', label: 'Mining' },
   { to: '/security', label: 'Security' },
   { to: '/token', label: 'Token' },
   { to: '/download', label: 'Download' },
@@ -30,17 +32,20 @@ const footerColumns = [
     ],
   },
   {
-    title: 'Company',
+    title: 'Android wallet',
     links: [
-      { to: '/about', label: 'About' },
-      { to: '/security', label: 'Security & trust' },
-      { to: '/support', label: 'Support' },
-      { to: '/contact', label: 'Contact' },
+      { to: '/wallet', label: 'Wallet features' },
+      { to: '/mining', label: 'VFXT mining' },
+      { to: '/download', label: 'Get the APK' },
+      { to: '/security', label: 'Security model' },
     ],
   },
   {
-    title: 'Legal',
+    title: 'Company',
     links: [
+      { to: '/about', label: 'About' },
+      { to: '/support', label: 'Support' },
+      { to: '/contact', label: 'Contact' },
       { to: '/legal/terms', label: 'Terms of Service' },
       { to: '/legal/privacy', label: 'Privacy Policy' },
       { to: '/legal/risk', label: 'Risk Disclosure' },
@@ -216,69 +221,83 @@ export function PublicShell() {
       </motion.main>
 
       <footer className="bg-brand text-white">
-        <div className="container-page grid gap-10 py-14 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-          <div className="max-w-xs">
-            <Logo inverted />
-            <p className="mt-4 text-sm leading-relaxed text-white/60">{footerTagline}</p>
-            {footerSocials.length > 0 ? (
-              <div className="mt-5 flex flex-wrap gap-2">
-                {footerSocials.map((social) => {
-                  const Icon = SOCIAL_ICONS[social.platform] ?? SOCIAL_ICONS.other
-                  const title = socialLabel(social.platform, social.label)
-                  return (
-                    <a
-                      key={social.id}
-                      href={social.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={title}
-                      aria-label={title}
-                      className="grid size-10 place-items-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-                    >
-                      <Icon className="size-4" />
-                    </a>
-                  )
-                })}
-              </div>
-            ) : null}
-          </div>
-          {footerColumnsResolved.map((column) => (
-            <div key={column.title}>
-              <p className="text-xs font-semibold text-white/40">
-                {column.title}
+        <div className="container-page py-10 sm:py-12 lg:py-14">
+          <div className="flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1.85fr)] lg:items-start lg:gap-12">
+            <div className="min-w-0 max-w-md">
+              <Logo inverted />
+              <p className="mt-3 text-sm leading-relaxed text-white/60 sm:mt-4">
+                {footerTagline}
               </p>
-              <ul className="mt-3 space-y-0.5">
-                {column.links.map((link) => (
-                  <li key={link.to}>
-                    {/^https?:\/\//i.test(link.to) ? (
+              {footerSocials.length > 0 ? (
+                <div className="mt-4 flex flex-wrap gap-2 sm:mt-5">
+                  {footerSocials.map((social) => {
+                    const Icon = SOCIAL_ICONS[social.platform] ?? SOCIAL_ICONS.other
+                    const title = socialLabel(social.platform, social.label)
+                    return (
                       <a
-                        href={link.to}
+                        key={social.id}
+                        href={social.url}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-block py-1.5 text-sm text-white/70 transition-colors hover:text-white"
+                        title={title}
+                        aria-label={title}
+                        className="grid size-10 place-items-center rounded-xl border border-white/15 bg-white/5 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
                       >
-                        {link.label}
+                        <Icon className="size-4" />
                       </a>
-                    ) : (
-                      <Link
-                        to={link.to}
-                        className="inline-block py-1.5 text-sm text-white/70 transition-colors hover:text-white"
-                      >
-                        {link.label}
-                      </Link>
-                    )}
-                  </li>
-                ))}
-              </ul>
+                    )
+                  })}
+                </div>
+              ) : null}
             </div>
-          ))}
+
+            <nav
+              aria-label="Footer"
+              className="grid min-w-0 grid-cols-3 gap-x-3 gap-y-6 sm:gap-x-6 sm:gap-y-8"
+            >
+              {footerColumnsResolved.map((column) => (
+                <div key={column.title} className="min-w-0">
+                  <p className="text-[13px] font-semibold text-white/55 sm:text-sm">
+                    {column.title}
+                  </p>
+                  <ul className="mt-2 space-y-0.5 sm:mt-2.5">
+                    {column.links.map((link) => (
+                      <li key={`${column.title}-${link.to}-${link.label}`}>
+                        {/^https?:\/\//i.test(link.to) ? (
+                          <a
+                            href={link.to}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="block py-1.5 text-[13px] leading-snug text-white/75 transition-colors hover:text-white sm:text-sm"
+                          >
+                            {link.label}
+                          </a>
+                        ) : (
+                          <Link
+                            to={link.to}
+                            className="block py-1.5 text-[13px] leading-snug text-white/75 transition-colors hover:text-white sm:text-sm"
+                          >
+                            {link.label}
+                          </Link>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </nav>
+          </div>
         </div>
+
         <div className="border-t border-white/10">
-          <div className="container-page flex flex-col gap-2 py-6 text-xs text-white/45 sm:flex-row sm:items-center sm:justify-between">
-            <p>{footerCopyright}</p>
-            <p>
+          <div className="container-page flex flex-col gap-3 py-5 text-xs leading-relaxed text-white/45 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:py-6">
+            <p className="min-w-0">{footerCopyright}</p>
+            <p className="min-w-0 sm:max-w-md sm:text-right">
               Returns are not guaranteed and you can lose the money you deposit.{' '}
-              <Link to="/legal/risk" className="inline-block py-1.5 font-medium text-white/70 underline underline-offset-2 hover:text-white">
+              <Link
+                to="/legal/risk"
+                className="font-medium text-white/70 underline underline-offset-2 hover:text-white"
+              >
                 Read the risk disclosure
               </Link>
             </p>

@@ -1,6 +1,36 @@
 package com.vfxt.wallet.ui.support
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.DoneAll
+import androidx.compose.material.icons.outlined.NorthEast
+import androidx.compose.material.icons.outlined.NotificationsOff
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.SouthWest
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.vfxt.wallet.core.common.Formatters
+import com.vfxt.wallet.core.designsystem.components.SkeletonListRow
+import com.vfxt.wallet.core.designsystem.components.VfxtBottomSheet
+import com.vfxt.wallet.core.designsystem.components.VfxtIconButton
+import com.vfxt.wallet.data.repository.AppNotification
+import com.vfxt.wallet.data.repository.NotificationsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -28,16 +58,100 @@ import com.vfxt.wallet.core.designsystem.theme.Spacing
 import com.vfxt.wallet.core.designsystem.theme.VfxtTheme
 
 @Composable
-fun NotificationsScreen(onBack: () -> Unit) {
+fun NotificationsScreen(onBack: () -> Unit, viewModel: NotificationsViewModel = hiltViewModel()) {
+    val colors = VfxtTheme.colors
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    var opened by remember { mutableStateOf<AppNotification?>(null) }
+    val items = (state as? NotificationsState.Ready)?.items.orEmpty()
+
     Column(Modifier.fillMaxSize()) {
-        VfxtTopBar("Notifications", onBack)
-        Column(Modifier.padding(horizontal = Spacing.screen)) {
-            VfxtCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.xs)) {
-                EmptyState(
-                    icon = Icons.Outlined.Notifications,
-                    title = "You're all caught up",
-                    message = "Mining, claim and security alerts will appear here when push notifications are enabled for your account.",
+        VfxtTopBar(
+            "Notifications",
+            onBack,
+            trailing = if (items.any { !it.read }) {
+                { VfxtIconButton(Icons.Outlined.DoneAll, "Mark all as read", viewModel::markAllRead) }
+            } else {
+                null
+            },
+        )
+        when (val s = state) {
+            NotificationsState.Loading -> Column(Modifier.padding(horizontal = Spacing.screen)) {
+                repeat(4) { SkeletonListRow() }
+            }
+            is NotificationsState.Unavailable -> Column(Modifier.padding(horizontal = Spacing.screen)) {
+                VfxtCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.xs)) {
+                    EmptyState(Icons.Outlined.NotificationsOff, "Notifications unavailable", s.message)
+                }
+            }
+            is NotificationsState.Ready -> if (s.items.isEmpty()) {
+                Column(Modifier.padding(horizontal = Spacing.screen)) {
+                    VfxtCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(Spacing.xs)) {
+                        EmptyState(
+                            icon = Icons.Outlined.Notifications,
+                            title = "You're all caught up",
+                            message = "Mining, claim, deposit and security alerts for your account will appear here.",
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(horizontal = Spacing.screen, vertical = Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+                ) {
+                    items(s.items, key = { it.id }) { item ->
+                        NotificationRow(item) {
+                            viewModel.open(item)
+                            opened = item
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    opened?.let { item ->
+        VfxtBottomSheet(onDismiss = { opened = null }) {
+            Text(item.title, style = MaterialTheme.typography.headlineSmall, color = colors.textPrimary)
+            item.createdAtMillis?.let {
+                Text(Formatters.dateTime(it), style = MaterialTheme.typography.bodySmall, color = colors.textMuted)
+            }
+            Spacer(Modifier.height(Spacing.md))
+            Text(item.body, style = MaterialTheme.typography.bodyLarge, color = colors.textSecondary)
+            Spacer(Modifier.height(Spacing.lg))
+        }
+    }
+}
+
+@Composable
+private fun NotificationRow(item: AppNotification, onClick: () -> Unit) {
+    val colors = VfxtTheme.colors
+    val (icon, tint) = when {
+        item.type.contains("deposit", true) -> Icons.Outlined.SouthWest to colors.success
+        item.type.contains("withdraw", true) -> Icons.Outlined.NorthEast to colors.primary
+        item.type.contains("mining", true) || item.type.contains("claim", true) -> Icons.Outlined.Bolt to colors.electric
+        item.type.contains("security", true) -> Icons.Outlined.Shield to colors.warning
+        else -> Icons.Outlined.Notifications to colors.accent
+    }
+    VfxtCard(Modifier.fillMaxWidth(), onClick = onClick, contentPadding = PaddingValues(Spacing.md)) {
+        Row(verticalAlignment = Alignment.Top) {
+            IconTile(icon, tint, size = 40.dp)
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = colors.textPrimary,
+                    fontWeight = if (item.read) FontWeight.Normal else FontWeight.SemiBold,
                 )
+                Text(item.body, style = MaterialTheme.typography.bodySmall, color = colors.textSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                item.createdAtMillis?.let {
+                    Spacer(Modifier.height(2.dp))
+                    Text(Formatters.dateTime(it), style = MaterialTheme.typography.labelSmall, color = colors.textMuted)
+                }
+            }
+            if (!item.read) {
+                Spacer(Modifier.width(Spacing.sm))
+                Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(colors.primary))
             }
         }
     }

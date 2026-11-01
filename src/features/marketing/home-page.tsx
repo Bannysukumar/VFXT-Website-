@@ -20,9 +20,16 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { VideoBackground } from '@/components/motion/video-background'
-import { CountUp, Marquee, ParallaxImage, Reveal } from '@/components/motion/reveal'
-import { CtaBand, Faq, SectionHeading } from '@/features/marketing/marketing-hero'
+import { CountUp, Marquee, Reveal } from '@/components/motion/reveal'
+import {
+  CinematicBand,
+  CtaBand,
+  Faq,
+  SectionHeading,
+  StorySplit,
+} from '@/features/marketing/marketing-hero'
 import { commonFaqs } from '@/features/marketing/content'
+import { PhoneShowcaseBand, PhoneTrio, WalletPhone } from '@/features/marketing/phone-mockup'
 import { RotatingWords } from '@/components/motion/typing'
 import { images, videos } from '@/lib/media'
 
@@ -36,7 +43,7 @@ const capabilities = [
   { icon: KeyRound, label: 'Idempotent requests' },
   { icon: Fingerprint, label: 'Email-verified accounts' },
   { icon: Lock, label: 'Secrets never in the browser' },
-  { icon: Coins, label: 'ERC-20 token ready' },
+  { icon: Coins, label: 'BEP-20 VFXT on BNB Chain' },
 ]
 
 const stats = [
@@ -46,21 +53,40 @@ const stats = [
   { value: 2, suffix: '', label: 'Currencies: USD & VFXT' },
 ]
 
+const products = [
+  {
+    title: 'Deposit USDT',
+    body: 'Send BEP-20 USDT, submit your reference, and wait for finance review before the ledger credit lands.',
+  },
+  {
+    title: 'Daily income stakes',
+    body: 'Stake from your Deposit wallet. About 1% credits every 24 hours from your exact stake time into Daily ROI.',
+  },
+  {
+    title: 'Internal transfers',
+    body: 'Move value between your own wallets, or send VFXT and Withdrawal USD to another member by User ID.',
+  },
+  {
+    title: 'Rank & referrals',
+    body: 'Build your network, track team volume, and unlock rank benefits as your organisation grows.',
+  },
+]
+
 const steps = [
   {
     image: images.teamLaptops,
     title: 'Create your account',
-    body: 'Register with email and verify your address. USD and VFXT wallets are provisioned for you automatically.',
+    body: 'Register with email, verify your address, and get USD ledger wallets plus VFXT provisioned automatically.',
   },
   {
     image: images.tradingDesk,
-    title: 'Request a deposit',
-    body: 'Submit an amount and reference. Finance admins review and approve it before your balance updates.',
+    title: 'Fund with USDT',
+    body: 'Deposit on BNB Smart Chain with a clear reference. Finance admins approve before your available balance updates.',
   },
   {
     image: images.coins,
-    title: 'Manage and withdraw',
-    body: 'Follow every ledger entry in real time and request withdrawals to your verified destination.',
+    title: 'Stake, earn, withdraw',
+    body: 'Run daily income stakes, move funds between wallets, and withdraw to your saved BEP-20 destination.',
   },
 ]
 
@@ -199,7 +225,7 @@ export function HomePage() {
                 <Sparkles className="size-3" />
                 New
               </span>
-              VFXT token rails are on the roadmap
+              Live on BNB Smart Chain
             </motion.div>
             <motion.h1
               className="mt-7 max-w-2xl text-[42px] font-extrabold leading-[1.04] tracking-tight text-balance text-white sm:text-6xl lg:text-7xl"
@@ -216,8 +242,8 @@ export function HomePage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.18, duration: 0.7, ease }}
             >
-              Verified deposits, controlled withdrawals, and an audited ledger where every balance
-              is server-authoritative, with VFXT token rails ready when the network is.
+              Verified USDT deposits, daily income stakes, member transfers, and controlled withdrawals —
+              all on an audited ledger where every balance is decided by trusted servers, not the browser.
             </motion.p>
             <motion.div
               className="mt-10 flex flex-wrap items-center gap-3"
@@ -303,15 +329,13 @@ export function HomePage() {
           description="Each workflow follows one rule: the frontend never decides a financial outcome. Trusted servers do."
         />
         <div className="mt-16 grid auto-rows-[minmax(260px,auto)] gap-5 md:grid-cols-3">
-          <Reveal className="group relative overflow-hidden rounded-3xl bg-brand text-white md:col-span-2 md:row-span-2">
-            <img
-              src={images.laptopChart}
-              alt="Trading chart on a laptop"
-              loading="lazy"
-              className="absolute inset-0 size-full object-cover opacity-50"
+          <Reveal className="group relative isolate overflow-hidden rounded-3xl bg-brand text-white md:col-span-2 md:row-span-2">
+            <VideoBackground
+              src={videos.marketUi}
+              poster={images.laptopChart}
+              overlayClassName="bg-gradient-to-t from-brand via-brand/75 to-brand/30"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-brand via-brand/70 to-transparent" />
-            <div className="relative flex h-full flex-col justify-end p-8 sm:p-10">
+            <div className="relative flex h-full min-h-[420px] flex-col justify-end p-8 sm:p-10">
               <span className="grid size-12 place-items-center rounded-xl bg-white/10 text-accent-bright backdrop-blur">
                 <Wallet className="size-6" />
               </span>
@@ -319,8 +343,8 @@ export function HomePage() {
                 Multi-currency wallets with real-time ledger history
               </h3>
               <p className="mt-3 max-w-lg text-white/70">
-                Available and reserved balances are tracked separately and provisioned the moment
-                your account is created. Every change is backed by an immutable ledger entry.
+                Deposit, Daily ROI, Withdrawal, and VFXT wallets are provisioned the moment your account
+                is created. Available and reserved balances stay separate — every change writes an immutable ledger entry.
               </p>
             </div>
           </Reveal>
@@ -376,81 +400,73 @@ export function HomePage() {
             delay={0.16}
             className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-accent to-accent-strong text-white"
           >
-            <img
-              src={images.phoneMarkets}
-              alt="Markets app on a phone"
-              loading="lazy"
-              className="absolute -bottom-10 -right-10 w-2/3 rotate-6 rounded-2xl opacity-40 shadow-2xl"
-            />
-            <div className="relative flex h-full flex-col p-8">
+            <div className="pointer-events-none absolute -bottom-16 -right-8 w-[55%] rotate-6 opacity-90">
+              <WalletPhone screen="assets" className="!w-full" />
+            </div>
+            <div className="relative flex h-full min-h-[280px] flex-col p-8">
               <span className="grid size-12 place-items-center rounded-xl bg-white/15 backdrop-blur">
                 <Coins className="size-6" />
               </span>
-              <h3 className="mt-auto pt-8 text-xl text-white">VFXT token ready</h3>
-              <p className="mt-2 max-w-[16rem] text-sm leading-relaxed text-white/80">
-                A tested ERC-20 contract awaits network review for on-chain settlement.
+              <h3 className="mt-auto max-w-[12rem] pt-8 text-xl text-white">VFXT on BNB Chain</h3>
+              <p className="mt-2 max-w-[14rem] text-sm leading-relaxed text-white/80">
+                BEP-20 VFXT is live — hold it in the Android wallet or on the platform ledger.
               </p>
             </div>
           </Reveal>
         </div>
       </section>
 
-      {/* Split showcase */}
-      <section className="overflow-hidden border-y border-line bg-panel">
-        <div className="container-page grid items-center gap-16 py-24 sm:py-32 lg:grid-cols-2">
-          <Reveal className="relative">
-            <ParallaxImage
-              src={images.analyticsDashboard}
-              alt="Analytics dashboard on a screen"
-              className="aspect-[4/3] rounded-3xl shadow-lift"
-            />
-            <div className="absolute -bottom-8 -right-4 w-60 animate-float rounded-2xl border border-line bg-panel p-4 shadow-lift sm:-right-8">
-              <p className="text-xs font-medium text-ink-muted">Withdrawal status</p>
-              <div className="mt-3 space-y-2.5">
-                {['Requested', 'Funds reserved', 'Admin approved'].map((step, i) => (
-                  <div key={step} className="flex items-center gap-2.5 text-sm">
-                    <CheckCircle2 className={i < 2 ? 'size-4 text-accent' : 'size-4 text-line-strong'} />
-                    <span className={i < 2 ? 'font-medium' : 'text-ink-muted'}>{step}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </Reveal>
-          <div>
-            <SectionHeading
-              align="left"
-              eyebrow="Transparency"
-              title="Your money, visible at every step"
-              description="See exactly where each request stands. Deposits, reservations, approvals, and completions are recorded as they happen — nothing changes behind your back."
-            />
-            <Reveal delay={0.1}>
-              <ul className="mt-8 space-y-5">
-                {[
-                  ['Live ledger', 'Every entry shows its type, status, and resulting balance.'],
-                  ['Clear statuses', 'Pending, approved, completed, or rejected — always explicit.'],
-                  ['Reserved funds', 'See what is held for in-flight withdrawals at a glance.'],
-                ].map(([title, body]) => (
-                  <li key={title} className="flex gap-4">
-                    <span className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
-                      <CheckCircle2 className="size-4" />
-                    </span>
-                    <div>
-                      <p className="font-semibold">{title}</p>
-                      <p className="text-sm text-ink-muted">{body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <Button asChild size="lg" className="mt-10">
-                <Link to="/auth/register">
-                  Start in minutes
-                  <ArrowRight />
-                </Link>
-              </Button>
-            </Reveal>
+      {/* Product grid */}
+      <section className="border-y border-line bg-panel">
+        <div className="container-page py-24 sm:py-32">
+          <SectionHeading
+            eyebrow="What you can do"
+            title="A complete member workspace"
+            description="From first deposit to daily rewards and payouts — every tool sits behind the same server-authoritative ledger."
+          />
+          <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {products.map(({ title, body }, i) => (
+              <Reveal
+                key={title}
+                delay={i * 0.06}
+                className="rounded-3xl border border-line bg-canvas p-6 transition-[transform,box-shadow] duration-300 hover:-translate-y-1 hover:shadow-lift"
+              >
+                <span className="font-display text-3xl font-extrabold text-accent/30">0{i + 1}</span>
+                <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-muted">{body}</p>
+              </Reveal>
+            ))}
           </div>
         </div>
       </section>
+
+      <StorySplit
+        title="Your money, visible at every step"
+        description="See exactly where each request stands. Deposits, reservations, approvals, and completions are recorded as they happen — nothing changes behind your back."
+        video={videos.dataPulse}
+        poster={images.analyticsDashboard}
+        bullets={[
+          'Live ledger — every entry shows type, status, and resulting balances.',
+          'Clear statuses — pending, approved, completed, or rejected, always explicit.',
+          'Reserved funds — see what is held for in-flight withdrawals at a glance.',
+          'Member transfers — send by User ID without guessing wallet addresses.',
+        ]}
+        cta={{ to: '/auth/register', label: 'Start in minutes' }}
+      />
+
+      <CinematicBand
+        title="Daily income that follows your stake clock"
+        description="Each stake earns on its own 24-hour cycle from the moment it was created — not a global batch. Credits land in your Daily ROI wallet until the day or payout cap is reached."
+        video={videos.cityNight}
+        poster={images.skyscrapers}
+        points={[
+          'About 1% credited every 24 hours',
+          'Per-stake anniversary timing',
+          'Deposit wallet → stake → Daily ROI',
+          'Caps protect the programme',
+        ]}
+        cta={{ to: '/auth/register', label: 'Open an account' }}
+      />
 
       {/* How it works */}
       <section id="how-it-works" className="container-page scroll-mt-20 py-24 sm:py-32">
@@ -481,6 +497,21 @@ export function HomePage() {
         </div>
       </section>
 
+      <StorySplit
+        reverse
+        title="Withdrawals that cannot double-spend"
+        description="When you request a payout, funds move from available to reserved immediately. They leave only after review — or return if the request is rejected."
+        video={videos.marketCloseUp}
+        poster={images.candlesticks}
+        bullets={[
+          'Destination address saved after your first successful payout.',
+          'Finance review before completion.',
+          'Full history of reservations and releases in your ledger.',
+          'Android wallet available for self-custody on EVM networks.',
+        ]}
+        cta={{ to: '/download', label: 'Get the Android wallet' }}
+      />
+
       {/* Security with full-bleed video */}
       <section className="relative isolate overflow-hidden bg-brand py-24 text-white sm:py-32">
         <VideoBackground
@@ -494,8 +525,8 @@ export function HomePage() {
               align="left"
               inverted
               eyebrow="Security"
-              title="Security"
-              description="Authorization rules, Cloud Functions, and App Check work together so no client can change a balance it should not."
+              title="Built so the client cannot rewrite the ledger"
+              description="Authorization rules, Cloud Functions, and App Check work together so no browser session can change a balance it should not."
             />
             <Reveal delay={0.1}>
               <ul className="mt-8 space-y-4">
@@ -513,6 +544,12 @@ export function HomePage() {
                   </li>
                 ))}
               </ul>
+              <Button asChild size="lg" variant="accent" className="mt-10">
+                <Link to="/security">
+                  Read the security model
+                  <ArrowRight />
+                </Link>
+              </Button>
             </Reveal>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -535,6 +572,89 @@ export function HomePage() {
           </div>
         </div>
       </section>
+
+      <PhoneShowcaseBand
+        title="Meet VFXT Wallet on Android"
+        description="Self-custody portfolio, mining, and transfers — shown the way they appear on a phone."
+        screens={['home', 'mining', 'send']}
+      />
+
+      <section className="border-y border-line bg-panel">
+        <div className="container-page py-24 sm:py-32">
+          <SectionHeading
+            eyebrow="Android app"
+            title="VFXT Wallet — self-custody on your phone"
+            description="The Android app is a separate product from the web ledger: multi-chain send and receive, LI.FI swaps, device PIN security, and a Mining tab for VFXT sessions."
+          />
+          <div className="mt-10 hidden md:block">
+            <PhoneTrio screens={['receive', 'home', 'security']} />
+          </div>
+          <div className="mt-14 grid gap-6 lg:grid-cols-2">
+            <Reveal className="rounded-3xl border border-line bg-canvas p-8">
+              <h3 className="text-2xl font-semibold">Wallet features</h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+                Create or import BIP-39 wallets, manage multiple accounts, scan QR codes, add custom
+                networks and tokens, and lock the app with PIN or biometrics. Keys stay encrypted on device.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-ink-muted">
+                {[
+                  'BNB Smart Chain default + major EVM chains',
+                  'USDT, USDC, VFXT, and custom tokens',
+                  'Swap and bridge via LI.FI',
+                  'Official APK from the Download page only',
+                ].map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-accent" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button asChild className="mt-8">
+                <Link to="/wallet">
+                  Explore the wallet
+                  <ArrowRight />
+                </Link>
+              </Button>
+            </Reveal>
+            <Reveal delay={0.08} className="rounded-3xl border border-line bg-canvas p-8">
+              <h3 className="text-2xl font-semibold">VFXT mining</h3>
+              <p className="mt-3 text-sm leading-relaxed text-ink-muted">
+                Run timed daily mining sessions in the wallet, track rewards, claim VFXT to your address,
+                and optionally buy USDT speed boosters signed from the same self-custody wallet.
+              </p>
+              <ul className="mt-6 space-y-2 text-sm text-ink-muted">
+                {[
+                  'Server-authoritative rates and caps',
+                  'Claim when you clear the minimum',
+                  'Separate from web daily income stakes',
+                  'Wallet-signature account login',
+                ].map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-accent" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Button asChild className="mt-8" variant="outline">
+                <Link to="/mining">
+                  How mining works
+                  <ArrowRight />
+                </Link>
+              </Button>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      <CinematicBand
+        title="Support that stays inside your account"
+        description="Open tickets from the dashboard, recover access by email, and read FAQs that cover deposits, stakes, transfers, withdrawals, and the Android wallet."
+        video={videos.deskActivity}
+        poster={images.supportDesk}
+        invertOverlay
+        points={['In-app tickets with status tracking', 'Password reset by email', 'Public FAQs & contact form']}
+        cta={{ to: '/support', label: 'Visit support centre' }}
+      />
 
       {/* FAQ */}
       <section className="container-page grid gap-12 py-24 sm:py-32 lg:grid-cols-[1fr_1.4fr]">
@@ -559,7 +679,7 @@ export function HomePage() {
       <CtaBand
         title="Ready to open your VFXT account?"
         description="Create an account in minutes. Your wallets are provisioned instantly and every transaction is recorded."
-        video={videos.floatingIndicators}
+        video={videos.skylinePan}
         poster={images.tradingDesk}
       />
     </>

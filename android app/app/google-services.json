@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "282549187158",
+    "project_id": "vfxt-a60d6",
+    "storage_bucket": "vfxt-a60d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:282549187158:android:110cb9836e335a30b781f7",
+        "android_client_info": {
+          "package_name": "com.vfxt.wallet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCpXO1APLKwhP7ShyD1-rIGaGAWaY7xAyg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

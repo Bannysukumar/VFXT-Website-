@@ -144,25 +144,23 @@ export function ProfilePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Account"
         title="Profile"
-        description="Update how you appear in the app and where USDT withdrawals are sent."
+        description="Update your display name and review the withdrawal address used for USDT payouts."
       />
 
       <Alert>
         <UserCircle />
-        <AlertTitle>Auto-withdraw</AlertTitle>
+        <AlertTitle>Withdrawal address</AlertTitle>
         <AlertDescription>
-          After your first successful withdrawal, the platform may auto-submit future withdrawals to
-          your saved address when your balance meets the minimum, if auto-withdraw is enabled by
-          admins.
+          After your first successful withdrawal, your payout address is saved for safety. Contact
+          support if you ever need it updated.
         </AlertDescription>
       </Alert>
 
       <Card className="max-w-lg">
         <CardHeader>
-          <CardTitle className="font-sans text-lg">Your details</CardTitle>
-          <CardDescription>Email: {user?.email ?? '—'}</CardDescription>
+          <CardTitle>Your details</CardTitle>
+          <CardDescription>Signed in as {user?.email ?? '—'}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="space-y-4" noValidate>
@@ -187,8 +185,8 @@ export function ProfilePage() {
               />
               <p className="text-xs text-ink-subtle">
                 {savedWithdrawalAddress
-                  ? 'Locked after your first successful withdrawal. Only an admin can change it.'
-                  : 'Saved automatically when your first withdrawal succeeds. Members cannot edit it later.'}
+                  ? 'Saved after your first successful withdrawal. Contact support to change it.'
+                  : 'Saved automatically when your first withdrawal succeeds.'}
               </p>
             </div>
             <Button type="submit" disabled={isSubmitting || save.isPending}>
@@ -200,7 +198,7 @@ export function ProfilePage() {
 
       <Card className="max-w-lg">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 font-sans text-lg">
+          <CardTitle className="flex items-center gap-2">
             <KeyRound className="size-4 text-accent" />
             Change password
           </CardTitle>

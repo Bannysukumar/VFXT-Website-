@@ -189,6 +189,7 @@ class LiFiApi @Inject constructor(private val http: OkHttpClient) {
                 decimals = decimals,
                 priceUsd = o.str("priceUSD")?.toBigDecimalOrNull()?.takeIf { it.signum() > 0 },
                 verified = status == null || status == "verified",
+                listLogoUrl = o.str("logoURI"),
             )
         }
 

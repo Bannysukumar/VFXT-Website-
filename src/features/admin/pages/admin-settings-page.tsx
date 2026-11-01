@@ -24,6 +24,8 @@ const DEFAULT_FOOTER_COLUMNS: FooterColumn[] = [
     title: 'Product',
     links: [
       { label: 'Token', href: '/token' },
+      { label: 'Wallet features', href: '/wallet' },
+      { label: 'Mining', href: '/mining' },
       { label: 'Download wallet', href: '/download' },
       { label: 'Security', href: '/security' },
       { label: 'Support', href: '/support' },

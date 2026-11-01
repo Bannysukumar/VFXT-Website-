@@ -19,6 +19,16 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Reown WalletKit transitive deps that are only published on JitPack.
+        maven("https://jitpack.io") {
+            content {
+                includeGroup("com.walletconnect.Scarlet")
+                includeGroup("com.github.multiformats")
+                includeGroupByRegex("com\\.github\\.komputing.*")
+                includeGroupByRegex("com\\.github\\.reown-com.*")
+                includeGroupByRegex("com\\.github\\.WalletConnect.*")
+            }
+        }
     }
 }
 

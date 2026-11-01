@@ -8,6 +8,7 @@ import { CALLABLE_OPTS, toHttpsError } from '../../lib/callable';
 import { Collections, getDb, initAdmin } from '../../lib/firebase';
 import { AppError } from '../../lib/errors';
 import { log } from '../../lib/logger';
+import { isWalletDeviceRevoked } from './wallet-app-devices';
 
 const NONCE_TTL_MS = 10 * 60 * 1000;
 
@@ -65,6 +66,7 @@ export const verifyWalletAppLogin = onCall(CALLABLE_OPTS, async (request) => {
       .object({
         address: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
         signature: z.string().min(80).max(200),
+        installId: z.string().max(64).optional(),
       })
       .safeParse(request.data ?? {});
     if (!parsed.success) {
@@ -100,6 +102,13 @@ export const verifyWalletAppLogin = onCall(CALLABLE_OPTS, async (request) => {
 
     const auth = getAuth();
     const uid = walletUid(address);
+
+    if (await isWalletDeviceRevoked(uid, parsed.data.installId)) {
+      throw new AppError(
+        'permission-denied',
+        'This device was signed out of your VFXT account from another device. Reinstall the app and import your wallet to sign in again.',
+      );
+    }
 
     try {
       await auth.getUser(uid);

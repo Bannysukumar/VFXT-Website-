@@ -77,6 +77,8 @@ fun MainShell(
     onPrivacy: () -> Unit,
     onTerms: () -> Unit,
     onWalletConnect: () -> Unit,
+    onCurrency: () -> Unit,
+    onSessions: () -> Unit,
 ) {
     val colors = VfxtTheme.colors
     val navController = rememberNavController()
@@ -123,6 +125,7 @@ fun MainShell(
                     onActivity = onActivity,
                     onTokenDetails = onTokenDetails,
                     onNetwork = onNetwork,
+                    onNotifications = onNotifications,
                     onNotify = notify,
                 )
             }
@@ -150,6 +153,8 @@ fun MainShell(
                     onPrivacy = onPrivacy,
                     onTerms = onTerms,
                     onWalletConnect = onWalletConnect,
+                    onCurrency = onCurrency,
+                    onSessions = onSessions,
                     onNotify = notify,
                 )
             }

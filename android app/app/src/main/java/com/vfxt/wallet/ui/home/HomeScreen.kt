@@ -103,13 +103,17 @@ fun HomeScreen(
     onActivity: () -> Unit,
     onTokenDetails: (String) -> Unit,
     onNetwork: () -> Unit,
+    onNotifications: () -> Unit,
     onNotify: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
+    val unread by viewModel.unreadNotifications.collectAsStateWithLifecycle()
     val context = LocalContext.current
     HomeContent(
+        onNotifications = onNotifications,
+        hasUnreadNotifications = unread > 0,
         onSend = { onSend(null, null) },
         onReceive = onReceive,
         onSwap = onSwap,
@@ -158,6 +162,8 @@ fun HomeContent(
     onTokenDetails: (String) -> Unit = {},
     onNetwork: () -> Unit = {},
     onScan: () -> Unit = {},
+    onNotifications: () -> Unit = {},
+    hasUnreadNotifications: Boolean = false,
 ) {
     val colors = VfxtTheme.colors
     val overview = state.overview
@@ -190,7 +196,8 @@ fun HomeContent(
                     account = account,
                     onWalletSelector = { if (account == null) onCreateWallet() else showWalletPicker = true },
                     onScan = { if (account == null) onNotify("Create or import a wallet first.") else onScan() },
-                    onNotifications = { onNotify("You have no notifications yet.") },
+                    onNotifications = onNotifications,
+                    hasUnread = hasUnreadNotifications,
                 )
             }
             item {
@@ -324,6 +331,7 @@ private fun HomeTopBar(
     onWalletSelector: () -> Unit,
     onScan: () -> Unit,
     onNotifications: () -> Unit,
+    hasUnread: Boolean = false,
 ) {
     val colors = VfxtTheme.colors
     val clipboard = LocalClipboard.current
@@ -371,7 +379,12 @@ private fun HomeTopBar(
         }
         VfxtIconButton(Icons.Filled.QrCodeScanner, "Scan QR code", onScan)
         Spacer(Modifier.width(Spacing.sm))
-        VfxtIconButton(Icons.Outlined.Notifications, "Notifications", onNotifications)
+        VfxtIconButton(
+            Icons.Outlined.Notifications,
+            if (hasUnread) "Notifications, unread" else "Notifications",
+            onNotifications,
+            showDot = hasUnread,
+        )
     }
 }
 
@@ -454,7 +467,7 @@ private fun BalanceHero(overview: WalletOverview, network: EvmNetwork?, hidden: 
     val nativeHolding = overview.holdings.firstOrNull { it.token.kind == TokenKind.Native }
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-            if (testnet) "${network?.name} balance" else "Total balance · ${overview.fiatCurrency}",
+            if (testnet) "${network?.name} balance" else "Total balance · ${com.vfxt.wallet.core.common.FiatDisplay.effective.code}",
             style = MaterialTheme.typography.labelMedium,
             color = Color.White.copy(alpha = 0.8f),
             modifier = Modifier.weight(1f),

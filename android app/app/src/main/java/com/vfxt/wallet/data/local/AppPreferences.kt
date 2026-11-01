@@ -8,10 +8,13 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.vfxt.wallet.core.common.FiatCurrency
 import com.vfxt.wallet.core.designsystem.theme.ThemeMode
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,6 +46,36 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         AutoLock.entries.firstOrNull { it.millis == millis } ?: AutoLock.OneMinute
     }
 
+    val currency: Flow<FiatCurrency> = store.data.map { FiatCurrency.fromCode(it[CURRENCY]) }
+
+    /** Last known USD→currency rate, kept so prices show correctly offline. */
+    val cachedRates: Flow<Pair<Long, String>?> = store.data.map { prefs ->
+        val at = prefs[RATES_AT] ?: return@map null
+        val json = prefs[RATES_JSON] ?: return@map null
+        at to json
+    }
+
+    /** Random per-install id used to list and remotely sign out devices. Not tied to hardware. */
+    suspend fun installId(): String {
+        store.data.first()[INSTALL_ID]?.let { return it }
+        var id = ""
+        store.edit { prefs ->
+            id = prefs[INSTALL_ID] ?: UUID.randomUUID().toString().also { prefs[INSTALL_ID] = it }
+        }
+        return id
+    }
+
+    suspend fun setCurrency(currency: FiatCurrency) {
+        store.edit { it[CURRENCY] = currency.code }
+    }
+
+    suspend fun setCachedRates(at: Long, json: String) {
+        store.edit {
+            it[RATES_AT] = at
+            it[RATES_JSON] = json
+        }
+    }
+
     suspend fun setOnboardingComplete() {
         store.edit { it[ONBOARDING_COMPLETE] = true }
     }
@@ -64,5 +97,9 @@ class AppPreferences @Inject constructor(@ApplicationContext context: Context) {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val BIOMETRIC_ENABLED = booleanPreferencesKey("biometric_enabled")
         val AUTO_LOCK_MS = longPreferencesKey("auto_lock_ms")
+        val CURRENCY = stringPreferencesKey("display_currency")
+        val RATES_AT = longPreferencesKey("fx_rates_at")
+        val RATES_JSON = stringPreferencesKey("fx_rates_json")
+        val INSTALL_ID = stringPreferencesKey("install_id")
     }
 }

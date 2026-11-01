@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -29,7 +31,17 @@ data class HomeUiState(
 )
 
 @HiltViewModel
-class HomeViewModel @Inject constructor(private val walletRepository: WalletRepository) : ViewModel() {
+class HomeViewModel @Inject constructor(
+    private val walletRepository: WalletRepository,
+    notifications: com.vfxt.wallet.data.repository.NotificationsRepository,
+) : ViewModel() {
+
+    /** Unread server notifications for the bell badge; 0 when signed out or unavailable. */
+    val unreadNotifications: StateFlow<Int> = notifications.observe()
+        .map { s -> (s as? com.vfxt.wallet.data.repository.NotificationsState.Ready)?.items?.count { !it.read } ?: 0 }
+        .catch { emit(0) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
+
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 

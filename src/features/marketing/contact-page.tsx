@@ -28,7 +28,14 @@ import { Input, NativeSelect, Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { FieldError } from '@/components/shared/page-header'
 import { Reveal } from '@/components/motion/reveal'
-import { MarketingHero, SectionHeading, StatsBand } from '@/features/marketing/marketing-hero'
+import {
+  CinematicBand,
+  CtaBand,
+  MarketingHero,
+  SectionHeading,
+  StatsBand,
+} from '@/features/marketing/marketing-hero'
+import { PhonePair, WalletPhone } from '@/features/marketing/phone-mockup'
 import { officeLocation, supportHours } from '@/features/marketing/content'
 import { env } from '@/lib/env'
 import { images, videos } from '@/lib/media'
@@ -40,6 +47,8 @@ const topics = [
   { value: 'account', label: 'Account access' },
   { value: 'deposit', label: 'Deposits' },
   { value: 'withdrawal', label: 'Withdrawals' },
+  { value: 'wallet', label: 'Android wallet' },
+  { value: 'mining', label: 'Mining / rewards' },
   { value: 'security', label: 'Security report' },
   { value: 'legal', label: 'Legal & privacy' },
 ] as const
@@ -209,10 +218,23 @@ export function ContactPage() {
       <MarketingHero
         eyebrow="Contact"
         title="Talk to the VFXT team"
-        description="Questions about your account, a deposit, or how the platform works? Choose the channel that fits, or send us a message directly."
-        video={videos.analystRealtime}
+        description="Questions about your account, a deposit, stakes, or how the platform works? Choose the channel that fits, or send us a message directly."
+        video={videos.deskActivity}
         poster={images.officeTalk}
-      />
+        aside={<PhonePair front="home" back="security" />}
+      >
+        <div className="mt-10 flex flex-wrap gap-3">
+          <Button size="lg" variant="accent" asChild>
+            <a href="#message">
+              Send a message
+              <ArrowRight />
+            </a>
+          </Button>
+          <Button size="lg" variant="glass" asChild>
+            <Link to="/app/support">Open a ticket</Link>
+          </Button>
+        </div>
+      </MarketingHero>
 
       {/* Channels */}
       <section className="container-page relative z-10 -mt-12 pb-20">
@@ -248,8 +270,21 @@ export function ContactPage() {
         ]}
       />
 
+      <CinematicBand
+        title="Pick the right channel the first time"
+        description="Account-specific balances and payouts move fastest as in-app tickets. Password resets are self-serve. Security reports should use the contact form with the Security topic."
+        video={videos.cityNight}
+        poster={images.skyscrapers}
+        points={[
+          'Tickets for deposits & withdrawals',
+          'Email reset for locked accounts',
+          'Private security disclosures',
+          'Office details for formal mail',
+        ]}
+      />
+
       {/* Form + hours */}
-      <section className="border-t border-line bg-panel">
+      <section id="message" className="scroll-mt-20 border-t border-line bg-panel">
         <div className="container-page grid gap-12 py-24 lg:grid-cols-[1fr_1.3fr]">
           <div>
             <SectionHeading
@@ -416,7 +451,7 @@ export function ContactPage() {
             <span className="grid size-12 place-items-center rounded-xl bg-brand text-accent-bright">
               <Building2 className="size-6" />
             </span>
-            <p className="mt-6 text-xs font-semiboldr text-accent">{officeLocation.label}</p>
+            <p className="mt-6 text-xs font-semibold text-accent">{officeLocation.label}</p>
             <h3 className="mt-1 text-2xl">{companyName}</h3>
             <address className="mt-5 flex gap-3 not-italic leading-relaxed text-ink-muted">
               <MapPin className="mt-1 size-5 shrink-0 text-accent" />
@@ -456,6 +491,50 @@ export function ContactPage() {
           <MapIllustration company={companyName} addressLines={addressLines} />
         </Reveal>
       </section>
+
+      <section className="border-t border-line bg-panel">
+        <div className="container-page grid items-center gap-12 py-20 lg:grid-cols-[0.85fr_1.15fr]">
+          <Reveal className="relative mx-auto hidden lg:block">
+            <WalletPhone screen="assets" float />
+          </Reveal>
+          <div>
+            <SectionHeading
+              align="left"
+              eyebrow="Self-serve first"
+              title="Guides that often replace a message"
+              description="If your question is about the Android app, start here — then email us if you still need a human."
+            />
+            <div className="mt-10 grid gap-4 sm:grid-cols-3">
+              {[
+                { to: '/wallet', title: 'Wallet features', body: 'Keys, networks, swaps, security.' },
+                { to: '/mining', title: 'Mining', body: 'Sessions, claims, boosters.' },
+                { to: '/download', title: 'Download', body: 'Official APK channel only.' },
+              ].map(({ to, title, body }, i) => (
+                <Reveal key={to} delay={i * 0.05}>
+                  <Link
+                    to={to}
+                    className="block rounded-3xl border border-line bg-canvas p-6 transition-colors hover:border-accent/40"
+                  >
+                    <p className="font-semibold">{title}</p>
+                    <p className="mt-1 text-sm text-ink-muted">{body}</p>
+                    <span className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-accent">
+                      Open
+                      <ArrowRight className="size-4" />
+                    </span>
+                  </Link>
+                </Reveal>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <CtaBand
+        title="Prefer to message from inside the app?"
+        description="Sign in and open Support for the fastest path on account, deposit, stake, and withdrawal questions."
+        video={videos.skylinePan}
+        poster={images.tradingDesk}
+      />
     </>
   )
 }

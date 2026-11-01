@@ -6,10 +6,12 @@ import { z } from 'zod';
 import {
   DAILY_YIELD,
   getLockedPackage,
+  isDailyYieldDue,
   LOCKED_PACKAGES,
   lockedMaturityPayout,
   MIN_STAKE_USD_CENTS,
   nextDailyYieldCents,
+  nextDailyYieldDueAtMs,
   payoutCapCents,
   shouldStopDailyYield,
   StakingPlanId,
@@ -54,6 +56,33 @@ function requireStakingEnabled(): void {
     throw new FeatureDisabledError('staking', 'Staking is disabled');
   }
 }
+
+/** Firestore Timestamp / Date / millis → epoch ms (0 if unknown). */
+function toMillis(value: unknown): number {
+  if (!value) return 0;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (value instanceof Timestamp) return value.toMillis();
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toMillis' in value &&
+    typeof (value as { toMillis: () => number }).toMillis === 'function'
+  ) {
+    return (value as { toMillis: () => number }).toMillis();
+  }
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'toDate' in value &&
+    typeof (value as { toDate: () => Date }).toDate === 'function'
+  ) {
+    return (value as { toDate: () => Date }).toDate().getTime();
+  }
+  return 0;
+}
+
+/** Max catch-up ROI days credited per position per scheduler tick. */
+const MAX_YIELD_CATCH_UP_DAYS = 7;
 
 export const getStakingPlans = onCall(CALLABLE_OPTS, async (request) => {
   try {
@@ -313,8 +342,15 @@ async function handleGetMyPositions(
       bonusTokenPct: p.bonusTokenPct,
       lockDays: p.lockDays,
       createdAt: toIso(p.createdAt),
+      lastYieldAt: toIso(p.lastYieldAt),
       maturesAt: toIso(p.maturesAt),
       completedAt: toIso(p.completedAt),
+      nextYieldAt:
+        p.planId === 'daily_yield' && p.status === 'active'
+          ? new Date(
+              nextDailyYieldDueAtMs(toMillis(p.createdAt), p.daysPaid),
+            ).toISOString()
+          : null,
     };
   });
 
@@ -333,14 +369,18 @@ export const getMyPositions = onCall(CALLABLE_OPTS, async (request) => {
 export const getMyStakingPositions = getMyPositions;
 
 /**
- * Daily job: credit 1% ROI to daily_roi for active daily_yield positions.
- * Stop when days>=200 OR totalPaid >= cap (2X/3X). Cap rechecked with working status.
+ * Credits 1% ROI to daily_roi for active daily_yield positions.
+ *
+ * Timing is per stake (not a global clock): if a user stakes at 10:00 IST,
+ * day-1 ROI credits at 10:00 IST the next day, then every +24h after that.
+ * Scheduler ticks every 15 minutes in Asia/Kolkata so credits land near that
+ * anniversary. Stop when days>=200 OR totalPaid >= cap (2X/3X).
  */
 export const processDailyYields = onSchedule(
   {
-    schedule: 'every 24 hours',
+    schedule: 'every 15 minutes',
     region: 'us-central1',
-    timeZone: 'UTC',
+    timeZone: 'Asia/Kolkata',
   },
   async () => {
     if (!FeatureFlags.staking) {
@@ -352,6 +392,7 @@ export const processDailyYields = onSchedule(
     const pageSize = 100;
     let processed = 0;
     let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+    const nowMs = Date.now();
 
     for (let page = 0; page < 50; page += 1) {
       let query = db
@@ -372,6 +413,22 @@ export const processDailyYields = onSchedule(
       for (const doc of snap.docs) {
         const position = doc.data() as StakingPosition;
         try {
+          const createdAtMs = toMillis(position.createdAt);
+          if (
+            !isDailyYieldDue({
+              createdAtMs,
+              daysPaid: position.daysPaid,
+              nowMs,
+            }) &&
+            !shouldStopDailyYield({
+              daysPaid: position.daysPaid,
+              totalPaidMinor: position.totalPaidMinor,
+              capMinor: position.capMinor,
+            })
+          ) {
+            continue;
+          }
+
           const working = await isWorkingAccount(db, position.userId);
           const capMinor = payoutCapCents(position.principalMinor, working);
 
@@ -392,82 +449,104 @@ export const processDailyYields = onSchedule(
             continue;
           }
 
-          const yieldCents = nextDailyYieldCents({
-            principalCents: position.principalMinor,
-            daysPaid: position.daysPaid,
-            totalPaidMinor: position.totalPaidMinor,
-            capMinor,
-          });
-          if (yieldCents <= 0) {
-            await doc.ref.update({
-              status: 'completed',
-              workingAccount: working,
-              capMinor,
-              completedAt: FieldValue.serverTimestamp(),
-              updatedAt: FieldValue.serverTimestamp(),
-            });
-            continue;
-          }
-
-          const dayNumber = position.daysPaid + 1;
-          const idemKey = buildIdempotencyKey(
-            'roi.daily',
-            `${position.positionId}:D${dayNumber}`,
-            position.userId,
-          );
-
           await ensureUserWallets(db, position.userId);
 
-          await db.runTransaction(async (tx) => {
-            const fresh = await tx.get(doc.ref);
-            if (!fresh.exists) return;
-            const p = fresh.data() as StakingPosition;
-            if (p.status !== 'active' || p.planId !== 'daily_yield') return;
-            if (p.daysPaid >= dayNumber) return;
+          for (let catchUp = 0; catchUp < MAX_YIELD_CATCH_UP_DAYS; catchUp += 1) {
+            let credited = false;
 
-            await claimIdempotencyKey(
-              tx,
-              db,
-              idemKey,
-              'roi.daily',
-              'system',
-              position.positionId,
-            );
+            await db.runTransaction(async (tx) => {
+              const fresh = await tx.get(doc.ref);
+              if (!fresh.exists) return;
+              const p = fresh.data() as StakingPosition;
+              if (p.status !== 'active' || p.planId !== 'daily_yield') return;
 
-            await creditAvailable(tx, db, {
-              userId: p.userId,
-              walletId: walletDocId(p.userId, 'daily_roi'),
-              type: 'roi',
-              amountMinor: yieldCents,
-              currency: 'USD',
-              referenceType: 'staking_position',
-              referenceId: p.positionId,
-              description: `Daily ROI day ${dayNumber}`,
-              createdBy: 'system',
-              metadata: { dayNumber, working },
+              const stakeMs = toMillis(p.createdAt);
+              if (
+                !isDailyYieldDue({
+                  createdAtMs: stakeMs,
+                  daysPaid: p.daysPaid,
+                  nowMs,
+                })
+              ) {
+                return;
+              }
+
+              const yieldCents = nextDailyYieldCents({
+                principalCents: p.principalMinor,
+                daysPaid: p.daysPaid,
+                totalPaidMinor: p.totalPaidMinor,
+                capMinor,
+              });
+              if (yieldCents <= 0) {
+                tx.update(doc.ref, {
+                  status: 'completed',
+                  workingAccount: working,
+                  capMinor,
+                  completedAt: FieldValue.serverTimestamp(),
+                  updatedAt: FieldValue.serverTimestamp(),
+                });
+                return;
+              }
+
+              const dayNumber = p.daysPaid + 1;
+              const idemKey = buildIdempotencyKey(
+                'roi.daily',
+                `${p.positionId}:D${dayNumber}`,
+                p.userId,
+              );
+
+              await claimIdempotencyKey(
+                tx,
+                db,
+                idemKey,
+                'roi.daily',
+                'system',
+                p.positionId,
+              );
+
+              await creditAvailable(tx, db, {
+                userId: p.userId,
+                walletId: walletDocId(p.userId, 'daily_roi'),
+                type: 'roi',
+                amountMinor: yieldCents,
+                currency: 'USD',
+                referenceType: 'staking_position',
+                referenceId: p.positionId,
+                description: `Daily ROI day ${dayNumber}`,
+                createdBy: 'system',
+                metadata: {
+                  dayNumber,
+                  working,
+                  dueAt: new Date(
+                    nextDailyYieldDueAtMs(stakeMs, p.daysPaid),
+                  ).toISOString(),
+                },
+              });
+
+              const nextPaid = p.totalPaidMinor + yieldCents;
+              const nextDays = p.daysPaid + 1;
+              const done = shouldStopDailyYield({
+                daysPaid: nextDays,
+                totalPaidMinor: nextPaid,
+                capMinor,
+              });
+
+              tx.update(doc.ref, {
+                totalPaidMinor: nextPaid,
+                daysPaid: nextDays,
+                workingAccount: working,
+                capMinor,
+                lastYieldAt: FieldValue.serverTimestamp(),
+                status: done ? 'completed' : 'active',
+                completedAt: done ? FieldValue.serverTimestamp() : null,
+                updatedAt: FieldValue.serverTimestamp(),
+              });
+              credited = true;
             });
 
-            const nextPaid = p.totalPaidMinor + yieldCents;
-            const nextDays = p.daysPaid + 1;
-            const done = shouldStopDailyYield({
-              daysPaid: nextDays,
-              totalPaidMinor: nextPaid,
-              capMinor,
-            });
-
-            tx.update(doc.ref, {
-              totalPaidMinor: nextPaid,
-              daysPaid: nextDays,
-              workingAccount: working,
-              capMinor,
-              lastYieldAt: FieldValue.serverTimestamp(),
-              status: done ? 'completed' : 'active',
-              completedAt: done ? FieldValue.serverTimestamp() : null,
-              updatedAt: FieldValue.serverTimestamp(),
-            });
-          });
-
-          processed += 1;
+            if (!credited) break;
+            processed += 1;
+          }
         } catch (err) {
           log.warn('daily_yield_position_failed', {
             positionId: position.positionId,

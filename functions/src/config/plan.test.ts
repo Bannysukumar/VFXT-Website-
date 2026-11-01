@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DAILY_YIELD_INTERVAL_MS,
   dailyYieldCents,
   directReferralBonusTokens,
+  isDailyYieldDue,
   isLevelUnlocked,
   isTransferAllowed,
   levelCommissionCents,
   lockedMaturityPayout,
   nextDailyYieldCents,
+  nextDailyYieldDueAtMs,
   payoutCapCents,
   qualifiedRank,
   shouldStopDailyYield,
@@ -54,6 +57,31 @@ describe('VFXT plan math', () => {
         capMinor: 20_000,
       }),
     ).toBe(50);
+  });
+
+  it('credits ROI on each 24h anniversary of the stake time', () => {
+    // Stake at 10:00 Asia/Kolkata on 2026-11-01 → first credit 10:00 next day.
+    const stakeMs = Date.parse('2026-11-01T04:30:00.000Z'); // 10:00 IST
+    expect(nextDailyYieldDueAtMs(stakeMs, 0)).toBe(
+      stakeMs + DAILY_YIELD_INTERVAL_MS,
+    );
+    expect(nextDailyYieldDueAtMs(stakeMs, 1)).toBe(
+      stakeMs + 2 * DAILY_YIELD_INTERVAL_MS,
+    );
+    expect(
+      isDailyYieldDue({
+        createdAtMs: stakeMs,
+        daysPaid: 0,
+        nowMs: stakeMs + DAILY_YIELD_INTERVAL_MS - 1,
+      }),
+    ).toBe(false);
+    expect(
+      isDailyYieldDue({
+        createdAtMs: stakeMs,
+        daysPaid: 0,
+        nowMs: stakeMs + DAILY_YIELD_INTERVAL_MS,
+      }),
+    ).toBe(true);
   });
 
   it('computes 7-level commissions on capital', () => {

@@ -59,7 +59,7 @@ fun AssetRow(
             .padding(horizontal = Spacing.md, vertical = Spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        TokenIcon(token.symbol, size = 40.dp)
+        TokenIcon(token.symbol, size = 40.dp, logoUrl = token.logoUrl)
         Spacer(Modifier.width(Spacing.md))
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
