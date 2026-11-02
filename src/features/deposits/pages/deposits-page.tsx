@@ -22,8 +22,8 @@ import { parseToMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { images } from '@/lib/media'
 import {
-  getInstalledPayWallets,
   getMissingPayWallets,
+  getPayWalletChoices,
   hasInjectedEthereum,
   isLikelyMobile,
   openPayWallet,
@@ -153,9 +153,7 @@ export function DepositsPage() {
   const [openedWallet, setOpenedWallet] = useState<string | null>(null)
   const checkSeq = useMemo(() => ({ current: 0 }), [])
   const mobile = useMemo(() => isLikelyMobile(), [])
-  const [installedWallets, setInstalledWallets] = useState<PayWalletOption[]>(() =>
-    getInstalledPayWallets(),
-  )
+  const [payWallets, setPayWallets] = useState<PayWalletOption[]>(() => getPayWalletChoices())
   const [missingWallets, setMissingWallets] = useState<PayWalletOption[]>(() =>
     getMissingPayWallets(),
   )
@@ -166,7 +164,7 @@ export function DepositsPage() {
 
   useEffect(() => {
     const refresh = () => {
-      setInstalledWallets(getInstalledPayWallets())
+      setPayWallets(getPayWalletChoices())
       setMissingWallets(getMissingPayWallets())
       setCanConnectInjected(hasInjectedEthereum())
     }
@@ -186,10 +184,9 @@ export function DepositsPage() {
   }, [])
 
   const detectedNames = useMemo(
-    () => installedWallets.map((w) => w.name),
-    [installedWallets],
+    () => payWallets.filter((w) => w.detected).map((w) => w.name),
+    [payWallets],
   )
-  const payWallets = installedWallets
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -767,27 +764,32 @@ export function DepositsPage() {
               <div className="min-w-0 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-ink">Installed wallets</p>
+                    <p className="text-sm font-semibold text-ink">
+                      {mobile ? 'Open in wallet app' : 'Browser wallets'}
+                    </p>
                     <p className="text-xs text-ink-muted">
-                      Detected on this device. Or use WalletConnect above to pick any wallet.
+                      {mobile
+                        ? 'Tap your wallet — it opens with this address and exact amount.'
+                        : 'Detected in this browser. Or use WalletConnect above.'}
                     </p>
                   </div>
-                  {installedWallets.length > 0 ? (
+                  {payWallets.length > 0 ? (
                     <Badge variant="secondary" className="shrink-0">
-                      {installedWallets.length} found
+                      {payWallets.length} wallets
                     </Badge>
                   ) : null}
                 </div>
 
-                {installedWallets.length > 0 ? (
+                {payWallets.length > 0 ? (
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                    {installedWallets.map((wallet) => (
+                    {payWallets.map((wallet) => (
                       <button
                         key={wallet.id}
                         type="button"
                         onClick={() => handleOpenWallet(wallet.id)}
                         className={cn(
                           'relative flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-panel px-3 py-3 text-left transition-[transform,border-color,background-color] hover:border-accent/50 active:scale-[0.99]',
+                          wallet.detected && 'border-accent/40 bg-accent-soft/30',
                           openedWallet === wallet.name && 'border-accent bg-accent-soft/50 ring-2 ring-accent/15',
                         )}
                       >
@@ -801,19 +803,27 @@ export function DepositsPage() {
                           <span className="block truncate text-sm font-semibold text-ink">
                             {wallet.name}
                           </span>
-                          <span className="block truncate text-[11px] text-success">Installed</span>
+                          <span
+                            className={cn(
+                              'block truncate text-[11px]',
+                              wallet.detected ? 'text-success' : 'text-ink-muted',
+                            )}
+                          >
+                            {wallet.detected ? 'Detected' : mobile ? 'Tap to open' : 'Open'}
+                          </span>
                         </span>
-                        <CheckCircle2 className="ml-auto size-4 shrink-0 text-success" />
+                        {wallet.detected ? (
+                          <CheckCircle2 className="ml-auto size-4 shrink-0 text-success" />
+                        ) : null}
                       </button>
                     ))}
                   </div>
                 ) : (
                   <div className="rounded-2xl border border-dashed border-line bg-panel-elevated/50 px-4 py-5 text-center">
                     <Wallet className="mx-auto size-8 text-ink-subtle" />
-                    <p className="mt-2 text-sm font-medium text-ink">No wallet app detected here</p>
+                    <p className="mt-2 text-sm font-medium text-ink">No browser wallet found</p>
                     <p className="mt-1 text-xs text-ink-muted">
-                      Use the QR code or copy details below, or open this page inside your wallet
-                      browser.
+                      Use WalletConnect above, or the QR / copy details below.
                     </p>
                   </div>
                 )}

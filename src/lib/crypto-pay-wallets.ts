@@ -350,8 +350,25 @@ export function getInstalledPayWallets(): PayWalletOption[] {
   }))
 }
 
-/** Catalog wallets that are NOT installed — for optional download links only. */
+/**
+ * Wallets to show for payment.
+ * Mobile Chrome/Safari cannot see native apps — always list deeplink targets
+ * (MetaMask, Trust, …) so users can open the installed app with amount filled.
+ * Desktop: only show injected/detected providers.
+ */
+export function getPayWalletChoices(): PayWalletOption[] {
+  const detected = detectInjectedWalletIds()
+  if (isLikelyMobile()) {
+    return [...PAY_WALLETS]
+      .map((w) => ({ ...w, detected: detected.has(w.id) }))
+      .sort((a, b) => Number(b.detected) - Number(a.detected) || 0)
+  }
+  return getInstalledPayWallets()
+}
+
+/** Catalog wallets that are NOT injected — download links (desktop / optional). */
 export function getMissingPayWallets(): PayWalletOption[] {
+  if (isLikelyMobile()) return []
   const detected = detectInjectedWalletIds()
   return PAY_WALLETS.filter((w) => !detected.has(w.id)).map((w) => ({
     ...w,
@@ -360,8 +377,9 @@ export function getMissingPayWallets(): PayWalletOption[] {
 }
 
 /**
- * Open a wallet app with the payment prefilled.
- * Tries the deep link; if the page is still visible shortly after, offer install.
+ * Open a wallet app with the payment prefilled via deep link / universal link.
+ * On mobile we do not auto-jump to the store — the app is often installed and
+ * just needs a moment to come to the foreground.
  */
 export function openPayWallet(wallet: PayWalletOption, params: CryptoPayParams): void {
   const url = wallet.buildUrl(params)
@@ -371,11 +389,15 @@ export function openPayWallet(wallet: PayWalletOption, params: CryptoPayParams):
       ? `${window.location.origin}${wallet.installUrl}`
       : wallet.installUrl
 
+  // Prefer leaving this tab so the OS can hand off to the installed app.
   window.location.href = url
 
-  window.setTimeout(() => {
-    if (document.visibilityState === 'visible' && Date.now() - started < 2800) {
-      window.open(install, '_blank', 'noopener,noreferrer')
-    }
-  }, 2200)
+  // Desktop / slow handoff only: if still visible, offer install as a last resort.
+  if (!isLikelyMobile()) {
+    window.setTimeout(() => {
+      if (document.visibilityState === 'visible' && Date.now() - started < 2800) {
+        window.open(install, '_blank', 'noopener,noreferrer')
+      }
+    }, 2200)
+  }
 }
