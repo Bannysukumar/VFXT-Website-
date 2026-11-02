@@ -69,7 +69,12 @@ export function AdminStakingPage() {
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">{row.status ?? '—'}</Badge>
                   <span>
-                    {formatMinor(row.principalMinor ?? 0, { scale: 2, currency: 'USD' })}
+                    {formatMinor(row.principalMinor ?? 0, { scale: 0 })} VFXT
+                    {row.totalPaidMinor != null ? (
+                      <span className="ml-2 text-ink-muted">
+                        paid {formatMinor(row.totalPaidMinor, { scale: 0 })}
+                      </span>
+                    ) : null}
                   </span>
                 </div>
               </div>

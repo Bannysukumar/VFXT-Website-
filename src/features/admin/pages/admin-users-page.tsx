@@ -33,7 +33,7 @@ import {
 } from '@/services/admin-service'
 import { PasswordInput } from '@/features/auth/components/auth-layout'
 import { getFirebaseAuth } from '@/lib/firebase'
-import { formatMinor, parseToMinor } from '@/lib/money'
+import { formatMinor } from '@/lib/money'
 import { exportRowsToCsv, exportRowsToExcel } from '@/lib/export-table'
 import type { AdminRole } from '@/types/models'
 
@@ -97,8 +97,6 @@ function UserDetailDialog({
   const [adjustDirection, setAdjustDirection] = useState<'credit' | 'debit'>('credit')
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjustReason, setAdjustReason] = useState('')
-  const adjustIsVfxt = walletKind === 'vfxt' || walletKind === 'direct_referral'
-
   useEffect(() => {
     if (!open || !profile) return
     setDisplayName(String(profile.displayName ?? ''))
@@ -159,17 +157,9 @@ function UserDetailDialog({
   const adjustWallet = useMutation({
     mutationFn: async () => {
       if (adjustReason.trim().length < 3) throw new Error('Reason must be at least 3 characters')
-      let raw: number
-      if (adjustIsVfxt) {
-        raw = Number.parseInt(adjustAmount.trim(), 10)
-        if (!Number.isFinite(raw) || raw <= 0) throw new Error('Enter a positive VFXT amount (whole tokens)')
-      } else {
-        try {
-          raw = Number(parseToMinor(adjustAmount.trim() || '0', 2))
-        } catch {
-          throw new Error('Enter a valid USD amount (e.g. 10 or 10.50)')
-        }
-        if (!Number.isFinite(raw) || raw <= 0) throw new Error('Enter a positive USD amount (e.g. 10)')
+      const raw = Number.parseInt(adjustAmount.trim(), 10)
+      if (!Number.isFinite(raw) || raw <= 0) {
+        throw new Error('Enter a positive VFXT amount (whole tokens)')
       }
       const signed = adjustDirection === 'credit' ? raw : -raw
       return adminAdjustWallet({
@@ -449,17 +439,10 @@ function UserDetailDialog({
                     <TR key={w.walletId}>
                       <TD className="capitalize">{w.kind.replaceAll('_', ' ')}</TD>
                       <TD className="tabular">
-                        {formatMinor(w.availableMinor, {
-                          scale: w.currency === 'USD' ? 2 : 0,
-                          currency: w.currency === 'USD' ? 'USD' : undefined,
-                        })}
-                        {w.currency === 'VFXT' ? ' VFXT' : ''}
+                        {formatMinor(w.availableMinor, { scale: 0 })} VFXT
                       </TD>
                       <TD className="tabular text-ink-muted">
-                        {formatMinor(w.reservedMinor, {
-                          scale: w.currency === 'USD' ? 2 : 0,
-                          currency: w.currency === 'USD' ? 'USD' : undefined,
-                        })}
+                        {formatMinor(w.reservedMinor, { scale: 0 })} VFXT
                       </TD>
                     </TR>
                   ))}
@@ -492,27 +475,15 @@ function UserDetailDialog({
                   </NativeSelect>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="adj-amt">
-                    {adjustIsVfxt ? 'Amount (VFXT tokens)' : 'Amount (USD)'}
-                  </Label>
+                  <Label htmlFor="adj-amt">Amount (VFXT tokens)</Label>
                   <Input
                     id="adj-amt"
-                    inputMode="decimal"
-                    placeholder={adjustIsVfxt ? 'e.g. 10000' : 'e.g. 10 or 10.50'}
+                    inputMode="numeric"
+                    placeholder="e.g. 10000"
                     value={adjustAmount}
-                    onChange={(e) =>
-                      setAdjustAmount(
-                        adjustIsVfxt
-                          ? e.target.value.replace(/\D/g, '')
-                          : e.target.value.replace(/[^\d.]/g, ''),
-                      )
-                    }
+                    onChange={(e) => setAdjustAmount(e.target.value.replace(/\D/g, ''))}
                   />
-                  <p className="text-xs text-ink-muted">
-                    {adjustIsVfxt
-                      ? 'Whole VFXT tokens (not cents).'
-                      : 'Enter dollars — 10 credits $10.00, not $0.10.'}
-                  </p>
+                  <p className="text-xs text-ink-muted">Whole VFXT tokens (not USD cents).</p>
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="adj-reason">Reason</Label>

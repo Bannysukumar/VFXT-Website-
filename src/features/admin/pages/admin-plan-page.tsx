@@ -43,6 +43,7 @@ export function AdminPlanPage() {
   const [directReferralBonusBps, setDirectReferralBonusBps] = useState('')
   const [lockedPackages, setLockedPackages] = useState<LockedPackageRow[]>([])
   const [rankRewards, setRankRewards] = useState<RankRewardRow[]>([])
+  const [tokensPerUsd, setTokensPerUsd] = useState(10_000)
 
   useEffect(() => {
     const p = settings.data?.plan as Record<string, unknown> | undefined
@@ -53,6 +54,9 @@ export function AdminPlanPage() {
     setDirectReferralBonusBps(String(p.directReferralBonusBps ?? ''))
     setLockedPackages((p.lockedPackages as LockedPackageRow[]) ?? [])
     setRankRewards((p.rankRewards as RankRewardRow[]) ?? [])
+    const t = settings.data?.token as Record<string, unknown> | undefined
+    const per = Number(t?.tokensPerUsd ?? 10_000)
+    if (Number.isFinite(per) && per > 0) setTokensPerUsd(per)
   }, [settings.data])
 
   const save = useMutation({
@@ -97,7 +101,7 @@ export function AdminPlanPage() {
       <PageHeader
         eyebrow="Console"
         title="Plan"
-        description="Stake minimums, daily ROI rate, level commissions, locked packages, and rank rewards."
+        description="Staking, ROI, commissions, and ranks run in VFXT tokens. USD fields below convert at the token rate."
       />
 
       <Card>
@@ -107,11 +111,29 @@ export function AdminPlanPage() {
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-2">
             <Label>Min stake (USD cents)</Label>
-            <Input value={minStakeUsdCents} onChange={(e) => setMinStakeUsdCents(e.target.value)} />
+            <Input
+              value={minStakeUsdCents}
+              onChange={(e) => setMinStakeUsdCents(e.target.value)}
+              placeholder="10000 = $100"
+              inputMode="numeric"
+            />
+            <p className="text-xs text-ink-muted">
+              ${((Number.parseInt(minStakeUsdCents || '0', 10) || 0) / 100).toFixed(2)} →{' '}
+              <span className="font-semibold text-ink">
+                {Math.floor(
+                  ((Number.parseInt(minStakeUsdCents || '0', 10) || 0) * tokensPerUsd) / 100,
+                ).toLocaleString()}{' '}
+                VFXT
+              </span>{' '}
+              at {tokensPerUsd.toLocaleString()} VFXT / $1
+            </p>
           </div>
           <div className="space-y-2">
             <Label>Daily rate (bps)</Label>
             <Input value={dailyRateBps} onChange={(e) => setDailyRateBps(e.target.value)} />
+            <p className="text-xs text-ink-muted">
+              {(Number(dailyRateBps || 0) / 100).toFixed(2)}% of principal paid daily in VFXT
+            </p>
           </div>
           <div className="space-y-2 sm:col-span-2">
             <Label>Level commission bps (comma-separated)</Label>
@@ -213,15 +235,19 @@ export function AdminPlanPage() {
       <Card className="overflow-hidden">
         <CardHeader>
           <CardTitle className="font-sans text-lg">Rank rewards</CardTitle>
+          <p className="text-sm text-ink-muted">
+            Enter USD thresholds/rewards — the server multiplies by{' '}
+            {tokensPerUsd.toLocaleString()} to get VFXT volume and payout amounts.
+          </p>
         </CardHeader>
         <CardContent className="p-0">
           <Table>
             <THead>
               <tr>
                 <TH>Rank</TH>
-                <TH>Left USD</TH>
-                <TH>Right USD</TH>
-                <TH>Reward USD</TH>
+                <TH>Left $</TH>
+                <TH>Right $</TH>
+                <TH>Reward $</TH>
                 <TH>Cycle days</TH>
                 <TH>Enabled</TH>
               </tr>

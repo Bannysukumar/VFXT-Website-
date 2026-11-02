@@ -16,44 +16,44 @@ export const INCOME_PAGES: Record<
   roi: {
     type: 'roi',
     title: 'Daily ROI income',
-    description: 'All daily yield (ROI) credits paid to users.',
-    currency: 'USD',
+    description: 'All daily yield (ROI) credits paid to users in VFXT.',
+    currency: 'VFXT',
   },
   'level-commission': {
     type: 'level_commission',
     title: 'Level commission income',
-    description: 'Seven-level affiliate commission credits.',
-    currency: 'USD',
+    description: 'Seven-level affiliate commission credits in VFXT.',
+    currency: 'VFXT',
   },
   'direct-bonus': {
     type: 'direct_bonus',
     title: 'Direct bonus income',
-    description: 'Direct referral bonus credits.',
+    description: 'Direct referral bonus credits in VFXT.',
     currency: 'VFXT',
   },
   'referral-bonus': {
     type: 'referral_bonus',
     title: 'Referral bonus income',
-    description: 'Referral bonus ledger credits.',
-    currency: 'USD',
+    description: 'Referral bonus ledger credits in VFXT.',
+    currency: 'VFXT',
   },
   'rank-reward': {
     type: 'rank_reward',
     title: 'Rank reward income',
-    description: 'Binary rank reward payouts.',
-    currency: 'USD',
+    description: 'Binary rank reward payouts in VFXT.',
+    currency: 'VFXT',
   },
   'staking-reward': {
     type: 'staking_reward',
     title: 'Staking reward income',
-    description: 'Staking reward credits.',
-    currency: 'USD',
+    description: 'Staking reward credits in VFXT.',
+    currency: 'VFXT',
   },
   'locked-maturity': {
     type: 'locked_maturity',
     title: 'Locked maturity income',
-    description: 'Locked package maturity payouts.',
-    currency: 'USD',
+    description: 'Locked package maturity payouts in VFXT.',
+    currency: 'VFXT',
   },
   'locked-bonus': {
     type: 'locked_bonus',
@@ -64,8 +64,8 @@ export const INCOME_PAGES: Record<
   'deposit-credit': {
     type: 'deposit_credit',
     title: 'Deposit credit income',
-    description: 'Fund wallet credits from deposits (manual and automatic).',
-    currency: 'USD',
+    description: 'Fund wallet VFXT credits from deposits (manual and automatic).',
+    currency: 'VFXT',
   },
 }
 

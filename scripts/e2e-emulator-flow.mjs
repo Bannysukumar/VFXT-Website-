@@ -226,20 +226,21 @@ async function main() {
     ok(`pad_directs_${user.code}`, `${after.size} directs (need ≥ ${need})`)
   }
 
-  // Credit fund wallet for staker U7 via adminAdjustWallet
+  // Credit fund wallet for staker U7 via adminAdjustWallet (whole VFXT tokens)
   console.log('5) Admin credit fund + stake')
   const staker = chain[7]
-  const stakeCents = 100_00 // $100
+  const stakeTokens = 1_000_000 // $100 at 10_000 VFXT / $1
+  const fundCredit = 5_000_000
   try {
     // Re-sign admin for fresh claims
     rootToken = (await signIn(rootEmail, password)).idToken
     await callCallable('adminAdjustWallet', rootToken, {
       uid: staker.uid,
       walletKind: 'fund',
-      amountMinor: 500_00,
+      amountMinor: fundCredit,
       reason: 'E2E emulator fund credit',
     })
-    ok('admin_credit_fund', '$500')
+    ok('admin_credit_fund', `${fundCredit.toLocaleString()} VFXT`)
   } catch (e) {
     fail('admin_credit_fund', e.message)
     // Fallback: write wallet directly
@@ -249,10 +250,10 @@ async function main() {
         walletId: wid,
         userId: staker.uid,
         kind: 'fund',
-        currency: 'USD',
-        availableMinor: 500_00,
+        currency: 'VFXT',
+        availableMinor: fundCredit,
         reservedMinor: 0,
-        decimals: 2,
+        decimals: 0,
         createdAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       },
@@ -265,7 +266,7 @@ async function main() {
   try {
     const stakeRes = await callCallable('createStakingPosition', staker.token, {
       planId: 'daily_yield',
-      amountMinor: stakeCents,
+      amountMinor: stakeTokens,
       idempotencyKey: `e2e-stake-${stamp}`,
     })
     ok('create_stake', JSON.stringify(stakeRes).slice(0, 120))
@@ -277,17 +278,17 @@ async function main() {
   await new Promise((r) => setTimeout(r, 2000))
 
   console.log('6) Verify level commissions L1–L7 + direct bonus')
-  // Expected bps: [50,50,25,25,20,20,10] of $100 = cents [50,50,25,25,20,20,10]
-  const expectedLevelCents = [50, 50, 25, 25, 20, 20, 10]
+  // Expected bps: [50,50,25,25,20,20,10] of 1_000_000 VFXT
+  const expectedLevelTokens = [5_000, 5_000, 2_500, 2_500, 2_000, 2_000, 1_000]
   for (let level = 1; level <= 7; level += 1) {
     const payee = chain[7 - level] // L1→U6, L7→root
     const bal = await walletBal(payee.uid, 'level_income')
-    const expect = expectedLevelCents[level - 1]
-    if (bal >= expect) ok(`level_income_L${level}`, `${payee.code} bal=${bal}¢ (≥${expect})`)
-    else fail(`level_income_L${level}`, `${payee.code} bal=${bal}¢ expected≥${expect}`)
+    const expect = expectedLevelTokens[level - 1]
+    if (bal >= expect) ok(`level_income_L${level}`, `${payee.code} bal=${bal} VFXT (≥${expect})`)
+    else fail(`level_income_L${level}`, `${payee.code} bal=${bal} VFXT expected≥${expect}`)
   }
 
-  // Direct bonus: 5% of $100 = $5 → 5 * 10000 VFXT = 50000 tokens to U6
+  // Direct bonus: 5% of 1_000_000 = 50_000 VFXT to U6
   const directBal = await walletBal(chain[6].uid, 'direct_referral')
   if (directBal >= 50_000) ok('direct_referral_bonus', `${directBal} VFXT`)
   else fail('direct_referral_bonus', `got ${directBal}, expected ≥50000`)
@@ -295,10 +296,10 @@ async function main() {
   console.log('7) Deposit request')
   try {
     const dep = await callCallable('createDepositRequest', staker.token, {
-      amountMinor: 100_00,
+      amountMinor: 100_00, // $100 USDT (cents) — converts to VFXT on approve
       currency: 'USD',
       idempotencyKey: `e2e-dep-${stamp}`,
-      method: 'usdt_bep20',
+      method: 'manual',
       note: 'e2e',
     })
     ok('create_deposit', `id=${dep.depositId || dep.id || JSON.stringify(dep).slice(0, 80)}`)
@@ -307,13 +308,15 @@ async function main() {
   }
 
   console.log('8) Withdrawal request (may queue without hot wallet)')
-  // Move some funds to withdrawal wallet
+  // Credit withdrawal wallet in VFXT tokens (min ≈ 100_000 at $10 / 10k rate)
+  const withdrawCredit = 250_000
+  const withdrawAmount = 100_000
   try {
     rootToken = (await signIn(rootEmail, password)).idToken
     await callCallable('adminAdjustWallet', rootToken, {
       uid: staker.uid,
       walletKind: 'withdrawal',
-      amountMinor: 50_00,
+      amountMinor: withdrawCredit,
       reason: 'E2E withdrawal balance',
     })
   } catch {
@@ -322,10 +325,10 @@ async function main() {
         walletId: `${staker.uid}_withdrawal`,
         userId: staker.uid,
         kind: 'withdrawal',
-        currency: 'USD',
-        availableMinor: 50_00,
+        currency: 'VFXT',
+        availableMinor: withdrawCredit,
         reservedMinor: 0,
-        decimals: 2,
+        decimals: 0,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true },
@@ -336,8 +339,8 @@ async function main() {
     // Unique valid BEP-20 destination per run (addresses are claimed after first use).
     const dest = `0x${Buffer.from(`e2e-${stamp}`).toString('hex').padEnd(40, '0').slice(0, 40)}`
     const w = await callCallable('createWithdrawalRequest', staker.token, {
-      amountMinor: 20_00,
-      currency: 'USD',
+      amountMinor: withdrawAmount,
+      currency: 'VFXT',
       destination: dest,
       idempotencyKey: `e2e-wd-${stamp}`,
       method: 'usdt_bep20',
@@ -351,11 +354,12 @@ async function main() {
   }
 
   console.log('9) Rank / salary volumes')
-  // Simulate binary volumes meeting rank 1 ($1000/$1000)
+  // Rank 1 thresholds are $1000/$1000 → 10_000_000 VFXT each at default rate
+  const rankVolumeTokens = 10_000_000
   await db.collection('users').doc(rootUid).set(
     {
-      leftVolumeMinor: 100_000,
-      rightVolumeMinor: 100_000,
+      leftVolumeMinor: rankVolumeTokens,
+      rightVolumeMinor: rankVolumeTokens,
       updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true },
@@ -373,7 +377,7 @@ async function main() {
     const rank = await callCallable('getRankStatus', rootToken, {})
     const qualified =
       rank?.qualifiedRank ?? rank?.currentRank ?? rank?.rank ?? rank?.qualified
-    if (Number(qualified) >= 1 || rank?.leftVolumeMinor >= 100_000) {
+    if (Number(qualified) >= 1 || Number(rank?.leftVolumeMinor) >= rankVolumeTokens) {
       ok('rank_salary_qualified', JSON.stringify(rank).slice(0, 160))
     } else {
       ok('rank_status_payload', JSON.stringify(rank).slice(0, 160))

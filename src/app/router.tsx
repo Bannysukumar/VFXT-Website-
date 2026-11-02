@@ -23,6 +23,7 @@ import { TransferPage } from '@/features/wallets/pages/transfer-page'
 import { PeerTransferHistoryPage } from '@/features/wallets/pages/peer-transfer-history-page'
 import { AdminPeerTransfersPage } from '@/features/admin/pages/admin-peer-transfers-page'
 import { AdminDashboardPage } from '@/features/admin/pages/admin-dashboard-page'
+import { AdminAnalyticsPage } from '@/features/admin/pages/admin-analytics-page'
 import { AdminDepositsPage } from '@/features/admin/pages/admin-deposits-page'
 import { AdminWithdrawalsPage } from '@/features/admin/pages/admin-withdrawals-page'
 import { AdminUsersPage } from '@/features/admin/pages/admin-users-page'
@@ -109,6 +110,7 @@ export const router = createBrowserRouter([
         element: <AppShell variant="admin" />,
         children: [
           { index: true, element: <AdminDashboardPage /> },
+          { path: 'analytics', element: <AdminAnalyticsPage /> },
           { path: 'deposits', element: <AdminDepositsPage /> },
           { path: 'auto-deposits', element: <AdminAutoDepositsPage /> },
           { path: 'withdrawals', element: <AdminWithdrawalsPage /> },

@@ -25,7 +25,7 @@ const columns: HistoryColumn[] = [
   },
   {
     key: 'amountMinor',
-    label: 'Amount',
+    label: 'USDT received',
     align: 'right',
     render: (r) =>
       formatMinor(Number(r.amountMinor ?? 0), { scale: 2, currency: 'USD' }),

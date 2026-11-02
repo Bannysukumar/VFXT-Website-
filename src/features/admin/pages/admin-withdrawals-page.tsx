@@ -95,7 +95,7 @@ export function AdminWithdrawalsPage() {
       <PageHeader
         eyebrow="Finance"
         title="Withdrawal requests"
-        description="Approve, complete, or reject withdrawals. Rejections release reserved funds back to the user."
+        description="Users debit VFXT; on complete, net USDT is sent on-chain. Rejections release reserved VFXT."
       />
       <StatusTabs value={status} onChange={setStatus} options={tabs} layoutId="withdrawal-tabs" />
       <AdminFiltersBar
@@ -160,7 +160,9 @@ export function AdminWithdrawalsPage() {
                       <StatusBadge status={row.status} />
                     </TD>
                     <TD className="tabular text-right font-semibold">
-                      {formatMinor(row.amountMinor, { scale: 2, currency: row.currency === 'USD' ? 'USD' : undefined })}
+                      {row.currency === 'VFXT'
+                        ? `${formatMinor(row.amountMinor, { scale: 0 })} VFXT`
+                        : formatMinor(row.amountMinor, { scale: 2, currency: 'USD' })}
                     </TD>
                     {actionable ? (
                       <TD>

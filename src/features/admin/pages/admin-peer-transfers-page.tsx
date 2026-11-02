@@ -52,10 +52,11 @@ const columns: HistoryColumn[] = [
     align: 'right',
     render: (r) => {
       const n = Number(r.amountMinor ?? 0)
-      if (String(r.currency) === 'VFXT') {
-        return `${formatMinor(n, { scale: 0 })} VFXT`
+      // Peer transfers are VFXT after tokens-only; keep USD fallback for legacy rows.
+      if (String(r.currency) === 'USD') {
+        return formatMinor(n, { scale: 2, currency: 'USD' })
       }
-      return formatMinor(n, { scale: 2, currency: 'USD' })
+      return `${formatMinor(n, { scale: 0 })} VFXT`
     },
   },
   {
@@ -69,7 +70,7 @@ export function AdminPeerTransfersPage() {
   return (
     <AdminHistoryTable
       title="User transfers"
-      description="Member-to-member transfers by User ID (VFXT tokens or Withdrawal USD)."
+      description="Member-to-member transfers by User ID (all wallets are VFXT tokens)."
       queryKey={['admin', 'peer-transfers']}
       queryFn={async () => {
         const res = await adminListPeerTransfers()

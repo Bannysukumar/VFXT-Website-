@@ -70,7 +70,7 @@ const mapWithdrawal = (id: string, data: DocumentData): WithdrawalRequest => ({
   id,
   userId: data.userId,
   amountMinor: Number(data.amountMinor ?? 0),
-  currency: (data.currency ?? 'USD') as CurrencyCode,
+  currency: (data.currency ?? 'VFXT') as CurrencyCode,
   status: data.status as TransactionStatus,
   destination: data.destination ?? '',
   idempotencyKey: data.idempotencyKey ?? '',

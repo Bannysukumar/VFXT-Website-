@@ -22,6 +22,7 @@ export function AdminWithdrawSettingsPage() {
   const [commissionBps, setCommissionBps] = useState('')
   const [autoWithdrawEnabled, setAutoWithdrawEnabled] = useState(false)
   const [requireProfileAddress, setRequireProfileAddress] = useState(true)
+  const [tokensPerUsd, setTokensPerUsd] = useState(10_000)
 
   useEffect(() => {
     const w = settings.data?.withdraw as Record<string, unknown> | undefined
@@ -30,6 +31,9 @@ export function AdminWithdrawSettingsPage() {
     setCommissionBps(String(w.commissionBps ?? 0))
     setAutoWithdrawEnabled(Boolean(w.autoWithdrawEnabled))
     setRequireProfileAddress(w.requireProfileAddress !== false)
+    const t = settings.data?.token as Record<string, unknown> | undefined
+    const per = Number(t?.tokensPerUsd ?? 10_000)
+    if (Number.isFinite(per) && per > 0) setTokensPerUsd(per)
   }, [settings.data])
 
   const save = useMutation({
@@ -57,21 +61,25 @@ export function AdminWithdrawSettingsPage() {
     return <ErrorState message={settings.error.message} onRetry={() => settings.refetch()} />
   }
 
+  const cents = Number.parseInt(minWithdrawUsdCents || '0', 10) || 0
+  const minTokens = Math.floor((cents * tokensPerUsd) / 100)
+
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow="Console"
         title="Withdraw"
-        description="Minimum amount, commission fee, auto-withdraw after first payout, and address rules."
+        description="Users debit VFXT from the Withdrawal wallet. Net USDT is sent on-chain after commission."
       />
 
       <Card>
         <CardHeader>
           <CardTitle className="font-sans text-lg">Withdraw settings</CardTitle>
           <CardDescription>
-            After a member’s first withdrawal, their wallet is linked. When auto-withdraw is on and
-            the withdrawal wallet reaches the minimum, payouts run automatically to that unique
-            address.
+            Minimum is stored as USD cents and converted to VFXT at the live token rate (
+            {tokensPerUsd.toLocaleString()} VFXT / $1). After a member’s first withdrawal, their
+            wallet is linked. When auto-withdraw is on and the withdrawal wallet reaches the
+            minimum, payouts run automatically to that unique address.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid max-w-md gap-4">
@@ -80,9 +88,13 @@ export function AdminWithdrawSettingsPage() {
             <Input
               value={minWithdrawUsdCents}
               onChange={(e) => setMinWithdrawUsdCents(e.target.value)}
+              placeholder="1000 = $10"
+              inputMode="numeric"
             />
             <p className="text-xs text-ink-muted">
-              ${(Number(minWithdrawUsdCents || 0) / 100).toFixed(2)} minimum
+              ${(cents / 100).toFixed(2)} USDT floor →{' '}
+              <span className="font-semibold text-ink">{minTokens.toLocaleString()} VFXT</span>{' '}
+              minimum debit
             </p>
           </div>
           <div className="space-y-2">
@@ -93,8 +105,8 @@ export function AdminWithdrawSettingsPage() {
               placeholder="500 = 5%"
             />
             <p className="text-xs text-ink-muted">
-              {(Number(commissionBps || 0) / 100).toFixed(2)}% fee — user is debited full amount; net
-              USDT is sent on-chain.
+              {(Number(commissionBps || 0) / 100).toFixed(2)}% fee on USDT payout — user is debited
+              full VFXT; net USDT is sent on-chain.
             </p>
           </div>
           <div className="space-y-2">
@@ -108,7 +120,8 @@ export function AdminWithdrawSettingsPage() {
             </NativeSelect>
             <p className="text-xs text-ink-muted">
               When Yes: after the first successful withdrawal, any time the withdrawal wallet is at
-              or above the minimum, the system auto-sends to the linked wallet (every ~5 minutes).
+              or above the VFXT minimum, the system auto-sends USDT to the linked wallet (every ~5
+              minutes).
             </p>
           </div>
           <div className="space-y-2">

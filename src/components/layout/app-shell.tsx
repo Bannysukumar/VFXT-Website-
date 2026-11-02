@@ -123,7 +123,10 @@ const userNav: NavSection[] = [
 const adminNav: NavSection[] = [
   {
     title: 'Overview',
-    items: [{ to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true }],
+    items: [
+      { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
+      { to: '/admin/analytics', label: 'Analytics', icon: LineChart },
+    ],
   },
   {
     title: 'Configuration',
@@ -209,6 +212,7 @@ const titles: Record<string, string> = {
   '/app/support': 'Support',
   '/app/profile': 'Profile',
   '/admin': 'Dashboard',
+  '/admin/analytics': 'Analytics',
   '/admin/settings': 'Platform settings',
   '/admin/plan': 'Plan',
   '/admin/withdraw': 'Withdraw rules',

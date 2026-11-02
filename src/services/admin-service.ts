@@ -60,6 +60,72 @@ export async function getPlatformStats() {
   >('getPlatformStats')
 }
 
+export type TreasuryInvestedPeriod =
+  | 'today'
+  | 'yesterday'
+  | 'last_7_days'
+  | 'last_30_days'
+  | 'all'
+
+export type TreasuryPayoutWindow = 'tomorrow' | 'next_24h'
+
+export type TreasuryAnalytics = {
+  generatedAt: string
+  tokensPerUsd: number
+  invested: {
+    tokens: number
+    usdtCents: number
+    positions: number
+    period: TreasuryInvestedPeriod
+  }
+  totalActiveStake: {
+    tokens: number
+    usdtCents: number
+    positions: number
+  }
+  tomorrowPayout: {
+    tokens: number
+    usdtCents: number
+    positions: number
+    users: number
+    window: TreasuryPayoutWindow
+  }
+  pendingWithdrawals: {
+    tokens: number
+    usdtCents: number
+    count: number
+  }
+  hotWallet: {
+    configured: boolean
+    address: string | null
+    usdt: number
+    usdtCents: number
+  }
+  required: {
+    usdtCents: number
+    shortfallUsdtCents: number
+    surplusUsdtCents: number
+    coveragePct: number
+  }
+}
+
+export async function getAdminTreasuryAnalytics(input?: {
+  investedPeriod?: TreasuryInvestedPeriod
+  payoutWindow?: TreasuryPayoutWindow
+  includePendingWithdrawals?: boolean
+  utcOffsetMinutes?: number
+}) {
+  return callFunction<
+    {
+      investedPeriod?: TreasuryInvestedPeriod
+      payoutWindow?: TreasuryPayoutWindow
+      includePendingWithdrawals?: boolean
+      utcOffsetMinutes?: number
+    },
+    TreasuryAnalytics
+  >('getAdminTreasuryAnalytics', input ?? {})
+}
+
 export interface AdminUserSummary {
   uid: string
   email: string | null

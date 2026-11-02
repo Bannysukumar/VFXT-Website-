@@ -25,21 +25,20 @@ const columns: HistoryColumn[] = [
   },
   {
     key: 'amountMinor',
-    label: 'Gross',
+    label: 'Gross VFXT',
     align: 'right',
-    render: (r) =>
-      formatMinor(Number(r.amountMinor ?? 0), { scale: 2, currency: 'USD' }),
+    render: (r) => `${formatMinor(Number(r.amountMinor ?? 0), { scale: 0 })} VFXT`,
   },
   {
     key: 'commissionMinor',
-    label: 'Fee',
+    label: 'Fee USDT',
     align: 'right',
     render: (r) =>
       formatMinor(Number(r.commissionMinor ?? 0), { scale: 2, currency: 'USD' }),
   },
   {
     key: 'netAmountMinor',
-    label: 'Net sent',
+    label: 'Net USDT sent',
     align: 'right',
     render: (r) =>
       formatMinor(Number(r.netAmountMinor ?? 0), { scale: 2, currency: 'USD' }),
@@ -77,7 +76,7 @@ export function AdminAutoWithdrawalsPage() {
   return (
     <AdminHistoryTable
       title="Automatic withdrawals"
-      description="Completed USDT BEP-20 withdrawals sent by the hot wallet / auto-withdraw."
+      description="Completed payouts: VFXT debited from the user, net USDT BEP-20 sent by the hot wallet."
       queryKey={['admin', 'auto-withdrawals']}
       queryFn={async () => {
         const res = await adminListAutoWithdrawals()

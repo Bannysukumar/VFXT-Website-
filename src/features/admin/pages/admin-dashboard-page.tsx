@@ -92,7 +92,12 @@ function QueuePreview({
               <li key={row.id} className="flex items-center justify-between gap-3 py-3">
                 <div>
                   <p className="tabular font-semibold">
-                    {formatMinor(row.amountMinor, { scale: 2, currency: row.currency === 'USD' ? 'USD' : undefined })}
+                    {row.currency === 'VFXT'
+                      ? `${formatMinor(row.amountMinor, { scale: 0 })} VFXT`
+                      : formatMinor(row.amountMinor, {
+                          scale: 2,
+                          currency: row.currency === 'USD' ? 'USD' : undefined,
+                        })}
                   </p>
                   <p className="text-xs text-ink-muted">
                     {formatDistanceToNow(new Date(row.createdAt), { addSuffix: true })}

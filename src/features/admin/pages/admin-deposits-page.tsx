@@ -78,7 +78,12 @@ export function AdminDepositsPage() {
       ),
     )
   }, [allRows, search])
-  const total = rows.reduce((sum, r) => sum + r.amountMinor, 0)
+  const totalUsdt = rows
+    .filter((r) => r.currency !== 'VFXT')
+    .reduce((sum, r) => sum + r.amountMinor, 0)
+  const totalVfxt = rows
+    .filter((r) => r.currency === 'VFXT')
+    .reduce((sum, r) => sum + r.amountMinor, 0)
   const exportCols = [
     { key: 'id', label: 'Deposit ID' },
     { key: 'userId', label: 'User' },
@@ -93,7 +98,7 @@ export function AdminDepositsPage() {
       <PageHeader
         eyebrow="Finance"
         title="Deposit requests"
-        description="Approving a deposit writes an atomic ledger credit to the user's wallet."
+        description="USDT deposits convert to VFXT Fund credit on approve. VFXT deposits credit Fund 1:1."
       />
       <StatusTabs value={status} onChange={setStatus} options={tabs} layoutId="deposit-tabs" />
       <AdminFiltersBar
@@ -122,10 +127,23 @@ export function AdminDepositsPage() {
         extra={
           rows.length > 0 ? (
             <p className="text-sm text-ink-muted">
-              Total{' '}
-              <span className="tabular font-semibold text-ink">
-                {formatMinor(total, { scale: 2, currency: 'USD' })}
-              </span>
+              {totalUsdt > 0 ? (
+                <>
+                  USDT{' '}
+                  <span className="tabular font-semibold text-ink">
+                    {formatMinor(totalUsdt, { scale: 2, currency: 'USD' })}
+                  </span>
+                </>
+              ) : null}
+              {totalUsdt > 0 && totalVfxt > 0 ? ' · ' : null}
+              {totalVfxt > 0 ? (
+                <>
+                  VFXT{' '}
+                  <span className="tabular font-semibold text-ink">
+                    {formatMinor(totalVfxt, { scale: 0 })}
+                  </span>
+                </>
+              ) : null}
             </p>
           ) : null
         }
@@ -168,7 +186,9 @@ export function AdminDepositsPage() {
                       <StatusBadge status={row.status} />
                     </TD>
                     <TD className="tabular text-right font-semibold">
-                      {formatMinor(row.amountMinor, { scale: 2, currency: row.currency === 'USD' ? 'USD' : undefined })}
+                      {row.currency === 'VFXT'
+                        ? `${formatMinor(row.amountMinor, { scale: 0 })} VFXT`
+                        : formatMinor(row.amountMinor, { scale: 2, currency: 'USD' })}
                     </TD>
                     {status === 'pending' ? (
                       <TD>

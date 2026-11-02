@@ -89,6 +89,7 @@ export {
   listPendingWithdrawals,
   getPlatformStats,
 } from './modules/admin/handlers';
+export { getAdminTreasuryAnalytics } from './modules/admin/treasury-analytics';
 export {
   adminListAutoDeposits,
   adminListAutoWithdrawals,
