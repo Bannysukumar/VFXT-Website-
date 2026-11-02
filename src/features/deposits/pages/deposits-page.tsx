@@ -411,11 +411,15 @@ export function DepositsPage() {
       symbol === 'VFXT' ? String(open.amountMinor) : (open.amountMinor / 100).toFixed(2)
     if (open.expectedWei) {
       try {
-        // Show 6 decimals so wallets / copy field keep the unique payment tag.
+        // Show 4 decimals — matches wallet-safe unique tags (e.g. 10.7641).
         const wei = BigInt(open.expectedWei)
         const whole = wei / 10n ** 18n
-        const frac = (wei % 10n ** 18n).toString().padStart(18, '0').slice(0, 6)
-        amountDisplay = `${whole.toString()}.${frac}`
+        const frac = (wei % 10n ** 18n).toString().padStart(18, '0').slice(0, 4)
+        amountDisplay = /^0+$/.test(frac)
+          ? symbol === 'USDT'
+            ? `${whole.toString()}.00`
+            : whole.toString()
+          : `${whole.toString()}.${frac}`
       } catch {
         /* keep fallback */
       }

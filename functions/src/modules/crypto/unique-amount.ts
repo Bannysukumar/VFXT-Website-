@@ -1,5 +1,5 @@
 import { formatUnits } from 'ethers';
-import { FieldValue, type Firestore } from 'firebase-admin/firestore';
+import type { Firestore } from 'firebase-admin/firestore';
 import { Collections } from '../../lib/firebase';
 import { AppError } from '../../lib/errors';
 import {
@@ -9,22 +9,25 @@ import {
 } from '../../config/bsc';
 
 /**
- * Unique tags are scaled into the visible 6-decimal range so Trust / MetaMask /
- * VFXT Wallet show and send e.g. 10.524707 instead of rounding to 10.00.
- * 1 tag unit = 10^(decimals-6) wei = 0.000001 token.
+ * Unique tags use 4 visible decimals so wallets (Trust / MetaMask) show and send
+ * the exact amount, e.g. 10.7641 — not 6+ digits that get truncated mid-payment.
+ * 1 tag unit = 10^(decimals-4) wei = 0.0001 token.
  */
-const VISIBLE_DECIMALS = 6;
-const MAX_PAYMENT_TAG = 999_999;
+const VISIBLE_DECIMALS = 4;
+const MAX_PAYMENT_TAG = 9_999;
+/** Previous 6-decimal scheme — still detect reserved tags / accept old payments. */
+const LEGACY_VISIBLE_DECIMALS = 6;
+const LEGACY_MAX_PAYMENT_TAG = 999_999;
 
 export type DepositAsset = 'USDT' | 'VFXT';
 
-function tagUnitWei(decimals: number): bigint {
-  return 10n ** BigInt(decimals - VISIBLE_DECIMALS);
+function tagUnitWei(decimals: number, visible = VISIBLE_DECIMALS): bigint {
+  return 10n ** BigInt(decimals - visible);
 }
 
 /**
  * USDT: amountMinor = USD cents → USDT wei (1:1).
- * VFXT: amountMinor = whole tokens → VFXT wei (18 decimals). Enter 100 → send ~100 VFXT.
+ * VFXT: amountMinor = whole tokens → VFXT wei (18 decimals).
  */
 function baseWeiForAsset(amountMinor: number, asset: DepositAsset): bigint {
   if (asset === 'VFXT') {
@@ -36,13 +39,12 @@ function baseWeiForAsset(amountMinor: number, asset: DepositAsset): bigint {
   return usdCentsToUsdtWei(amountMinor);
 }
 
-/** Human amount: round when tag=0, else fixed 6 decimals (wallet-safe). */
+/** Human amount: round when tag=0, else fixed 4 decimals (wallet-safe). */
 export function formatUniqueAmountDisplay(wei: bigint, decimals: number): string {
   const raw = formatUnits(wei, decimals);
   const [whole, fracRaw = ''] = raw.split('.');
-  const frac = `${fracRaw}000000`.slice(0, VISIBLE_DECIMALS);
+  const frac = `${fracRaw}0000`.slice(0, VISIBLE_DECIMALS);
   if (/^0+$/.test(frac)) {
-    // Sole open deposit for this amount — usual round amount (no unique decimals).
     return decimals === USDT_DECIMALS ? `${whole}.00` : whole;
   }
   return `${whole}.${frac}`;
@@ -55,30 +57,44 @@ function extractPaymentTag(
 ): number | null {
   if (expectedWei < base) return null;
   const delta = expectedWei - base;
-  const unit = tagUnitWei(decimals);
 
-  // New scheme: visible 6-decimal tags.
-  if (delta % unit === 0n) {
-    const tag = Number(delta / unit);
+  const unit4 = tagUnitWei(decimals, VISIBLE_DECIMALS);
+  if (delta % unit4 === 0n) {
+    const tag = Number(delta / unit4);
     if (Number.isInteger(tag) && tag >= 0 && tag <= MAX_PAYMENT_TAG) return tag;
   }
 
-  // Legacy scheme: raw wei tags (1…999999) — still detect so old opens don't collide.
-  if (delta <= BigInt(MAX_PAYMENT_TAG)) {
+  const unit6 = tagUnitWei(decimals, LEGACY_VISIBLE_DECIMALS);
+  if (delta % unit6 === 0n) {
+    const tag = Number(delta / unit6);
+    if (Number.isInteger(tag) && tag >= 0 && tag <= LEGACY_MAX_PAYMENT_TAG) {
+      // Map legacy 6-dp tag into 4-dp occupancy buckets so new tags don't collide.
+      return Math.min(MAX_PAYMENT_TAG, Math.floor(tag / 100) || tag);
+    }
+  }
+
+  if (delta <= BigInt(LEGACY_MAX_PAYMENT_TAG)) {
     const tag = Number(delta);
-    if (Number.isInteger(tag) && tag >= 0) return tag;
+    if (Number.isInteger(tag) && tag >= 0) return Math.min(MAX_PAYMENT_TAG, tag);
   }
 
   return null;
 }
 
+/** Truncate wei down to N visible decimals (wallet truncation). */
+function truncateToVisibleWei(wei: bigint, decimals: number, visible: number): bigint {
+  const unit = tagUnitWei(decimals, visible);
+  return (wei / unit) * unit;
+}
+
 /**
  * Allocate on-chain expected wei for a deposit:
  * - If nobody else is awaiting this same amount+asset → usual round amount (tag 0).
- * - If another open deposit already owns the round amount → add visible 6-decimal
- *   uniqueness so both payments can be matched (tag 1…999999).
+ * - If another awaiting deposit already owns the round amount → add visible 4-decimal
+ *   uniqueness (tag 1…9999), e.g. 10.7641.
  *
- * Formula when tagged: baseWei + paymentTag * 10^(decimals-6)
+ * Pending (manual-review) deposits are ignored — payment already submitted.
+ * Expected amount is frozen at create time and must not change mid-payment.
  */
 export async function allocateUniqueDepositWei(
   db: Firestore,
@@ -91,9 +107,10 @@ export async function allocateUniqueDepositWei(
   const unit = tagUnitWei(decimals);
   const method = asset === 'VFXT' ? 'vfxt_bep20' : 'usdt_bep20';
 
+  // Only deposits still waiting for payment compete for unique amounts.
   const open = await db
     .collection(Collections.deposits)
-    .where('status', 'in', ['pending', 'awaiting_payment'])
+    .where('status', '==', 'awaiting_payment')
     .limit(200)
     .get();
 
@@ -116,7 +133,6 @@ export async function allocateUniqueDepositWei(
     }
   }
 
-  // Prefer the usual round amount whenever it is free (single depositor case).
   if (!usedTags.has(0)) {
     return {
       expectedWei: base.toString(),
@@ -125,7 +141,6 @@ export async function allocateUniqueDepositWei(
     };
   }
 
-  // Concurrent same-amount deposit(s) — assign a visible unique decimal amount.
   const start = (Date.now() % MAX_PAYMENT_TAG) + 1;
   for (let i = 0; i < MAX_PAYMENT_TAG; i++) {
     const tag = ((start + i - 1) % MAX_PAYMENT_TAG) + 1;
@@ -163,7 +178,6 @@ export function resolveDepositExpectedWei(dep: {
   return baseWeiForAsset(Number(dep.amountMinor), resolveDepositAsset(dep));
 }
 
-/** Whole-token / whole-cent base wei before the unique payment tag. */
 export function resolveDepositBaseWei(dep: {
   amountMinor?: number;
   method?: string | null;
@@ -172,10 +186,6 @@ export function resolveDepositBaseWei(dep: {
   return baseWeiForAsset(Number(dep.amountMinor), resolveDepositAsset(dep));
 }
 
-/**
- * Wallets sometimes still send the round amount (10 USDT / 10 VFXT).
- * Accept both the exact tagged amount and the base amount when allowed.
- */
 export function depositWeiCandidates(dep: {
   expectedWei?: string | null;
   amountMinor?: number;
@@ -197,7 +207,7 @@ type OpenDepositPeer = {
   paymentTag?: number | null;
 };
 
-async function listOpenSameAmountPeers(
+async function listAwaitingSameAmountPeers(
   db: Firestore,
   dep: OpenDepositPeer,
 ): Promise<Array<{ id: string; data: OpenDepositPeer & Record<string, unknown> }>> {
@@ -208,7 +218,7 @@ async function listOpenSameAmountPeers(
 
   const open = await db
     .collection(Collections.deposits)
-    .where('status', 'in', ['pending', 'awaiting_payment'])
+    .where('status', '==', 'awaiting_payment')
     .limit(100)
     .get();
 
@@ -231,28 +241,26 @@ async function listOpenSameAmountPeers(
 }
 
 /**
- * Round (base) amounts may match many open deposits. Only the oldest open
+ * Round (base) amounts may match many open deposits. Only the oldest awaiting
  * deposit for the same amount + asset + receive address may claim a base payment.
- * If this deposit is the only open one for that amount, it may always claim base.
  */
 export async function canAcceptBaseWeiPayment(
   db: Firestore,
   depositId: string,
   dep: OpenDepositPeer,
 ): Promise<boolean> {
-  const peers = await listOpenSameAmountPeers(db, dep);
+  const peers = await listAwaitingSameAmountPeers(db, dep);
   if (peers.length <= 1) return peers[0]?.id === depositId || peers.length === 0;
   return peers[0]?.id === depositId;
 }
 
 /**
- * When concurrent peers finish and this deposit is alone for its amount,
- * clear unique decimals so the user pays the usual round amount again.
- * Still accepts the old tagged amount if they already copied/sent it.
+ * Keep the amount frozen after create. Never rewrite expectedWei mid-payment —
+ * that caused users to pay 10.7641 while the page later showed 10.756579.
  */
 export async function normalizeDepositAmountIfSole(
-  db: Firestore,
-  depositId: string,
+  _db: Firestore,
+  _depositId: string,
   dep: OpenDepositPeer & { qrPayload?: string | null; tokenAddress?: string | null; chainId?: number | null },
 ): Promise<{
   expectedWei: string;
@@ -266,68 +274,40 @@ export async function normalizeDepositAmountIfSole(
   const base = resolveDepositBaseWei(dep);
   const current = resolveDepositExpectedWei(dep);
   const previousExpectedWei = dep.expectedWei ? String(dep.expectedWei) : null;
-
-  if (current === base) {
-    return {
-      expectedWei: base.toString(),
-      amountDisplay: formatUniqueAmountDisplay(base, decimals),
-      paymentTag: 0,
-      normalized: false,
-      previousExpectedWei,
-    };
-  }
-
-  const peers = await listOpenSameAmountPeers(db, dep);
-  const sole = peers.length <= 1 && (peers.length === 0 || peers[0]?.id === depositId);
-  if (!sole) {
-    return {
-      expectedWei: current.toString(),
-      amountDisplay: formatUniqueAmountDisplay(current, decimals),
-      paymentTag: Number(dep.paymentTag ?? extractPaymentTag(current, base, decimals) ?? 0),
-      normalized: false,
-      previousExpectedWei,
-    };
-  }
-
-  const amountDisplay = formatUniqueAmountDisplay(base, decimals);
-  const tokenAddress = dep.tokenAddress ? String(dep.tokenAddress) : null;
-  const chainId = Number(dep.chainId ?? 56);
-  const qrPayload =
-    tokenAddress != null
-      ? `ethereum:${tokenAddress}@${chainId}/transfer?address=${dep.depositAddress}&uint256=${base.toString()}`
-      : (dep.qrPayload ?? null);
-
-  await db.collection(Collections.deposits).doc(depositId).update({
-    expectedWei: base.toString(),
-    amountUsdt: amountDisplay,
-    paymentTag: 0,
-    qrPayload,
-    updatedAt: FieldValue.serverTimestamp(),
-  });
+  const tag = extractPaymentTag(current, base, decimals) ?? Number(dep.paymentTag ?? 0);
 
   return {
-    expectedWei: base.toString(),
-    amountDisplay,
-    paymentTag: 0,
-    normalized: true,
+    expectedWei: current.toString(),
+    amountDisplay: formatUniqueAmountDisplay(current, decimals),
+    paymentTag: tag,
+    normalized: false,
     previousExpectedWei,
   };
 }
 
-/** Candidates for verification — base wei if sole/oldest; always keep tagged amount too. */
+/** Candidates for verification — exact tag, 4-dp truncation, and base when allowed. */
 export async function depositWeiCandidatesForCredit(
   db: Firestore,
   depositId: string,
   dep: OpenDepositPeer & { previousExpectedWei?: string | null },
 ): Promise<bigint[]> {
+  const asset = resolveDepositAsset(dep);
+  const decimals = asset === 'VFXT' ? VFXT_TOKEN_DECIMALS : USDT_DECIMALS;
   const expected = resolveDepositExpectedWei(dep);
   const base = resolveDepositBaseWei(dep);
   const candidates = new Set<string>();
   candidates.add(expected.toString());
 
+  // Wallet may truncate 6-dp unique amounts to 4 decimals when sending.
+  const truncated4 = truncateToVisibleWei(expected, decimals, VISIBLE_DECIMALS);
+  if (truncated4 !== expected) candidates.add(truncated4.toString());
+
   if (dep.previousExpectedWei) {
     try {
-      candidates.add(BigInt(String(dep.previousExpectedWei)).toString());
+      const prev = BigInt(String(dep.previousExpectedWei));
+      candidates.add(prev.toString());
+      const prevTrunc = truncateToVisibleWei(prev, decimals, VISIBLE_DECIMALS);
+      if (prevTrunc !== prev) candidates.add(prevTrunc.toString());
     } catch {
       /* ignore */
     }
