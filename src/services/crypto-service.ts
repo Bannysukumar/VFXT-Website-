@@ -49,6 +49,10 @@ export async function checkDepositPayment(depositId: string, txHash?: string) {
       depositId: string
       depositAddress?: string
       fundCentsCredited?: number | null
+      amountUsdt?: string
+      expectedWei?: string
+      paymentTag?: number
+      amountNormalized?: boolean
     }
   >('checkDepositPayment', { depositId, ...(txHash ? { txHash } : {}) })
 }

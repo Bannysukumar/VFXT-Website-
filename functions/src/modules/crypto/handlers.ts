@@ -368,13 +368,24 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
     const receiveAddress = savedDepositAddress || hot.address;
     const {
       depositWeiCandidatesForCredit,
+      normalizeDepositAmountIfSole,
       resolveDepositExpectedWei,
     } = await import('./unique-amount');
-    const expectedWei = resolveDepositExpectedWei(dep);
-    const acceptedWeis = await depositWeiCandidatesForCredit(db, depositId, {
+    // If peers finished and this is the only open deposit for this amount,
+    // clear unique decimals so the user can pay the usual round amount.
+    const normalized = await normalizeDepositAmountIfSole(db, depositId, {
       ...dep,
       depositAddress: receiveAddress,
     });
+    const depForMatch = {
+      ...dep,
+      expectedWei: normalized.expectedWei,
+      paymentTag: normalized.paymentTag,
+      depositAddress: receiveAddress,
+      previousExpectedWei: normalized.previousExpectedWei,
+    };
+    const expectedWei = resolveDepositExpectedWei(depForMatch);
+    const acceptedWeis = await depositWeiCandidatesForCredit(db, depositId, depForMatch);
     const createdAt = dep.createdAt?.toMillis?.() ?? Date.now() - DEPOSIT_TTL_MS;
     if (Date.now() - createdAt > DEPOSIT_TTL_MS) {
       await snap.ref.update({
@@ -462,6 +473,10 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         txHash: null,
         depositId,
         depositAddress: receiveAddress,
+        amountUsdt: normalized.amountDisplay,
+        expectedWei: normalized.expectedWei,
+        paymentTag: normalized.paymentTag,
+        amountNormalized: normalized.normalized,
       };
     }
 
@@ -471,6 +486,10 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         txHash: null,
         depositId,
         depositAddress: receiveAddress,
+        amountUsdt: normalized.amountDisplay,
+        expectedWei: normalized.expectedWei,
+        paymentTag: normalized.paymentTag,
+        amountNormalized: normalized.normalized,
       };
     }
 
@@ -550,6 +569,7 @@ export const monitorCryptoDeposits = onSchedule(
 
     const {
       depositWeiCandidatesForCredit,
+      normalizeDepositAmountIfSole,
       resolveDepositExpectedWei,
     } = await import('./unique-amount');
     const ordered = [...pending.docs].sort((a, b) => {
@@ -569,8 +589,15 @@ export const monitorCryptoDeposits = onSchedule(
         continue;
       }
       try {
-        const expectedWei = resolveDepositExpectedWei(dep);
-        const acceptedWeis = await depositWeiCandidatesForCredit(db, doc.id, dep);
+        const normalized = await normalizeDepositAmountIfSole(db, doc.id, dep);
+        const depForMatch = {
+          ...dep,
+          expectedWei: normalized.expectedWei,
+          paymentTag: normalized.paymentTag,
+          previousExpectedWei: normalized.previousExpectedWei,
+        };
+        const expectedWei = resolveDepositExpectedWei(depForMatch);
+        const acceptedWeis = await depositWeiCandidatesForCredit(db, doc.id, depForMatch);
         const token = depositTokenMeta(dep);
         const found = await findIncomingUsdtTransfer({
           expectedWei,

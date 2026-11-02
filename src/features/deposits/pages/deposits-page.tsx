@@ -283,6 +283,32 @@ export function DepositsPage() {
           return
         }
 
+        // Sole remaining depositor for this amount → decimals cleared back to usual.
+        if (res.amountUsdt && res.expectedWei && active) {
+          const next = {
+            ...active,
+            amountUsdt: res.amountUsdt,
+            expectedWei: res.expectedWei,
+            status: res.status || active.status,
+            qrPayload:
+              active.tokenAddress && res.expectedWei
+                ? `ethereum:${active.tokenAddress}@${active.chainId ?? 56}/transfer?address=${active.depositAddress}&uint256=${res.expectedWei}`
+                : active.qrPayload,
+          }
+          if (
+            next.amountUsdt !== active.amountUsdt ||
+            next.expectedWei !== active.expectedWei
+          ) {
+            setActive(next)
+            saveActiveDeposit(next)
+            if (res.amountNormalized) {
+              toast.message(`Amount updated to usual ${res.amountUsdt} ${paySymbol}`, {
+                description: 'No other member is depositing this amount right now.',
+              })
+            }
+          }
+        }
+
         setPayStatus(res.status || 'awaiting_payment')
         if (!opts?.silent) {
           toast.message(`Still waiting for the matching ${paySymbol} transfer on BSC`)
@@ -335,10 +361,11 @@ export function DepositsPage() {
       symbol === 'VFXT' ? String(open.amountMinor) : (open.amountMinor / 100).toFixed(2)
     if (open.expectedWei) {
       try {
+        // Show 6 decimals so wallets / copy field keep the unique payment tag.
         const wei = BigInt(open.expectedWei)
         const whole = wei / 10n ** 18n
-        const frac = (wei % 10n ** 18n).toString().padStart(18, '0').replace(/0+$/, '')
-        amountDisplay = frac ? `${whole.toString()}.${frac}` : whole.toString()
+        const frac = (wei % 10n ** 18n).toString().padStart(18, '0').slice(0, 6)
+        amountDisplay = `${whole.toString()}.${frac}`
       } catch {
         /* keep fallback */
       }
@@ -516,7 +543,11 @@ export function DepositsPage() {
               <span className="inline break-all font-mono text-[11px] text-ink sm:text-xs">
                 {active.amountUsdt}
               </span>{' '}
-              {paySymbol} (unique amount).
+              {paySymbol}
+              {active.amountUsdt.includes('.') && !/\.0+$/.test(active.amountUsdt)
+                ? ' (unique decimals — another deposit is using this same amount right now)'
+                : ''}
+              .
             </CardDescription>
           </CardHeader>
           <CardContent className="min-w-0 space-y-6 sm:space-y-8">
@@ -640,8 +671,9 @@ export function DepositsPage() {
                   <ShieldCheck />
                   <AlertTitle>Automatic verification</AlertTitle>
                   <AlertDescription>
-                    Each deposit gets a unique exact {paySymbol} amount so your payment credits only
-                    your account. Send precisely{' '}
+                    Usual amount when you are alone for that figure. Unique decimals only while
+                    another member is depositing the same amount — they clear again when you are
+                    the only one left. Send precisely{' '}
                     <span className="break-all font-mono text-[11px] text-ink">
                       {active.amountUsdt}
                     </span>{' '}
