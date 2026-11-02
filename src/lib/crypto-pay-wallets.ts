@@ -49,7 +49,6 @@ function vfxtWalletUrl(p: CryptoPayParams): string {
   })
   const schemeUrl = `vfxtwallet://send?${q.toString()}`
   if (typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent)) {
-    // Chrome Intent URL targets the installed package and falls back to /download.
     const fallback =
       typeof window !== 'undefined'
         ? `${window.location.origin}/download`
@@ -63,13 +62,11 @@ function vfxtWalletUrl(p: CryptoPayParams): string {
   return schemeUrl
 }
 
-/** MetaMask universal link with token transfer. */
 function metamaskUrl(p: CryptoPayParams): string {
   const path = `${p.tokenAddress}@${p.chainId}/transfer?address=${p.depositAddress}&uint256=${p.amountWei}`
   return `https://metamask.app.link/send/${path}`
 }
 
-/** Trust Wallet send deeplink (BSC coin = 20000714). */
 function trustUrl(p: CryptoPayParams): string {
   const q = new URLSearchParams({
     coin: '20000714',
@@ -80,7 +77,6 @@ function trustUrl(p: CryptoPayParams): string {
   return `https://link.trustwallet.com/send?${q.toString()}`
 }
 
-/** TokenPocket dapp / transfer open. */
 function tokenPocketUrl(p: CryptoPayParams): string {
   const payload = encodeURIComponent(
     JSON.stringify({
@@ -92,32 +88,27 @@ function tokenPocketUrl(p: CryptoPayParams): string {
   return `tpdapp://open?params=${payload}`
 }
 
-/** OKX Wallet universal link. */
 function okxUrl(p: CryptoPayParams): string {
   return `https://www.okx.com/download?deeplink=${encodeURIComponent(
     `okx://wallet/dapp/url?dappUrl=${encodeURIComponent(eip681(p))}`,
   )}`
 }
 
-/** Bitget Wallet. */
 function bitgetUrl(p: CryptoPayParams): string {
   const coin = paySymbol(p)
   return `bitkeep://bkconnect?action=send&coin=${coin}&chain=BSC&to=${p.depositAddress}&amount=${p.amountUsdt}`
 }
 
-/** SafePal. */
 function safepalUrl(p: CryptoPayParams): string {
   const coin = paySymbol(p)
   return `safepalwallet://send?coin=${coin}&network=BSC&address=${p.depositAddress}&amount=${p.amountUsdt}`
 }
 
-/** Binance Web3 Wallet (falls back to EIP-681 via https open). */
 function binanceUrl(p: CryptoPayParams): string {
   const coin = paySymbol(p)
   return `bnc://app.binance.com/cedefi/wallet?action=transfer&asset=${coin}&network=BSC&address=${p.depositAddress}&amount=${p.amountUsdt}`
 }
 
-/** imToken. */
 function imTokenUrl(p: CryptoPayParams): string {
   const coin = paySymbol(p)
   return `imtokenv2://navigate/token?action=transfer&symbol=${coin}&to=${p.depositAddress}&amount=${p.amountUsdt}&blockchain=BSC`
@@ -138,7 +129,7 @@ export const PAY_WALLETS: PayWalletOption[] = [
     name: 'MetaMask',
     subtitle: 'Browser & app',
     color: '#E2761B',
-    glyph: '🦊',
+    glyph: 'MM',
     buildUrl: metamaskUrl,
     installUrl: 'https://metamask.io/download/',
   },
@@ -147,7 +138,7 @@ export const PAY_WALLETS: PayWalletOption[] = [
     name: 'Trust Wallet',
     subtitle: 'BSC token',
     color: '#0500FF',
-    glyph: '🛡️',
+    glyph: 'TW',
     buildUrl: trustUrl,
     installUrl: 'https://trustwallet.com/download',
   },
@@ -164,7 +155,7 @@ export const PAY_WALLETS: PayWalletOption[] = [
     id: 'okx',
     name: 'OKX Wallet',
     subtitle: 'Web3',
-    color: '#000000',
+    color: '#111111',
     glyph: 'OKX',
     buildUrl: okxUrl,
     installUrl: 'https://www.okx.com/download',
@@ -173,7 +164,7 @@ export const PAY_WALLETS: PayWalletOption[] = [
     id: 'bitget',
     name: 'Bitget',
     subtitle: 'Wallet',
-    color: '#00F0FF',
+    color: '#1BC29B',
     glyph: 'BG',
     buildUrl: bitgetUrl,
     installUrl: 'https://web3.bitget.com/en/wallet-download',
@@ -223,55 +214,149 @@ type EthProviderFlags = {
   isTrustWallet?: boolean
   isTokenPocket?: boolean
   isOkxWallet?: boolean
+  isOKExWallet?: boolean
   isBitKeep?: boolean
+  isBitget?: boolean
   isImToken?: boolean
+  isSafePal?: boolean
+  isBinance?: boolean
   isCoinbaseWallet?: boolean
   providers?: EthProviderFlags[]
 }
 
-function readEthereum(): EthProviderFlags | null {
-  if (typeof window === 'undefined') return null
-  const eth = (window as Window & { ethereum?: EthProviderFlags }).ethereum
-  return eth ?? null
+type BrowserWindow = Window & {
+  ethereum?: EthProviderFlags
+  okxwallet?: EthProviderFlags
+  okexchain?: EthProviderFlags
+  bitkeep?: { ethereum?: EthProviderFlags }
+  safepal?: EthProviderFlags
+  safepalProvider?: EthProviderFlags
+  BinanceChain?: EthProviderFlags
+  tokenpocket?: EthProviderFlags
+  imToken?: EthProviderFlags
+  trustwallet?: EthProviderFlags
+  vfxtwallet?: unknown
 }
 
-/** Detect injected browser wallets (MetaMask, Trust, etc.). */
-export function detectInjectedWalletIds(): Set<string> {
-  const found = new Set<string>()
-  const eth = readEthereum()
-  if (!eth) return found
+function readWindow(): BrowserWindow | null {
+  if (typeof window === 'undefined') return null
+  return window as BrowserWindow
+}
 
-  const providers = Array.isArray(eth.providers) && eth.providers.length > 0 ? eth.providers : [eth]
-  for (const p of providers) {
-    if (p.isMetaMask) found.add('metamask')
-    if (p.isTrust || p.isTrustWallet) found.add('trust')
-    if (p.isTokenPocket) found.add('tokenpocket')
-    if (p.isOkxWallet) found.add('okx')
-    if (p.isBitKeep) found.add('bitget')
-    if (p.isImToken) found.add('imtoken')
+function collectProviders(win: BrowserWindow): EthProviderFlags[] {
+  const list: EthProviderFlags[] = []
+  const push = (p?: EthProviderFlags | null) => {
+    if (p && !list.includes(p)) list.push(p)
   }
 
-  // Android Chrome often runs inside Trust / MetaMask in-app browsers.
+  const eth = win.ethereum
+  if (eth) {
+    if (Array.isArray(eth.providers) && eth.providers.length > 0) {
+      for (const p of eth.providers) push(p)
+    } else {
+      push(eth)
+    }
+  }
+  push(win.okxwallet)
+  push(win.okexchain)
+  push(win.bitkeep?.ethereum)
+  push(win.safepal)
+  push(win.safepalProvider)
+  push(win.BinanceChain)
+  push(win.tokenpocket)
+  push(win.imToken)
+  push(win.trustwallet)
+  return list
+}
+
+function markFromProvider(found: Set<string>, p: EthProviderFlags): void {
+  // MetaMask extension sets isMetaMask; exclude multi-flags that also claim it.
+  if (p.isMetaMask && !p.isTokenPocket && !p.isTrust && !p.isTrustWallet && !p.isOkxWallet && !p.isBitKeep) {
+    found.add('metamask')
+  } else if (p.isMetaMask) {
+    found.add('metamask')
+  }
+  if (p.isTrust || p.isTrustWallet) found.add('trust')
+  if (p.isTokenPocket) found.add('tokenpocket')
+  if (p.isOkxWallet || p.isOKExWallet) found.add('okx')
+  if (p.isBitKeep || p.isBitget) found.add('bitget')
+  if (p.isImToken) found.add('imtoken')
+  if (p.isSafePal) found.add('safepal')
+  if (p.isBinance) found.add('binance')
+}
+
+/**
+ * Detect wallets that are actually available in this browser / in-app WebView.
+ * Browsers cannot see native apps that are not injected — we never pretend they are installed.
+ */
+export function detectInjectedWalletIds(): Set<string> {
+  const found = new Set<string>()
+  const win = readWindow()
+  if (!win) return found
+
+  for (const p of collectProviders(win)) {
+    markFromProvider(found, p)
+  }
+
+  // Named globals (even when not listed under ethereum.providers).
+  if (win.okxwallet || win.okexchain) found.add('okx')
+  if (win.bitkeep?.ethereum) found.add('bitget')
+  if (win.safepal || win.safepalProvider) found.add('safepal')
+  if (win.BinanceChain) found.add('binance')
+  if (win.tokenpocket) found.add('tokenpocket')
+  if (win.imToken) found.add('imtoken')
+  if (win.trustwallet) found.add('trust')
+  if (win.vfxtwallet) found.add('vfxt')
+
+  // In-app browser user agents (reliable install signal).
   if (typeof navigator !== 'undefined') {
     const ua = navigator.userAgent
     if (/MetaMaskMobile/i.test(ua)) found.add('metamask')
-    if (/Trust\//i.test(ua) || /TrustWallet/i.test(ua)) found.add('trust')
+    if (/Trust\/|TrustWallet/i.test(ua)) found.add('trust')
     if (/TokenPocket/i.test(ua)) found.add('tokenpocket')
+    if (/OKApp|OKEx/i.test(ua)) found.add('okx')
+    if (/BitKeep|Bitget/i.test(ua)) found.add('bitget')
+    if (/SafePal/i.test(ua)) found.add('safepal')
+    if (/Binance/i.test(ua) && /WebView|BNB/i.test(ua)) found.add('binance')
+    if (/imToken/i.test(ua)) found.add('imtoken')
+    // Only mark VFXT when the official WebView / bridge is present — never all Android.
     if (/VFXTWallet|vfxtwallet/i.test(ua)) found.add('vfxt')
   }
-
-  // Official VFXT app is Android-only — highlight it on Android devices.
-  if (isLikelyAndroid()) found.add('vfxt')
 
   return found
 }
 
-/** PAY_WALLETS with detected wallets flagged and sorted to the front. */
+/** True when any injected Ethereum provider is available for Connect & send. */
+export function hasInjectedEthereum(): boolean {
+  const win = readWindow()
+  if (!win) return false
+  return Boolean(win.ethereum || win.okxwallet || win.bitkeep?.ethereum || win.BinanceChain)
+}
+
+/** All catalog wallets with detection flags (legacy helper). */
 export function getDetectedPayWallets(): PayWalletOption[] {
   const detected = detectInjectedWalletIds()
   return [...PAY_WALLETS]
     .map((w) => ({ ...w, detected: detected.has(w.id) }))
     .sort((a, b) => Number(b.detected) - Number(a.detected) || 0)
+}
+
+/** Only wallets confirmed installed / injected in this browser. */
+export function getInstalledPayWallets(): PayWalletOption[] {
+  const detected = detectInjectedWalletIds()
+  return PAY_WALLETS.filter((w) => detected.has(w.id)).map((w) => ({
+    ...w,
+    detected: true,
+  }))
+}
+
+/** Catalog wallets that are NOT installed — for optional download links only. */
+export function getMissingPayWallets(): PayWalletOption[] {
+  const detected = detectInjectedWalletIds()
+  return PAY_WALLETS.filter((w) => !detected.has(w.id)).map((w) => ({
+    ...w,
+    detected: false,
+  }))
 }
 
 /**
@@ -286,11 +371,9 @@ export function openPayWallet(wallet: PayWalletOption, params: CryptoPayParams):
       ? `${window.location.origin}${wallet.installUrl}`
       : wallet.installUrl
 
-  // Prefer navigating away so mobile OS can hand off to the app
   window.location.href = url
 
   window.setTimeout(() => {
-    // Still here ≈ app not installed / link ignored
     if (document.visibilityState === 'visible' && Date.now() - started < 2800) {
       window.open(install, '_blank', 'noopener,noreferrer')
     }

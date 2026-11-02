@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { QRCodeSVG } from 'qrcode.react'
-import { Copy, Loader2, ShieldCheck, Wallet } from 'lucide-react'
+import { CheckCircle2, Copy, Loader2, QrCode, ShieldCheck, Wallet } from 'lucide-react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -22,10 +22,13 @@ import { parseToMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { images } from '@/lib/media'
 import {
-  getDetectedPayWallets,
+  getInstalledPayWallets,
+  getMissingPayWallets,
+  hasInjectedEthereum,
   isLikelyMobile,
   openPayWallet,
   type CryptoPayParams,
+  type PayWalletOption,
 } from '@/lib/crypto-pay-wallets'
 import { sendDepositToken } from '@/lib/deposit-send'
 import { VFXT_TOKEN } from '@/lib/vfxt-token'
@@ -120,11 +123,41 @@ export function DepositsPage() {
   const [openedWallet, setOpenedWallet] = useState<string | null>(null)
   const checkSeq = useMemo(() => ({ current: 0 }), [])
   const mobile = useMemo(() => isLikelyMobile(), [])
-  const payWallets = useMemo(() => getDetectedPayWallets(), [])
-  const detectedNames = useMemo(
-    () => payWallets.filter((w) => w.detected).map((w) => w.name),
-    [payWallets],
+  const [installedWallets, setInstalledWallets] = useState<PayWalletOption[]>(() =>
+    getInstalledPayWallets(),
   )
+  const [missingWallets, setMissingWallets] = useState<PayWalletOption[]>(() =>
+    getMissingPayWallets(),
+  )
+  const [canConnectInjected, setCanConnectInjected] = useState(() => hasInjectedEthereum())
+  const [showInstallList, setShowInstallList] = useState(false)
+
+  useEffect(() => {
+    const refresh = () => {
+      setInstalledWallets(getInstalledPayWallets())
+      setMissingWallets(getMissingPayWallets())
+      setCanConnectInjected(hasInjectedEthereum())
+    }
+    refresh()
+    const onFocus = () => refresh()
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('ethereum#initialized', onFocus as EventListener)
+    // EIP-6963 / late-injected providers
+    const id = window.setInterval(refresh, 2500)
+    window.setTimeout(refresh, 400)
+    window.setTimeout(refresh, 1200)
+    return () => {
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('ethereum#initialized', onFocus as EventListener)
+      window.clearInterval(id)
+    }
+  }, [])
+
+  const detectedNames = useMemo(
+    () => installedWallets.map((w) => w.name),
+    [installedWallets],
+  )
+  const payWallets = installedWallets
 
   const form = useForm<Values>({
     resolver: zodResolver(schema),
@@ -531,196 +564,256 @@ export function DepositsPage() {
       ) : null}
 
       {active?.depositAddress && payStatus !== 'completed' ? (
-        <Card className="overflow-hidden">
-          <CardHeader>
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <CardTitle className="text-base sm:text-lg">Pay with {paySymbol}</CardTitle>
-              <Badge variant="warning">Waiting for payment</Badge>
-              <Badge variant="secondary">{paySymbol} · BEP-20</Badge>
-            </div>
-            <CardDescription>
-              Network: {active.network}. Send exactly{' '}
-              <span className="inline break-all font-mono text-[11px] text-ink sm:text-xs">
-                {active.amountUsdt}
-              </span>{' '}
-              {paySymbol}
-              {active.amountUsdt.includes('.') && !/\.0+$/.test(active.amountUsdt)
-                ? ' (unique decimals — another deposit is using this same amount right now)'
-                : ''}
-              .
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="min-w-0 space-y-6 sm:space-y-8">
-            <div className="space-y-3">
-              <Button
-                type="button"
-                size="lg"
-                className="w-full whitespace-normal text-center leading-snug"
-                disabled={sending || checking}
-                onClick={() => void handleSendFromWallet()}
-              >
-                {sending ? <Loader2 className="animate-spin" /> : <Wallet className="size-4 shrink-0" />}
-                {sending ? `Sending ${paySymbol}…` : `Connect wallet & send ${paySymbol}`}
-              </Button>
-              <p className="break-words text-center text-xs text-ink-muted [overflow-wrap:anywhere]">
-                {detectedNames.length > 0
-                  ? `Detected: ${detectedNames.join(', ')}. Or use Connect for an injected browser wallet.`
-                  : `Uses MetaMask / Trust / injected wallet on BSC, or open VFXT Wallet below.`}
-              </p>
-            </div>
-
-            <div className="min-w-0 space-y-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <Wallet className="size-4 shrink-0 text-accent" />
-                {mobile ? 'Choose an installed wallet' : 'Open in a wallet app'}
+        <div className="mx-auto w-full max-w-3xl space-y-4">
+          <Card className="overflow-hidden border-line shadow-sm">
+            <CardHeader className="space-y-4 border-b border-line bg-panel-elevated/40 pb-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="warning">Waiting for payment</Badge>
+                <Badge variant="secondary">BSC · BEP-20</Badge>
+                <Badge variant="secondary">{paySymbol}</Badge>
               </div>
-              <p className="break-words text-xs text-ink-muted [overflow-wrap:anywhere]">
-                Detected wallets are listed first. Tap VFXT Wallet, MetaMask, or Trust — it opens with
-                this deposit address and exact {paySymbol} amount.
-              </p>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
-                {payWallets.map((wallet) => (
-                  <button
-                    key={wallet.id}
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
+                  Send exactly
+                </p>
+                <p className="mt-1 break-all font-mono text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+                  {active.amountUsdt}{' '}
+                  <span className="text-lg font-semibold text-ink-muted sm:text-xl">{paySymbol}</span>
+                </p>
+                {active.amountUsdt.includes('.') && !/\.0+$/.test(active.amountUsdt) ? (
+                  <p className="mt-2 text-xs text-ink-muted">
+                    Unique decimals are active because another deposit is using this same amount.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-ink-muted">
+                    Network: {active.network || 'BNB Smart Chain (BEP-20)'}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(active.amountUsdt)
+                    toast.success('Amount copied')
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                  Copy amount
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(active.depositAddress!)
+                    toast.success('Address copied')
+                  }}
+                >
+                  <Copy className="size-3.5" />
+                  Copy address
+                </Button>
+              </div>
+            </CardHeader>
+
+            <CardContent className="min-w-0 space-y-6 pt-6">
+              {canConnectInjected ? (
+                <div className="space-y-2">
+                  <Button
                     type="button"
-                    onClick={() => handleOpenWallet(wallet.id)}
-                    className={cn(
-                      'relative flex min-w-0 flex-col items-center gap-1.5 overflow-hidden rounded-2xl border border-line bg-panel-elevated p-3 text-center transition-[transform,background-color,border-color,color] sm:gap-2 sm:p-4',
-                      'hover:border-accent/50 hover:shadow-sm active:scale-[0.98]',
-                      wallet.detected && 'border-accent/40 bg-accent-soft/40',
-                      openedWallet === wallet.name && 'border-accent ring-2 ring-accent/20',
+                    size="lg"
+                    className="w-full"
+                    disabled={sending || checking}
+                    onClick={() => void handleSendFromWallet()}
+                  >
+                    {sending ? (
+                      <Loader2 className="animate-spin" />
+                    ) : (
+                      <Wallet className="size-4 shrink-0" />
                     )}
-                  >
-                    {wallet.detected ? (
-                      <span className="absolute right-1.5 top-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wide text-accent-ink sm:right-2 sm:top-2 sm:text-[9px]">
-                        On
-                      </span>
-                    ) : null}
-                    <span
-                      className="grid size-10 place-items-center rounded-2xl text-sm font-bold text-white shadow-sm sm:size-12"
-                      style={{ backgroundColor: wallet.color }}
-                    >
-                      {wallet.glyph}
-                    </span>
-                    <span className="w-full truncate text-xs font-semibold text-ink sm:text-sm">
-                      {wallet.name}
-                    </span>
-                    <span className="w-full truncate text-[10px] text-ink-subtle sm:text-[11px]">
-                      {wallet.subtitle}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              {openedWallet ? (
-                <Alert>
-                  <Loader2 className="animate-spin" />
-                  <AlertTitle>Complete payment in {openedWallet}</AlertTitle>
-                  <AlertDescription>
-                    After the {paySymbol} transfer confirms on BSC, you&apos;ll see Payment
-                    successful here.
-                  </AlertDescription>
-                </Alert>
+                    {sending ? `Sending ${paySymbol}…` : `Connect wallet & send ${paySymbol}`}
+                  </Button>
+                  <p className="text-center text-xs text-ink-muted">
+                    {detectedNames.length > 0
+                      ? `Ready: ${detectedNames.join(', ')}`
+                      : 'Uses your browser wallet on BSC'}
+                  </p>
+                </div>
               ) : null}
-            </div>
 
-            <div className="grid min-w-0 gap-6 md:grid-cols-[220px_minmax(0,1fr)] md:gap-8">
-              <div className="mx-auto w-fit max-w-full rounded-2xl border border-line bg-white p-3 sm:p-4">
-                <QRCodeSVG value={active.qrPayload ?? active.depositAddress} size={176} level="M" />
-                <p className="mt-2 text-center text-[11px] text-ink-subtle">Or scan QR</p>
-              </div>
-              <div className="min-w-0 space-y-4 text-sm">
-                <div className="min-w-0">
-                  <p className="text-ink-muted">Deposit address</p>
-                  <p className="mt-1 break-all font-mono text-[11px] leading-relaxed sm:text-xs">
-                    {active.depositAddress}
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(active.depositAddress!)
-                      toast.success('Address copied')
-                    }}
-                  >
-                    <Copy className="size-4" />
-                    Copy address
-                  </Button>
+              <div className="min-w-0 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-ink">Installed wallets</p>
+                    <p className="text-xs text-ink-muted">
+                      Only wallets detected on this device are shown.
+                    </p>
+                  </div>
+                  {installedWallets.length > 0 ? (
+                    <Badge variant="secondary" className="shrink-0">
+                      {installedWallets.length} found
+                    </Badge>
+                  ) : null}
                 </div>
-                <div className="min-w-0">
-                  <SummaryRow
-                    label="Exact amount to send"
-                    value={`${active.amountUsdt} ${paySymbol}`}
-                    strong
+
+                {installedWallets.length > 0 ? (
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {installedWallets.map((wallet) => (
+                      <button
+                        key={wallet.id}
+                        type="button"
+                        onClick={() => handleOpenWallet(wallet.id)}
+                        className={cn(
+                          'relative flex min-w-0 items-center gap-3 rounded-2xl border border-line bg-panel px-3 py-3 text-left transition-[transform,border-color,background-color] hover:border-accent/50 active:scale-[0.99]',
+                          openedWallet === wallet.name && 'border-accent bg-accent-soft/50 ring-2 ring-accent/15',
+                        )}
+                      >
+                        <span
+                          className="grid size-10 shrink-0 place-items-center rounded-xl text-[11px] font-bold text-white"
+                          style={{ backgroundColor: wallet.color }}
+                        >
+                          {wallet.glyph}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-ink">
+                            {wallet.name}
+                          </span>
+                          <span className="block truncate text-[11px] text-success">Installed</span>
+                        </span>
+                        <CheckCircle2 className="ml-auto size-4 shrink-0 text-success" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-line bg-panel-elevated/50 px-4 py-5 text-center">
+                    <Wallet className="mx-auto size-8 text-ink-subtle" />
+                    <p className="mt-2 text-sm font-medium text-ink">No wallet app detected here</p>
+                    <p className="mt-1 text-xs text-ink-muted">
+                      Use the QR code or copy details below, or open this page inside your wallet
+                      browser.
+                    </p>
+                  </div>
+                )}
+
+                {openedWallet ? (
+                  <Alert>
+                    <Loader2 className="animate-spin" />
+                    <AlertTitle>Finish in {openedWallet}</AlertTitle>
+                    <AlertDescription>
+                      After the {paySymbol} transfer confirms on BSC, this page updates automatically.
+                    </AlertDescription>
+                  </Alert>
+                ) : null}
+
+                {missingWallets.length > 0 ? (
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-accent underline-offset-2 hover:underline"
+                      onClick={() => setShowInstallList((v) => !v)}
+                    >
+                      {showInstallList ? 'Hide download options' : 'Need a wallet? Show download options'}
+                    </button>
+                    {showInstallList ? (
+                      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                        {missingWallets.map((wallet) => (
+                          <a
+                            key={wallet.id}
+                            href={
+                              wallet.installUrl.startsWith('/')
+                                ? `${window.location.origin}${wallet.installUrl}`
+                                : wallet.installUrl
+                            }
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 rounded-xl border border-line px-3 py-2 text-left text-xs text-ink-muted transition-colors hover:border-accent/40 hover:text-ink"
+                          >
+                            <span
+                              className="grid size-7 place-items-center rounded-lg text-[9px] font-bold text-white"
+                              style={{ backgroundColor: wallet.color }}
+                            >
+                              {wallet.glyph}
+                            </span>
+                            <span className="truncate font-medium">{wallet.name}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="grid min-w-0 gap-5 rounded-2xl border border-line bg-panel-elevated/30 p-4 sm:p-5 md:grid-cols-[180px_minmax(0,1fr)]">
+                <div className="mx-auto w-fit rounded-2xl border border-line bg-white p-3">
+                  <QRCodeSVG value={active.qrPayload ?? active.depositAddress} size={152} level="M" />
+                  <p className="mt-2 flex items-center justify-center gap-1 text-[11px] text-ink-subtle">
+                    <QrCode className="size-3" /> Scan to pay
+                  </p>
+                </div>
+                <div className="min-w-0 space-y-4 text-sm">
+                  <div>
+                    <p className="text-xs font-medium text-ink-muted">Deposit address</p>
+                    <p className="mt-1 break-all font-mono text-[11px] leading-relaxed text-ink sm:text-xs">
+                      {active.depositAddress}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-ink-muted">Exact amount</p>
+                    <p className="mt-1 break-all font-mono text-sm font-semibold text-ink">
+                      {active.amountUsdt} {paySymbol}
+                    </p>
+                  </div>
+                  <div className="flex items-start gap-2 rounded-xl bg-accent-soft/40 px-3 py-2.5 text-xs text-ink-muted">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-accent" />
+                    <p>
+                      Payments are matched automatically on BSC. Send the exact amount shown — do not
+                      round it.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3 border-t border-line pt-4">
+                <p className="flex items-center gap-2 text-sm text-ink-muted">
+                  <Loader2 className="size-4 shrink-0 animate-spin" />
+                  Listening for your transaction…
+                </p>
+                <div className="space-y-2">
+                  <Label htmlFor="txHash">Transaction hash (optional)</Label>
+                  <Input
+                    id="txHash"
+                    placeholder="0x… paste from wallet / BscScan"
+                    className="min-w-0 font-mono text-xs"
+                    value={txHashInput}
+                    onChange={(e) => setTxHashInput(e.target.value.trim())}
                   />
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2"
-                    onClick={async () => {
-                      await navigator.clipboard.writeText(active.amountUsdt)
-                      toast.success('Exact amount copied')
-                    }}
+                    type="button"
+                    className="w-full sm:w-auto"
+                    disabled={checking}
+                    onClick={() => void runPaymentCheck(txHashInput)}
                   >
-                    <Copy className="size-4" />
-                    Copy exact amount
+                    {checking ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {checking ? 'Checking…' : 'I paid — check now'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full sm:w-auto"
+                    disabled={checking}
+                    onClick={dismissActive}
+                  >
+                    Cancel / new deposit
                   </Button>
                 </div>
-                <SummaryRow label="Token contract" value={active.tokenAddress ?? '—'} />
-                <Alert>
-                  <ShieldCheck />
-                  <AlertTitle>Automatic verification</AlertTitle>
-                  <AlertDescription>
-                    Usual amount when you are alone for that figure. Unique decimals only while
-                    another member is depositing the same amount — they clear again when you are
-                    the only one left. Send precisely{' '}
-                    <span className="break-all font-mono text-[11px] text-ink">
-                      {active.amountUsdt}
-                    </span>{' '}
-                    {paySymbol} on BSC (BEP-20).
-                  </AlertDescription>
-                </Alert>
-                <div className="min-w-0 space-y-3">
-                  <p className="flex items-center gap-2 text-ink-muted">
-                    <Loader2 className="size-4 shrink-0 animate-spin" />
-                    Listening for your transaction…
-                  </p>
-                  <div className="space-y-2">
-                    <Label htmlFor="txHash">Transaction hash (optional)</Label>
-                    <Input
-                      id="txHash"
-                      placeholder="0x… paste from wallet / BscScan"
-                      className="min-w-0 font-mono text-xs"
-                      value={txHashInput}
-                      onChange={(e) => setTxHashInput(e.target.value.trim())}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full whitespace-normal sm:w-auto"
-                      disabled={checking}
-                      onClick={() => void runPaymentCheck(txHashInput)}
-                    >
-                      {checking ? <Loader2 className="size-4 animate-spin" /> : null}
-                      {checking ? 'Checking…' : 'I have paid — check now'}
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="w-full sm:w-auto"
-                      disabled={checking}
-                      onClick={dismissActive}
-                    >
-                      Cancel / new deposit
-                    </Button>
-                  </div>
-                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       ) : null}
 
       {!active?.depositAddress ? (
