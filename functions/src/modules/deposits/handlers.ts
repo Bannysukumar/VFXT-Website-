@@ -69,16 +69,24 @@ async function handleCreateDepositRequest(
   const depositSettings = await getDepositSettings();
   const tokenFx = await getTokenEconomicsSettings();
   if (wantVfxt) {
-    const { usdCentsToVfxtTokens } = await import('../../config/plan');
+    const { usdCentsToVfxtTokens, minVfxtTokensForOneCent, vfxtTokensToFundCents } =
+      await import('../../config/plan');
     const minTokens = Math.max(
       1,
       depositSettings.minVfxtDepositTokens ||
         usdCentsToVfxtTokens(depositSettings.minDepositUsdCents, tokenFx.tokensPerUsd),
+      minVfxtTokensForOneCent(tokenFx.tokensPerUsd),
     );
     if (amountMinor < minTokens) {
       throw new AppError(
         'invalid-argument',
         `Minimum VFXT deposit is ${minTokens.toLocaleString()} tokens`,
+      );
+    }
+    if (vfxtTokensToFundCents(amountMinor, tokenFx.tokensPerUsd) < 1) {
+      throw new AppError(
+        'invalid-argument',
+        'VFXT amount is too small to credit Fund Wallet',
       );
     }
   } else if (amountMinor < depositSettings.minDepositUsdCents) {
@@ -235,7 +243,7 @@ async function handleApproveDeposit(
   let entryId = '';
 
   const { getTokenEconomicsSettings } = await import('../platform/store');
-  const { vfxtTokensToUsdCents } = await import('../../config/plan');
+  const { vfxtTokensToFundCents } = await import('../../config/plan');
   const tokenFx = await getTokenEconomicsSettings();
 
   const depositPreview = await db.collection(Collections.deposits).doc(depositId).get();
@@ -271,7 +279,7 @@ async function handleApproveDeposit(
       deposit.currency === 'VFXT' ||
       deposit.tokenSymbol === 'VFXT';
     const fundCents = isVfxt
-      ? vfxtTokensToUsdCents(deposit.amountMinor, tokenFx.tokensPerUsd)
+      ? vfxtTokensToFundCents(deposit.amountMinor, tokenFx.tokensPerUsd)
       : deposit.amountMinor;
     if (!Number.isFinite(fundCents) || fundCents < 1) {
       throw new AppError(

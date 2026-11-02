@@ -218,7 +218,7 @@ async function creditDepositFromChain(params: {
   const token = depositTokenMeta(params);
 
   const { getTokenEconomicsSettings } = await import('../platform/store');
-  const { vfxtTokensToUsdCents } = await import('../../config/plan');
+  const { vfxtTokensToFundCents } = await import('../../config/plan');
   const { walletDocId } = await import('../wallets/types');
   const { ensureUserWallets } = await import('../wallets/handlers');
   await ensureUserWallets(db, params.userId);
@@ -232,14 +232,12 @@ async function creditDepositFromChain(params: {
   const paidVfxtTokens = method === 'vfxt_bep20' ? params.amountMinor : null;
   const fundCents =
     method === 'vfxt_bep20'
-      ? vfxtTokensToUsdCents(params.amountMinor, tokenFx.tokensPerUsd)
+      ? vfxtTokensToFundCents(params.amountMinor, tokenFx.tokensPerUsd)
       : params.amountMinor;
   if (!Number.isFinite(fundCents) || fundCents < 1) {
     throw new AppError(
       'failed-precondition',
-      method === 'vfxt_bep20'
-        ? `Deposit too small to credit Fund Wallet (need enough VFXT for at least $0.01 at ${tokenFx.tokensPerUsd.toLocaleString()} VFXT / $1)`
-        : 'Deposit amount too small to credit Fund Wallet',
+      'Deposit amount too small to credit Fund Wallet',
     );
   }
   const fundWalletId = walletDocId(params.userId, 'fund');
@@ -436,17 +434,33 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       };
     }
 
-    await creditDepositFromChain({
-      depositId,
-      txHash: found.txHash,
-      from: found.from,
-      amountMinor: Number(dep.amountMinor),
-      userId: dep.userId,
-      walletId: dep.walletId,
-      method: String(dep.method || ''),
-      tokenSymbol: token.symbol,
-      tokenAddress: token.address,
-    });
+    try {
+      await creditDepositFromChain({
+        depositId,
+        txHash: found.txHash,
+        from: found.from,
+        amountMinor: Number(dep.amountMinor),
+        userId: dep.userId,
+        walletId: dep.walletId,
+        method: String(dep.method || ''),
+        tokenSymbol: token.symbol,
+        tokenAddress: token.address,
+      });
+    } catch (creditErr) {
+      // Concurrent check/monitor may have credited already — treat as success.
+      if (creditErr instanceof AppError && creditErr.code === 'already-exists') {
+        const fresh = await snap.ref.get();
+        const st = fresh.data()?.status;
+        if (st === 'completed' || st === 'approved') {
+          return {
+            status: 'completed' as const,
+            txHash: (fresh.data()?.txHash as string) ?? found.txHash,
+            depositId,
+          };
+        }
+      }
+      throw creditErr;
+    }
 
     return {
       status: 'completed' as const,

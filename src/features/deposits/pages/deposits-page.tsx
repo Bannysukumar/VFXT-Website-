@@ -33,7 +33,39 @@ import { requestDeposit, type CreateDepositResult } from '@/services/wallet-serv
 import { checkDepositPayment } from '@/services/crypto-service'
 import { fetchMyDeposits } from '@/services/records-service'
 import { getPublicPlatformSettings } from '@/services/platform-service'
-import { usdCentsToVfxtTokens, vfxtTokensToUsdCents } from '@/lib/plan'
+import {
+  minVfxtTokensForOneCent,
+  usdCentsToVfxtTokens,
+  vfxtTokensToFundCents,
+} from '@/lib/plan'
+
+const ACTIVE_DEPOSIT_KEY = 'vfxt.activeDeposit.v1'
+
+function saveActiveDeposit(result: CreateDepositResult) {
+  try {
+    sessionStorage.setItem(ACTIVE_DEPOSIT_KEY, JSON.stringify(result))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function loadActiveDeposit(): CreateDepositResult | null {
+  try {
+    const raw = sessionStorage.getItem(ACTIVE_DEPOSIT_KEY)
+    if (!raw) return null
+    return JSON.parse(raw) as CreateDepositResult
+  } catch {
+    return null
+  }
+}
+
+function clearActiveDeposit() {
+  try {
+    sessionStorage.removeItem(ACTIVE_DEPOSIT_KEY)
+  } catch {
+    /* ignore */
+  }
+}
 
 const schema = z.object({
   amount: z.string().min(1, 'Amount required'),
@@ -82,12 +114,15 @@ export function DepositsPage() {
   const previewSuccess = import.meta.env.DEV && searchParams.get('previewSuccess') === '1'
   const queryClient = useQueryClient()
   const [asset, setAsset] = useState<DepositAsset>('USDT')
-  const [active, setActive] = useState<CreateDepositResult | null>(null)
-  const [payStatus, setPayStatus] = useState<string>('awaiting_payment')
+  const [active, setActive] = useState<CreateDepositResult | null>(() => loadActiveDeposit())
+  const [payStatus, setPayStatus] = useState<string>(
+    () => loadActiveDeposit()?.status ?? 'awaiting_payment',
+  )
   const [txHashInput, setTxHashInput] = useState('')
   const [checking, setChecking] = useState(false)
   const [sending, setSending] = useState(false)
   const [openedWallet, setOpenedWallet] = useState<string | null>(null)
+  const checkSeq = useMemo(() => ({ current: 0 }), [])
   const mobile = useMemo(() => isLikelyMobile(), [])
   const payWallets = useMemo(() => getDetectedPayWallets(), [])
   const detectedNames = useMemo(
@@ -118,6 +153,7 @@ export function DepositsPage() {
     1,
     platform.data?.deposit?.minVfxtDepositTokens ||
       usdCentsToVfxtTokens(minDepositCents, tokensPerUsd),
+    minVfxtTokensForOneCent(tokensPerUsd),
   )
   const quickAmounts = asset === 'VFXT' ? quickAmountsVfxt : quickAmountsUsdt
 
@@ -138,7 +174,7 @@ export function DepositsPage() {
   })()
   const previewFundUsd =
     asset === 'VFXT'
-      ? vfxtTokensToUsdCents(previewVfxtTokens, tokensPerUsd) / 100
+      ? vfxtTokensToFundCents(previewVfxtTokens, tokensPerUsd) / 100
       : previewUsdtCents / 100
 
   const payParams = active ? toPayParams(active) : null
@@ -180,8 +216,10 @@ export function DepositsPage() {
     onSuccess: async (result) => {
       if (result.depositAddress && result.qrPayload) {
         setActive(result)
-        setPayStatus(result.status)
+        setPayStatus(result.status || 'awaiting_payment')
         setOpenedWallet(null)
+        setTxHashInput('')
+        saveActiveDeposit(result)
         const symbol = assetFromResult(result)
         toast.success(
           isLikelyMobile()
@@ -189,6 +227,7 @@ export function DepositsPage() {
             : `Scan the QR or connect a wallet to send ${symbol} (BEP-20)`,
         )
       } else {
+        clearActiveDeposit()
         toast.success('Deposit submitted for manual review')
       }
       form.reset()
@@ -197,9 +236,19 @@ export function DepositsPage() {
     onError: (error: Error) => toast.error(error.message),
   })
 
+  const dismissActive = useCallback(() => {
+    clearActiveDeposit()
+    setActive(null)
+    setPayStatus('awaiting_payment')
+    setOpenedWallet(null)
+    setTxHashInput('')
+  }, [])
+
   const runPaymentCheck = useCallback(
     async (txHash?: string, opts?: { silent?: boolean }) => {
       if (!active?.depositId) return
+      if (payStatus === 'completed') return
+      const seq = ++checkSeq.current
       setChecking(true)
       try {
         const cleaned = txHash?.trim()
@@ -207,32 +256,81 @@ export function DepositsPage() {
           active.depositId,
           cleaned && /^0x[0-9a-fA-F]{64}$/.test(cleaned) ? cleaned : undefined,
         )
-        setPayStatus(res.status)
-        if (res.status === 'completed') {
+        // Ignore stale overlapping polls so "completed" is never overwritten.
+        if (seq !== checkSeq.current) return
+
+        if (res.status === 'completed' || res.status === 'approved') {
+          setPayStatus('completed')
+          saveActiveDeposit({ ...active, status: 'completed' })
+          toast.success('Payment verified — Fund Wallet credited')
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['wallets'] }),
             queryClient.invalidateQueries({ queryKey: ['ledger'] }),
             queryClient.invalidateQueries({ queryKey: ['my-deposits'] }),
           ])
-        } else if (!opts?.silent) {
+          return
+        }
+
+        if (res.status === 'expired' || res.status === 'cancelled' || res.status === 'rejected') {
+          setPayStatus(res.status)
+          clearActiveDeposit()
+          if (!opts?.silent) toast.error(`Deposit ${res.status}`)
+          return
+        }
+
+        setPayStatus(res.status || 'awaiting_payment')
+        if (!opts?.silent) {
           toast.message(`Still waiting for the matching ${paySymbol} transfer on BSC`)
         }
       } catch (e) {
+        if (seq !== checkSeq.current) return
         if (!opts?.silent) {
           toast.error(e instanceof Error ? e.message : 'Check failed')
         }
       } finally {
-        setChecking(false)
+        if (seq === checkSeq.current) setChecking(false)
       }
     },
-    [active?.depositId, paySymbol, queryClient],
+    [active, checkSeq, payStatus, paySymbol, queryClient],
   )
+
+  // Restore / sync active deposit from history (completed or still awaiting).
+  useEffect(() => {
+    if (!history.data?.length) return
+    if (payStatus === 'completed') return
+
+    if (active?.depositId) {
+      const row = history.data.find((d) => d.id === active.depositId)
+      if (!row) return
+      const st = String(row.status)
+      if (st === 'completed' || st === 'approved') {
+        setPayStatus('completed')
+        saveActiveDeposit({ ...active, status: 'completed' })
+      } else if (st === 'expired' || st === 'cancelled' || st === 'rejected') {
+        dismissActive()
+      }
+      return
+    }
+
+    const open = history.data.find((d) => {
+      const st = String(d.status)
+      return st === 'awaiting_payment' || st === 'pending'
+    })
+    if (!open) return
+    // History rows are slim — only resume if we still have session payload.
+    const saved = loadActiveDeposit()
+    if (saved?.depositId === open.id && saved.depositAddress) {
+      setActive(saved)
+      setPayStatus(saved.status || 'awaiting_payment')
+    }
+  }, [history.data, active, payStatus, dismissActive])
 
   useEffect(() => {
     if (!active?.depositId || payStatus === 'completed') return
+    void runPaymentCheck(undefined, { silent: true })
     const id = window.setInterval(() => {
       void runPaymentCheck(undefined, { silent: true })
-    }, 12_000)
+    }, 8_000)
     return () => window.clearInterval(id)
   }, [active?.depositId, payStatus, runPaymentCheck])
 
@@ -311,7 +409,7 @@ export function DepositsPage() {
               previewSuccess
                 ? '$100.00'
                 : assetFromResult(active!) === 'VFXT'
-                  ? `$${(vfxtTokensToUsdCents(active!.amountMinor, tokensPerUsd) / 100).toFixed(2)}`
+                  ? `$${(vfxtTokensToFundCents(active!.amountMinor, tokensPerUsd) / 100).toFixed(2)}`
                   : `$${(active!.amountMinor / 100).toFixed(2)}`
             }
             subtitle={
@@ -327,7 +425,7 @@ export function DepositsPage() {
                 value: previewSuccess
                   ? '$100.00'
                   : assetFromResult(active!) === 'VFXT'
-                    ? `$${(vfxtTokensToUsdCents(active!.amountMinor, tokensPerUsd) / 100).toFixed(2)}`
+                    ? `$${(vfxtTokensToFundCents(active!.amountMinor, tokensPerUsd) / 100).toFixed(2)}`
                     : `$${(active!.amountMinor / 100).toFixed(2)}`,
               },
               {
@@ -342,15 +440,15 @@ export function DepositsPage() {
             primaryAction={{
               label: 'Stake now',
               onClick: () => {
-                setActive(null)
+                dismissActive()
                 navigate(previewSuccess ? '/app/staking?previewSuccess=1' : '/app/staking')
               },
             }}
             secondaryAction={{
               label: 'Make another deposit',
               onClick: () => {
+                dismissActive()
                 if (previewSuccess) navigate('/app/deposits')
-                else setActive(null)
               },
             }}
           />
@@ -524,16 +622,27 @@ export function DepositsPage() {
                       onChange={(e) => setTxHashInput(e.target.value.trim())}
                     />
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full whitespace-normal sm:w-auto"
-                    disabled={checking}
-                    onClick={() => void runPaymentCheck(txHashInput)}
-                  >
-                    {checking ? <Loader2 className="size-4 animate-spin" /> : null}
-                    {checking ? 'Checking…' : 'I have paid — check now'}
-                  </Button>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full whitespace-normal sm:w-auto"
+                      disabled={checking}
+                      onClick={() => void runPaymentCheck(txHashInput)}
+                    >
+                      {checking ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {checking ? 'Checking…' : 'I have paid — check now'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full sm:w-auto"
+                      disabled={checking}
+                      onClick={dismissActive}
+                    >
+                      Cancel / new deposit
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -627,7 +736,7 @@ export function DepositsPage() {
                         <span className="font-semibold text-ink">
                           $
                           {(
-                            vfxtTokensToUsdCents(minVfxtTokens, tokensPerUsd) / 100
+                            vfxtTokensToFundCents(minVfxtTokens, tokensPerUsd) / 100
                           ).toFixed(2)}
                         </span>{' '}
                         Fund credit

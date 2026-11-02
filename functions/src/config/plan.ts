@@ -192,6 +192,30 @@ export function vfxtTokensToUsdCents(
   return Math.floor((tokens * 100) / tokensPerUsd);
 }
 
+/**
+ * VFXT → Fund Wallet USD cents for deposits.
+ * Rounds to nearest cent and never returns 0 for a positive token amount
+ * (Fund Wallet is integer cents; dust still credits at least $0.01).
+ */
+export function vfxtTokensToFundCents(
+  tokens: number,
+  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
+): number {
+  if (!Number.isInteger(tokens) || tokens <= 0) return 0;
+  if (!Number.isInteger(tokensPerUsd) || tokensPerUsd <= 0) {
+    throw new Error('tokensPerUsd must be a positive integer');
+  }
+  return Math.max(1, Math.round((tokens * 100) / tokensPerUsd));
+}
+
+/** Minimum whole VFXT tokens that map to at least $0.01 Fund credit. */
+export function minVfxtTokensForOneCent(
+  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
+): number {
+  if (!Number.isInteger(tokensPerUsd) || tokensPerUsd <= 0) return 1;
+  return Math.max(1, Math.ceil(tokensPerUsd / 100));
+}
+
 /** Withdrawal fee + net payout. */
 export function splitWithdrawalCommission(
   amountMinor: number,

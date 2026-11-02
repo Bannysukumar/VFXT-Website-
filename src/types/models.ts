@@ -9,11 +9,13 @@ export type UserStatus = 'active' | 'suspended' | 'pending_verification'
 
 export type TransactionStatus =
   | 'pending'
+  | 'awaiting_payment'
   | 'approved'
   | 'processing'
   | 'completed'
   | 'rejected'
   | 'cancelled'
+  | 'expired'
   | 'failed'
 
 export type LedgerEntryType =

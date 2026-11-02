@@ -34,8 +34,8 @@ export const DEPOSIT_CONFIRMATIONS = 3;
 /** How long a deposit QR / pending request stays open. */
 export const DEPOSIT_TTL_MS = 60 * 60 * 1000; // 1 hour
 
-/** Scan this many recent blocks for Transfer events (~45–60 min on BSC). */
-export const DEPOSIT_SCAN_BLOCKS = 1_200;
+/** Scan this many recent blocks for Transfer events (~4–6 h on BSC). */
+export const DEPOSIT_SCAN_BLOCKS = 8_000;
 
 export const ERC20_ABI = [
   'function transfer(address to, uint256 amount) returns (bool)',

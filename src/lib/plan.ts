@@ -97,6 +97,17 @@ export function vfxtTokensToUsdCents(tokens: number, tokensPerUsd = DEFAULT_VFXT
   return Math.floor((tokens * 100) / tokensPerUsd)
 }
 
+/** VFXT → Fund Wallet cents (round nearest, min $0.01 for positive token amounts). */
+export function vfxtTokensToFundCents(tokens: number, tokensPerUsd = DEFAULT_VFXT_PER_USD): number {
+  if (!Number.isFinite(tokens) || tokens <= 0 || tokensPerUsd <= 0) return 0
+  return Math.max(1, Math.round((tokens * 100) / tokensPerUsd))
+}
+
+export function minVfxtTokensForOneCent(tokensPerUsd = DEFAULT_VFXT_PER_USD): number {
+  if (!Number.isFinite(tokensPerUsd) || tokensPerUsd <= 0) return 1
+  return Math.max(1, Math.ceil(tokensPerUsd / 100))
+}
+
 export function splitWithdrawalCommission(
   amountMinor: number,
   commissionBps: number,
