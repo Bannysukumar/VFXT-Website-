@@ -12,7 +12,7 @@ import {
 } from '../../lib/permissions';
 import { log } from '../../lib/logger';
 import { writeAuditLog } from '../audit/handlers';
-import { creditAvailable } from '../wallets/ledger';
+import { applyLedgerEntries } from '../wallets/ledger';
 import { createNotification } from '../notifications/handlers';
 import {
   BSC_CHAIN_ID,
@@ -252,21 +252,18 @@ async function creditDepositFromChain(params: {
       throw new AppError('failed-precondition', `Deposit status is ${data.status}`);
     }
 
-    tx.set(txRef, {
-      txHash: params.txHash.toLowerCase(),
-      depositId: params.depositId,
-      userId: params.userId,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    // Fund wallet (USD) — used for staking packages.
+    // All wallet reads must happen before any writes in this transaction.
+    const mutations = [];
     if (fundCents > 0) {
-      await creditAvailable(tx, db, {
+      mutations.push({
         userId: params.userId,
         walletId: fundWalletId,
-        type: 'deposit_credit',
+        type: 'deposit_credit' as const,
+        direction: 'credit' as const,
         amountMinor: fundCents,
-        currency: 'USD',
+        availableDelta: fundCents,
+        reservedDelta: 0,
+        currency: 'USD' as const,
         referenceType: 'deposit',
         referenceId: params.depositId,
         description: `${token.symbol} BEP-20 deposit ${params.txHash.slice(0, 10)}…`,
@@ -283,15 +280,16 @@ async function creditDepositFromChain(params: {
         },
       });
     }
-
-    // VFXT wallet — 1:1 for VFXT deposits; converted from USDT otherwise.
     if (vfxtTokens > 0) {
-      await creditAvailable(tx, db, {
+      mutations.push({
         userId: params.userId,
         walletId: vfxtWalletId,
-        type: 'deposit_credit',
+        type: 'deposit_credit' as const,
+        direction: 'credit' as const,
         amountMinor: vfxtTokens,
-        currency: 'VFXT',
+        availableDelta: vfxtTokens,
+        reservedDelta: 0,
+        currency: 'VFXT' as const,
         referenceType: 'deposit',
         referenceId: params.depositId,
         description:
@@ -307,6 +305,16 @@ async function creditDepositFromChain(params: {
         },
       });
     }
+    if (mutations.length > 0) {
+      await applyLedgerEntries(tx, db, mutations);
+    }
+
+    tx.set(txRef, {
+      txHash: params.txHash.toLowerCase(),
+      depositId: params.depositId,
+      userId: params.userId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
 
     tx.update(depositRef, {
       status: 'completed',
