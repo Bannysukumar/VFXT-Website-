@@ -400,12 +400,20 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
     const expectedWei = resolveDepositExpectedWei(depForMatch);
     const acceptedWeis = await depositWeiCandidatesForCredit(db, depositId, depForMatch);
     const createdAt = dep.createdAt?.toMillis?.() ?? Date.now() - DEPOSIT_TTL_MS;
-    if (Date.now() - createdAt > DEPOSIT_TTL_MS) {
+    const expiresAtMs =
+      dep.expiresAt?.toMillis?.() ?? createdAt + DEPOSIT_TTL_MS;
+    if (Date.now() > expiresAtMs) {
       await snap.ref.update({
         status: 'expired',
+        rejectionReason: 'Payment window expired — create a new deposit',
         updatedAt: FieldValue.serverTimestamp(),
       });
-      return { status: 'expired' as const, txHash: null, depositId };
+      return {
+        status: 'expired' as const,
+        txHash: null,
+        depositId,
+        expiresAtMs,
+      };
     }
 
     const isTxUsed = async (txHash: string) => {
@@ -750,9 +758,12 @@ export const monitorCryptoDeposits = onSchedule(
     for (const doc of ordered) {
       const dep = doc.data();
       const createdAt = dep.createdAt?.toMillis?.() ?? Date.now();
-      if (Date.now() - createdAt > DEPOSIT_TTL_MS) {
+      const expiresAtMs =
+        dep.expiresAt?.toMillis?.() ?? createdAt + DEPOSIT_TTL_MS;
+      if (Date.now() > expiresAtMs) {
         await doc.ref.update({
           status: 'expired',
+          rejectionReason: 'Payment window expired — create a new deposit',
           updatedAt: FieldValue.serverTimestamp(),
         });
         continue;

@@ -31,7 +31,37 @@ import {
   type PayWalletOption,
 } from '@/lib/crypto-pay-wallets'
 import { sendDepositToken } from '@/lib/deposit-send'
+import { walletConnectConfigured } from '@/lib/walletconnect-pay'
 import { VFXT_TOKEN } from '@/lib/vfxt-token'
+
+const DEFAULT_DEPOSIT_TTL_MS = 15 * 60 * 1000
+
+function resolveExpiresAtMs(dep: {
+  expiresAtMs?: number | null
+  expiresAt?: string | null
+  createdAt?: string | null
+  ttlMs?: number | null
+}): number | null {
+  if (dep.expiresAtMs && Number.isFinite(dep.expiresAtMs)) return Number(dep.expiresAtMs)
+  if (dep.expiresAt) {
+    const t = Date.parse(dep.expiresAt)
+    if (Number.isFinite(t)) return t
+  }
+  if (dep.createdAt) {
+    const created = Date.parse(dep.createdAt)
+    if (Number.isFinite(created)) {
+      return created + (dep.ttlMs && dep.ttlMs > 0 ? dep.ttlMs : DEFAULT_DEPOSIT_TTL_MS)
+    }
+  }
+  return null
+}
+
+function formatCountdown(ms: number): string {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 import { requestDeposit, type CreateDepositResult } from '@/services/wallet-service'
 import { checkDepositPayment } from '@/services/crypto-service'
 import { fetchMyDeposits } from '@/services/records-service'
@@ -131,6 +161,8 @@ export function DepositsPage() {
   )
   const [canConnectInjected, setCanConnectInjected] = useState(() => hasInjectedEthereum())
   const [showInstallList, setShowInstallList] = useState(false)
+  const [remainingMs, setRemainingMs] = useState<number | null>(null)
+  const wcReady = walletConnectConfigured()
 
   useEffect(() => {
     const refresh = () => {
@@ -329,7 +361,15 @@ export function DepositsPage() {
         if (res.status === 'expired' || res.status === 'cancelled' || res.status === 'rejected') {
           setPayStatus(res.status)
           clearActiveDeposit()
-          if (!opts?.silent) toast.error(`Deposit ${res.status}`)
+          setActive(null)
+          if (!opts?.silent) {
+            toast.error(
+              res.status === 'expired'
+                ? 'Payment failed — time expired. Create a new deposit.'
+                : `Deposit ${res.status}`,
+            )
+          }
+          await queryClient.invalidateQueries({ queryKey: ['my-deposits'] })
           return
         }
 
@@ -393,14 +433,18 @@ export function DepositsPage() {
       return
     }
 
-    const open = history.data.find((d) => {
-      const st = String(d.status)
-      return st === 'awaiting_payment' || st === 'pending'
-    })
+    const open = history.data.find((d) => String(d.status) === 'awaiting_payment')
     if (!open?.depositAddress) return
     const saved = loadActiveDeposit()
     if (saved?.depositId === open.id && saved.depositAddress) {
-      setActive(saved)
+      setActive({
+        ...saved,
+        expiresAt: saved.expiresAt ?? open.expiresAt ?? null,
+        expiresAtMs: saved.expiresAtMs ?? resolveExpiresAtMs({
+          expiresAt: open.expiresAt,
+          createdAt: open.createdAt,
+        }),
+      })
       setPayStatus(saved.status || 'awaiting_payment')
       return
     }
@@ -424,6 +468,10 @@ export function DepositsPage() {
         /* keep fallback */
       }
     }
+    const expiresAtMs = resolveExpiresAtMs({
+      expiresAt: open.expiresAt,
+      createdAt: open.createdAt,
+    })
     const reconstructed: CreateDepositResult = {
       depositId: open.id,
       status: String(open.status),
@@ -441,6 +489,9 @@ export function DepositsPage() {
           : null),
       chainId: open.chainId ?? 56,
       expectedWei: open.expectedWei ?? null,
+      expiresAt: open.expiresAt ?? null,
+      expiresAtMs,
+      ttlMs: DEFAULT_DEPOSIT_TTL_MS,
     }
     setActive(reconstructed)
     setPayStatus(String(open.status) || 'awaiting_payment')
@@ -448,13 +499,43 @@ export function DepositsPage() {
   }, [history.data, active, payStatus, dismissActive])
 
   useEffect(() => {
-    if (!active?.depositId || payStatus === 'completed') return
+    if (!active?.depositId || payStatus === 'completed' || payStatus === 'expired') return
     void runPaymentCheck(undefined, { silent: true })
     const id = window.setInterval(() => {
       void runPaymentCheck(undefined, { silent: true })
     }, 8_000)
     return () => window.clearInterval(id)
   }, [active?.depositId, payStatus, runPaymentCheck])
+
+  // Live payment-window countdown — expires abandoned deposits.
+  useEffect(() => {
+    if (!active?.depositAddress || payStatus === 'completed') {
+      setRemainingMs(null)
+      return
+    }
+    const expiresAtMs = resolveExpiresAtMs(active)
+    if (!expiresAtMs) {
+      setRemainingMs(null)
+      return
+    }
+
+    const tick = () => {
+      const left = expiresAtMs - Date.now()
+      setRemainingMs(left)
+      if (left <= 0) {
+        setPayStatus('expired')
+        clearActiveDeposit()
+        setActive(null)
+        toast.error('Payment failed — time expired', {
+          description: 'Create a new deposit to try again.',
+        })
+        void queryClient.invalidateQueries({ queryKey: ['my-deposits'] })
+      }
+    }
+    tick()
+    const id = window.setInterval(tick, 250)
+    return () => window.clearInterval(id)
+  }, [active, payStatus, queryClient])
 
   useEffect(() => {
     if (!active?.depositId || payStatus === 'completed') return
@@ -488,18 +569,21 @@ export function DepositsPage() {
     window.setTimeout(() => void runPaymentCheck(undefined, { silent: true }), 10000)
   }
 
-  async function handleSendFromWallet() {
+  async function handleSendFromWallet(preferWalletConnect = true) {
     if (!payParams) return
     setSending(true)
     try {
-      const result = await sendDepositToken({
-        tokenAddress: payParams.tokenAddress,
-        depositAddress: payParams.depositAddress,
-        amountWei: payParams.amountWei,
-        symbol: paySymbol,
-      })
+      const result = await sendDepositToken(
+        {
+          tokenAddress: payParams.tokenAddress,
+          depositAddress: payParams.depositAddress,
+          amountWei: payParams.amountWei,
+          symbol: paySymbol,
+        },
+        { preferWalletConnect },
+      )
       setTxHashInput(result.txHash)
-      setOpenedWallet('Connected wallet')
+      setOpenedWallet(result.via === 'walletconnect' ? 'WalletConnect' : 'Browser wallet')
       toast.success(`${paySymbol} sent`, {
         description: 'Waiting for BSC confirmations…',
         action: {
@@ -592,6 +676,11 @@ export function DepositsPage() {
                 <Badge variant="warning">Waiting for payment</Badge>
                 <Badge variant="secondary">BSC · BEP-20</Badge>
                 <Badge variant="secondary">{paySymbol}</Badge>
+                {remainingMs != null ? (
+                  <Badge variant={remainingMs <= 60_000 ? 'warning' : 'secondary'}>
+                    {remainingMs <= 0 ? 'Failed' : `Time left ${formatCountdown(remainingMs)}`}
+                  </Badge>
+                ) : null}
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-ink-muted">
@@ -601,7 +690,12 @@ export function DepositsPage() {
                   {active.amountUsdt}{' '}
                   <span className="text-lg font-semibold text-ink-muted sm:text-xl">{paySymbol}</span>
                 </p>
-                {active.amountUsdt.includes('.') && !/\.0+$/.test(active.amountUsdt) ? (
+                {remainingMs != null ? (
+                  <p className="mt-2 text-xs text-ink-muted">
+                    Complete payment before the timer ends or this request fails and you must create a
+                    new deposit.
+                  </p>
+                ) : active.amountUsdt.includes('.') && !/\.0+$/.test(active.amountUsdt) ? (
                   <p className="mt-2 text-xs text-ink-muted">
                     Unique decimals are active because another deposit is using this same amount.
                   </p>
@@ -640,36 +734,42 @@ export function DepositsPage() {
             </CardHeader>
 
             <CardContent className="min-w-0 space-y-6 pt-6">
-              {canConnectInjected ? (
-                <div className="space-y-2">
-                  <Button
-                    type="button"
-                    size="lg"
-                    className="w-full"
-                    disabled={sending || checking}
-                    onClick={() => void handleSendFromWallet()}
-                  >
-                    {sending ? (
-                      <Loader2 className="animate-spin" />
-                    ) : (
-                      <Wallet className="size-4 shrink-0" />
-                    )}
-                    {sending ? `Sending ${paySymbol}…` : `Connect wallet & send ${paySymbol}`}
-                  </Button>
-                  <p className="text-center text-xs text-ink-muted">
-                    {detectedNames.length > 0
-                      ? `Ready: ${detectedNames.join(', ')}`
-                      : 'Uses your browser wallet on BSC'}
-                  </p>
-                </div>
-              ) : null}
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full"
+                  disabled={sending || checking || (remainingMs != null && remainingMs <= 0)}
+                  onClick={() => void handleSendFromWallet(true)}
+                >
+                  {sending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <Wallet className="size-4 shrink-0" />
+                  )}
+                  {sending
+                    ? `Sending ${paySymbol}…`
+                    : wcReady
+                      ? `WalletConnect & send ${paySymbol}`
+                      : `Connect wallet & send ${paySymbol}`}
+                </Button>
+                <p className="text-center text-xs text-ink-muted">
+                  {wcReady
+                    ? 'Opens WalletConnect — pick MetaMask, Trust, or another wallet and approve the exact amount.'
+                    : canConnectInjected
+                      ? detectedNames.length > 0
+                        ? `Ready: ${detectedNames.join(', ')}`
+                        : 'Uses your browser wallet on BSC'
+                      : 'Set VITE_WALLETCONNECT_PROJECT_ID to enable WalletConnect, or open this page in a wallet browser.'}
+                </p>
+              </div>
 
               <div className="min-w-0 space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-ink">Installed wallets</p>
                     <p className="text-xs text-ink-muted">
-                      Only wallets detected on this device are shown.
+                      Detected on this device. Or use WalletConnect above to pick any wallet.
                     </p>
                   </div>
                   {installedWallets.length > 0 ? (

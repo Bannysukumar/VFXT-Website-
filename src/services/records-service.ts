@@ -67,6 +67,7 @@ const mapDeposit = (id: string, data: DocumentData): DepositRequest => ({
     data.observedUsdCents != null ? Number(data.observedUsdCents) : null,
   suggestedCreditMinor:
     data.suggestedCreditMinor != null ? Number(data.suggestedCreditMinor) : null,
+  expiresAt: data.expiresAt ? toIsoDate(data.expiresAt) : null,
   idempotencyKey: data.idempotencyKey ?? '',
   note: data.note,
   reviewedBy: data.reviewedBy,

@@ -91,6 +91,10 @@ export interface CreateDepositResult {
   chainId: number | null
   expectedWei?: string | null
   paymentTag?: number | null
+  /** ISO timestamp when awaiting payment expires (server). */
+  expiresAt?: string | null
+  expiresAtMs?: number | null
+  ttlMs?: number | null
 }
 
 export type DepositPayMethod = 'usdt_bep20' | 'vfxt_bep20'

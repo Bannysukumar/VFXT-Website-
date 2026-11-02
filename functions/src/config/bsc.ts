@@ -31,8 +31,8 @@ export const BSC_RPC_URLS = [
 /** Required confirmations before crediting a deposit. */
 export const DEPOSIT_CONFIRMATIONS = 3;
 
-/** How long a deposit QR / pending request stays open. */
-export const DEPOSIT_TTL_MS = 60 * 60 * 1000; // 1 hour
+/** How long a deposit QR / awaiting payment stays open before it fails. */
+export const DEPOSIT_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
 /** Scan this many recent blocks for Transfer events (~4–6 h on BSC). */
 export const DEPOSIT_SCAN_BLOCKS = 8_000;

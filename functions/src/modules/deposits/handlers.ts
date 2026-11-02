@@ -1,5 +1,5 @@
 import { onCall, CallableRequest } from 'firebase-functions/v2/https';
-import { FieldValue } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { CALLABLE_OPTS, toHttpsError } from '../../lib/callable';
 import { Collections, getDb } from '../../lib/firebase';
@@ -43,6 +43,9 @@ async function handleCreateDepositRequest(
   chainId: number | null;
   expectedWei: string | null;
   paymentTag: number | null;
+  expiresAt: string | null;
+  expiresAtMs: number | null;
+  ttlMs: number;
 }> {
   const ctx = requireAuth(request);
   gateEmailVerifiedForFinance(ctx);
@@ -187,6 +190,10 @@ async function handleCreateDepositRequest(
     }
   }
 
+  const { DEPOSIT_TTL_MS } = await import('../../config/bsc');
+  const expiresAtMs =
+    status === 'awaiting_payment' ? Date.now() + DEPOSIT_TTL_MS : null;
+
   const doc: DepositRequest = {
     depositId,
     userId: ctx.uid,
@@ -208,7 +215,7 @@ async function handleCreateDepositRequest(
     tokenSymbol,
     tokenAddress,
     tokensPerUsd: tokensPerUsdUsed,
-    expiresAt: null,
+    expiresAt: expiresAtMs != null ? Timestamp.fromMillis(expiresAtMs) : null,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -223,6 +230,7 @@ async function handleCreateDepositRequest(
     paymentTag,
     expectedWei,
     tokenSymbol,
+    expiresAtMs,
   });
 
   return {
@@ -239,6 +247,9 @@ async function handleCreateDepositRequest(
     chainId,
     expectedWei,
     paymentTag,
+    expiresAt: expiresAtMs != null ? new Date(expiresAtMs).toISOString() : null,
+    expiresAtMs,
+    ttlMs: DEPOSIT_TTL_MS,
   };
 }
 

@@ -119,6 +119,7 @@ export interface DepositRequest {
   observedAmountDisplay?: string | null
   observedUsdCents?: number | null
   suggestedCreditMinor?: number | null
+  expiresAt?: string | null
   idempotencyKey: string
   note?: string
   reviewedBy?: string
