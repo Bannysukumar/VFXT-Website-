@@ -220,7 +220,8 @@ export const adminAdjustWallet = onCall(CALLABLE_OPTS, async (request) => {
     const db = getDb();
     await ensureUserWallets(db, uid);
     const walletId = walletDocId(uid, walletKind as WalletKind);
-    const currency = walletKind === 'vfxt' || walletKind === 'direct_referral' ? 'VFXT' : 'USD';
+    const { WALLET_CURRENCY } = await import('../../config/plan');
+    const currency = WALLET_CURRENCY[walletKind as WalletKind];
 
     await db.runTransaction(async (tx) => {
       if (amountMinor > 0) {
