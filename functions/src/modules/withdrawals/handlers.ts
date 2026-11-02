@@ -35,6 +35,29 @@ import {
 
 const FINANCE_ROLES = [AdminRole.SuperAdmin, AdminRole.FinanceAdmin] as const;
 
+const USER_WITHDRAW_RETRY_MSG =
+  'Withdrawal could not be completed right now. Please try again later or contact admin.';
+
+/** Hide hot-wallet / RPC internals from members; keep detail in logs only. */
+function publicWithdrawalError(message: string): string {
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('hot wallet') ||
+    lower.includes('balance too low') ||
+    lower.includes('insufficient') ||
+    lower.includes('nonce') ||
+    lower.includes('rpc') ||
+    lower.includes('broadcast') ||
+    lower.includes('timed out')
+  ) {
+    return USER_WITHDRAW_RETRY_MSG;
+  }
+  if (message.startsWith('Withdrawal transfer failed:')) {
+    return USER_WITHDRAW_RETRY_MSG;
+  }
+  return message.length > 180 ? USER_WITHDRAW_RETRY_MSG : message;
+}
+
 function assertTransition(
   current: WithdrawalStatus,
   allowed: WithdrawalStatus[],
@@ -303,6 +326,12 @@ async function handleCreateWithdrawalRequest(
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Transfer failed';
+    const publicMessage = publicWithdrawalError(message);
+    log.warn('withdrawal_transfer_failed', {
+      withdrawalId,
+      uid: ctx.uid,
+      error: message.slice(0, 500),
+    });
     await db.runTransaction(async (tx) => {
       await releaseReserved(tx, db, {
         userId: ctx.uid,
@@ -318,11 +347,11 @@ async function handleCreateWithdrawalRequest(
       });
       tx.update(db.collection(Collections.withdrawals).doc(withdrawalId), {
         status: 'failed',
-        rejectionReason: message.slice(0, 1000),
+        rejectionReason: publicMessage,
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
-    throw new AppError('internal', `Withdrawal transfer failed: ${message}`);
+    throw new AppError('failed-precondition', publicMessage);
   }
 }
 

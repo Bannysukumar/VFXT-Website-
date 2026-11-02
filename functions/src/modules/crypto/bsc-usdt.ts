@@ -192,9 +192,14 @@ export async function sendUsdtBep20(params: {
       const token = new Contract(USDT_BEP20_ADDRESS, ERC20_ABI, signer);
       const bal = (await token.balanceOf(signer.address)) as bigint;
       if (bal < amountWei) {
+        log.warn('usdt_hot_wallet_balance_low', {
+          have: formatUnits(bal, USDT_DECIMALS),
+          needWei: amountWei.toString(),
+          from: signer.address,
+        });
         throw new AppError(
           'failed-precondition',
-          `Hot wallet USDT balance too low (have ${formatUnits(bal, USDT_DECIMALS)})`,
+          'Withdrawal could not be completed right now. Please try again later or contact admin.',
         );
       }
 

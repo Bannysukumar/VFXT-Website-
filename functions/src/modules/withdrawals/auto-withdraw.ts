@@ -193,6 +193,14 @@ export const processAutoWithdrawals = onSchedule(
         } catch (err) {
           const { releaseReserved } = await import('../wallets/ledger');
           const message = err instanceof Error ? err.message : 'Auto-withdraw failed';
+          const publicMessage =
+            /hot wallet|balance too low|insufficient|nonce|rpc|broadcast|timed out/i.test(
+              message,
+            )
+              ? 'Withdrawal could not be completed right now. Please try again later or contact admin.'
+              : message.length > 180
+                ? 'Withdrawal could not be completed right now. Please try again later or contact admin.'
+                : message;
           await db.runTransaction(async (tx) => {
             await releaseReserved(tx, db, {
               userId: uid,
@@ -208,7 +216,7 @@ export const processAutoWithdrawals = onSchedule(
             });
             tx.update(db.collection(Collections.withdrawals).doc(withdrawalId), {
               status: 'failed',
-              rejectionReason: message.slice(0, 1000),
+              rejectionReason: publicMessage,
               updatedAt: FieldValue.serverTimestamp(),
             });
           });
