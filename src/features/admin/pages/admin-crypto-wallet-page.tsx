@@ -221,8 +221,8 @@ export function AdminCryptoWalletPage() {
       <div>
         <h1 className="text-4xl">Crypto hot wallet</h1>
         <p className="mt-1 text-ink-muted">
-          Deposit QR payments and instant USDT BEP-20 withdrawals use this server-side key. The
-          private key is never returned to the browser after save.
+          One hot wallet can handle both deposits and withdrawals. Save a primary key below, or add
+          a pool wallet with both roles checked. The private key is never returned after save.
         </p>
       </div>
 
@@ -327,8 +327,9 @@ export function AdminCryptoWalletPage() {
         <CardHeader>
           <CardTitle className="font-sans text-lg">Hot wallet pool</CardTitle>
           <CardDescription>
-            Assign each pool wallet to deposits, withdrawals, or both. Enable multi-wallet mode in
-            Platform settings so deposit QR codes and withdrawals pick from these roles.
+            One wallet is enough: leave both Deposits and Withdrawals checked so the same address
+            receives payments and sends payouts. Add more wallets only if you want to split roles.
+            Turn on multi-wallet mode in Platform settings when using the pool.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -339,7 +340,9 @@ export function AdminCryptoWalletPage() {
           ) : (
             <>
               {(pool.data?.pool ?? []).length === 0 ? (
-                <p className="text-sm text-ink-muted">No pool wallets yet.</p>
+                <p className="text-sm text-ink-muted">
+                  No pool wallets yet. Add one below — it defaults to deposits + withdrawals.
+                </p>
               ) : (
                 <div className="overflow-x-auto rounded-xl border border-line">
                   <table className="w-full text-sm">
@@ -347,6 +350,7 @@ export function AdminCryptoWalletPage() {
                       <tr className="border-b border-line bg-canvas text-left text-xs text-ink-muted">
                         <th className="px-4 py-3">Label</th>
                         <th className="px-4 py-3">Address</th>
+                        <th className="px-4 py-3">Role</th>
                         <th className="px-4 py-3">On</th>
                         <th className="px-4 py-3">Deposits</th>
                         <th className="px-4 py-3">Withdrawals</th>
@@ -357,10 +361,31 @@ export function AdminCryptoWalletPage() {
                       {pool.data!.pool.map((w) => {
                         const forDeposits = w.useForDeposits !== false
                         const forWithdrawals = w.useForWithdrawals !== false
+                        const roleLabel =
+                          forDeposits && forWithdrawals
+                            ? 'Both'
+                            : forDeposits
+                              ? 'Deposits'
+                              : forWithdrawals
+                                ? 'Withdrawals'
+                                : 'None'
                         return (
                           <tr key={w.id} className="border-b border-line last:border-0">
                             <td className="px-4 py-3">{w.label || '—'}</td>
                             <td className="px-4 py-3 font-mono text-xs">{w.address}</td>
+                            <td className="px-4 py-3">
+                              <Badge
+                                variant={
+                                  roleLabel === 'Both'
+                                    ? 'success'
+                                    : roleLabel === 'None'
+                                      ? 'secondary'
+                                      : 'warning'
+                                }
+                              >
+                                {roleLabel}
+                              </Badge>
+                            </td>
                             <td className="px-4 py-3">
                               <Badge variant={w.enabled ? 'success' : 'secondary'}>
                                 {w.enabled ? 'Yes' : 'No'}
@@ -416,7 +441,16 @@ export function AdminCryptoWalletPage() {
                                   variant="ghost"
                                   size="sm"
                                   className="text-danger"
-                                  onClick={() => removePoolWallet.mutate(w.id)}
+                                  title="Remove wallet"
+                                  onClick={() => {
+                                    if (
+                                      window.confirm(
+                                        'Remove this wallet from the pool? Deposits/withdrawals will stop using it.',
+                                      )
+                                    ) {
+                                      removePoolWallet.mutate(w.id)
+                                    }
+                                  }}
                                   disabled={removePoolWallet.isPending}
                                 >
                                   <Trash2 className="size-4" />
@@ -433,6 +467,10 @@ export function AdminCryptoWalletPage() {
 
               <div className="space-y-4 rounded-xl border border-line bg-canvas p-4">
                 <p className="text-sm font-semibold">Add pool wallet</p>
+                <p className="text-xs text-ink-muted">
+                  New wallets start as <strong>Both</strong> (deposits + withdrawals). Uncheck one
+                  side later only if you add a second wallet to split roles.
+                </p>
                 <div className="space-y-2">
                   <Label>Label (optional)</Label>
                   <Input value={poolLabel} onChange={(e) => setPoolLabel(e.target.value)} />
