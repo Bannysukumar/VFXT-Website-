@@ -29,7 +29,7 @@ export function WalletRegisterPage() {
   const address = (session?.address || params.get('address') || '').toLowerCase()
   const signupToken = session?.signupToken || ''
 
-  const [uplinerName, setUplinerName] = useState<string | null>(null)
+  const [uplinerId, setUplinerId] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [phoneCountry, setPhoneCountry] = useState(DEFAULT_PHONE_COUNTRY)
@@ -64,7 +64,7 @@ export function WalletRegisterPage() {
   useEffect(() => {
     const code = referralCode?.trim()
     if (!code || code.length < 4) {
-      setUplinerName(null)
+      setUplinerId(null)
       setLookupError(null)
       return
     }
@@ -75,12 +75,12 @@ export function WalletRegisterPage() {
       try {
         const res = await lookupReferralCode(code)
         if (!cancelled) {
-          setUplinerName(res.displayName)
+          setUplinerId(res.referralCode)
           form.setValue('referralCode', res.referralCode, { shouldValidate: true })
         }
       } catch (err) {
         if (!cancelled) {
-          setUplinerName(null)
+          setUplinerId(null)
           setLookupError(err instanceof Error ? err.message : 'Invalid referral code')
         }
       } finally {
@@ -94,7 +94,7 @@ export function WalletRegisterPage() {
   }, [referralCode, form])
 
   const onSubmit = form.handleSubmit(async (values) => {
-    if (!uplinerName) {
+    if (!uplinerId) {
       toast.error('A valid referral code is required to sign up')
       return
     }
@@ -172,9 +172,10 @@ export function WalletRegisterPage() {
             <p className="flex items-center gap-1.5 text-xs text-ink-muted">
               <Loader2 className="size-3 animate-spin" /> Checking upliner…
             </p>
-          ) : uplinerName ? (
+          ) : uplinerId ? (
             <p className="flex items-center gap-1.5 text-xs text-accent">
-              <CheckCircle2 className="size-3.5" /> Upliner: {uplinerName}
+              <CheckCircle2 className="size-3.5" /> Upliner User ID:{' '}
+              <span className="font-mono uppercase">{uplinerId}</span>
             </p>
           ) : lookupError ? (
             <p className="text-xs text-danger">{lookupError}</p>
@@ -280,7 +281,7 @@ export function WalletRegisterPage() {
         <Button
           type="submit"
           className="w-full"
-          disabled={isSubmitting || !uplinerName}
+          disabled={isSubmitting || !uplinerId}
         >
           {isSubmitting ? <Loader2 className="animate-spin" /> : null}
           {includeCredentials ? 'Create account & link wallet' : 'Sign up with wallet'}

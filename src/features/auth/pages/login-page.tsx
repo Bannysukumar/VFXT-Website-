@@ -46,7 +46,7 @@ export function LoginPage() {
   const from = (location.state as { from?: string } | null)?.from ?? '/app'
   const [walletBusy, setWalletBusy] = useState(false)
   const [needsProfile, setNeedsProfile] = useState(false)
-  const [uplinerName, setUplinerName] = useState<string | null>(null)
+  const [uplinerId, setUplinerId] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
 
   const form = useForm<LoginValues>({
@@ -63,16 +63,16 @@ export function LoginPage() {
 
   async function resolveUpliner(code: string) {
     if (!code || code.trim().length < 4) {
-      setUplinerName(null)
+      setUplinerId(null)
       return
     }
     setLookingUp(true)
     try {
       const res = await lookupReferralCode(code.trim())
-      setUplinerName(res.displayName)
+      setUplinerId(res.referralCode)
       completeForm.setValue('referralCode', res.referralCode)
     } catch {
-      setUplinerName(null)
+      setUplinerId(null)
     } finally {
       setLookingUp(false)
     }
@@ -115,7 +115,7 @@ export function LoginPage() {
   }
 
   const onCompleteProfile = completeForm.handleSubmit(async (values) => {
-    if (!uplinerName) {
+    if (!uplinerId) {
       toast.error('A valid referral code is required')
       return
     }
@@ -157,9 +157,10 @@ export function LoginPage() {
             />
             {lookingUp ? (
               <p className="text-xs text-ink-muted">Checking sponsor…</p>
-            ) : uplinerName ? (
+            ) : uplinerId ? (
               <p className="flex items-center gap-1.5 text-xs font-medium text-success">
-                <CheckCircle2 className="size-3.5" /> Upliner: {uplinerName}
+                <CheckCircle2 className="size-3.5" /> Upliner User ID:{' '}
+                <span className="font-mono uppercase">{uplinerId}</span>
               </p>
             ) : referralCode?.trim().length >= 4 ? (
               <p className="text-xs text-danger">Referral code not found</p>
@@ -182,7 +183,7 @@ export function LoginPage() {
             className="w-full"
             size="lg"
             type="submit"
-            disabled={completeForm.formState.isSubmitting || !uplinerName}
+            disabled={completeForm.formState.isSubmitting || !uplinerId}
           >
             {completeForm.formState.isSubmitting ? <Loader2 className="animate-spin" /> : null}
             Continue

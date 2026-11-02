@@ -26,7 +26,7 @@ import {
 export function RegisterPage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [uplinerName, setUplinerName] = useState<string | null>(null)
+  const [uplinerId, setUplinerId] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [walletBusy, setWalletBusy] = useState(false)
@@ -51,7 +51,7 @@ export function RegisterPage() {
   useEffect(() => {
     const code = referralCode?.trim()
     if (!code || code.length < 4) {
-      setUplinerName(null)
+      setUplinerId(null)
       setLookupError(null)
       return
     }
@@ -62,12 +62,12 @@ export function RegisterPage() {
       try {
         const res = await lookupReferralCode(code)
         if (!cancelled) {
-          setUplinerName(res.displayName)
+          setUplinerId(res.referralCode)
           form.setValue('referralCode', res.referralCode, { shouldValidate: true })
         }
       } catch (err) {
         if (!cancelled) {
-          setUplinerName(null)
+          setUplinerId(null)
           setLookupError(err instanceof Error ? err.message : 'Invalid referral code')
         }
       } finally {
@@ -82,7 +82,7 @@ export function RegisterPage() {
 
   async function handleWalletConnect() {
     const code = form.getValues('referralCode')?.trim()
-    if (!code || !uplinerName) {
+    if (!code || !uplinerId) {
       toast.error('Enter a valid referral code before connecting your wallet')
       return
     }
@@ -123,7 +123,7 @@ export function RegisterPage() {
   }
 
   const onSubmit = form.handleSubmit(async (values) => {
-    if (!uplinerName) {
+    if (!uplinerId) {
       toast.error('Enter a valid referral code')
       return
     }
@@ -177,10 +177,11 @@ export function RegisterPage() {
               <Loader2 className="size-3.5 animate-spin" /> Checking sponsor…
             </p>
           ) : null}
-          {uplinerName && !lookingUp ? (
+          {uplinerId && !lookingUp ? (
             <p className="flex items-center gap-1.5 text-xs font-medium text-success">
               <CheckCircle2 className="size-3.5" />
-              Upliner: {uplinerName}
+              Upliner User ID:{' '}
+              <span className="font-mono uppercase">{uplinerId}</span>
             </p>
           ) : null}
         </div>
@@ -189,7 +190,7 @@ export function RegisterPage() {
           type="button"
           size="lg"
           className="w-full"
-          disabled={walletBusy || lookingUp || !uplinerName}
+          disabled={walletBusy || lookingUp || !uplinerId}
           onClick={() => void handleWalletConnect()}
         >
           {walletBusy ? <Loader2 className="animate-spin" /> : <Wallet className="size-4" />}
@@ -315,7 +316,7 @@ export function RegisterPage() {
           className="w-full"
           size="lg"
           type="submit"
-          disabled={isSubmitting || !uplinerName || lookingUp}
+          disabled={isSubmitting || !uplinerId || lookingUp}
         >
           {isSubmitting ? <Loader2 className="animate-spin" /> : null}
           {isSubmitting ? 'Creating account…' : 'Create account'}
