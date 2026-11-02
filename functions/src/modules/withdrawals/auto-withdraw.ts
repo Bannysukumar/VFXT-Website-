@@ -58,7 +58,18 @@ export const processAutoWithdrawals = onSchedule(
         const walletSnap = await db.collection(Collections.wallets).doc(walletId).get();
         if (!walletSnap.exists) continue;
         const available = Number(walletSnap.data()?.availableMinor ?? 0);
-        if (available < settings.minWithdrawUsdCents) continue;
+        const { getTokenEconomicsSettings } = await import('../platform/store');
+        const {
+          splitWithdrawalCommission,
+          usdCentsToVfxtTokens,
+          vfxtTokensToUsdCents,
+        } = await import('../../config/plan');
+        const tokenFx = await getTokenEconomicsSettings();
+        const minTokens = usdCentsToVfxtTokens(
+          settings.minWithdrawUsdCents,
+          tokenFx.tokensPerUsd,
+        );
+        if (available < minTokens) continue;
 
         // Skip if a withdrawal is already processing/pending.
         const open = await db
@@ -70,10 +81,14 @@ export const processAutoWithdrawals = onSchedule(
         if (!open.empty) continue;
 
         const toAddress = assertBep20Address(destination);
-        const amountMinor = available; // sweep available balance (already >= min)
-        const { splitWithdrawalCommission } = await import('../../config/plan');
-        const { commissionMinor, netMinor } = splitWithdrawalCommission(
+        const amountMinor = available; // sweep available VFXT (already >= min)
+        const usdtAmountCents = vfxtTokensToUsdCents(
           amountMinor,
+          tokenFx.tokensPerUsd,
+        );
+        if (usdtAmountCents < 1) continue;
+        const { commissionMinor, netMinor } = splitWithdrawalCommission(
+          usdtAmountCents,
           settings.commissionBps,
         );
         if (netMinor <= 0) continue;
@@ -85,7 +100,7 @@ export const processAutoWithdrawals = onSchedule(
             walletId,
             type: 'withdrawal_reserve',
             amountMinor,
-            currency: 'USD',
+            currency: 'VFXT',
             referenceType: 'withdrawal',
             referenceId: withdrawalId,
             description: 'Auto-withdrawal reserved',
@@ -95,6 +110,8 @@ export const processAutoWithdrawals = onSchedule(
               auto: true,
               commissionMinor,
               netMinor,
+              usdtAmountCents,
+              tokensPerUsd: tokenFx.tokensPerUsd,
               commissionBps: settings.commissionBps,
             },
           });
@@ -102,11 +119,13 @@ export const processAutoWithdrawals = onSchedule(
             withdrawalId,
             userId: uid,
             walletId,
-            currency: 'USD',
+            currency: 'VFXT',
             amountMinor,
+            usdtAmountCents,
             commissionMinor,
             netAmountMinor: netMinor,
             commissionBps: settings.commissionBps,
+            tokensPerUsd: tokenFx.tokensPerUsd,
             status: 'processing',
             destination: toAddress,
             method: 'usdt_bep20',
@@ -131,7 +150,7 @@ export const processAutoWithdrawals = onSchedule(
               walletId,
               type: 'withdrawal_debit',
               amountMinor,
-              currency: 'USD',
+              currency: 'VFXT',
               referenceType: 'withdrawal',
               referenceId: withdrawalId,
               description: `Auto USDT send ${txHash.slice(0, 10)}…`,
@@ -142,6 +161,8 @@ export const processAutoWithdrawals = onSchedule(
                 auto: true,
                 commissionMinor,
                 netMinor,
+                usdtAmountCents,
+                tokensPerUsd: tokenFx.tokensPerUsd,
               },
             });
             tx.update(db.collection(Collections.withdrawals).doc(withdrawalId), {
@@ -157,9 +178,9 @@ export const processAutoWithdrawals = onSchedule(
             title: 'Auto-withdrawal sent',
             body:
               commissionMinor > 0
-                ? `Sent $${(netMinor / 100).toFixed(2)} USDT (fee $${(commissionMinor / 100).toFixed(2)}).`
+                ? `Sent $${(netMinor / 100).toFixed(2)} USDT for ${amountMinor.toLocaleString()} VFXT (fee $${(commissionMinor / 100).toFixed(2)}).`
                 : 'Your withdrawal wallet reached the minimum and was paid out automatically.',
-            data: { withdrawalId, txHash, commissionMinor, netMinor },
+            data: { withdrawalId, txHash, commissionMinor, netMinor, amountMinor },
           });
           log.info('auto_withdrawal_sent', {
             uid,
@@ -178,7 +199,7 @@ export const processAutoWithdrawals = onSchedule(
               walletId,
               type: 'withdrawal_release',
               amountMinor,
-              currency: 'USD',
+              currency: 'VFXT',
               referenceType: 'withdrawal',
               referenceId: withdrawalId,
               description: 'Auto-withdrawal failed — funds released',

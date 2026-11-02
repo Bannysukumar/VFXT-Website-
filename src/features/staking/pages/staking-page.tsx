@@ -15,20 +15,20 @@ import { Label } from '@/components/ui/label'
 import { LoadingState } from '@/components/shared/loading-state'
 import { ErrorState } from '@/components/shared/error-state'
 import { FieldError, PageHeader } from '@/components/shared/page-header'
-import { AmountInputPrefix, ProcessSteps, SummaryRow } from '@/components/shared/process-steps'
+import { ProcessSteps, SummaryRow } from '@/components/shared/process-steps'
 import { SuccessReceipt } from '@/components/shared/success-receipt'
 import { useAuth } from '@/features/auth/auth-context'
-import { formatMinor, parseToMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { images } from '@/lib/media'
 import {
   DAILY_YIELD,
   LOCKED_PACKAGES,
-  MIN_STAKE_USD_CENTS,
+  MIN_STAKE_VFXT_TOKENS,
   dailyYieldCents,
   payoutCapCents,
   usdCentsToVfxtTokens,
 } from '@/lib/plan'
+import { getPublicPlatformSettings } from '@/services/platform-service'
 import { fetchUserWallets } from '@/services/wallet-service'
 import {
   createStakingPosition,
@@ -77,7 +77,7 @@ const PLAN_OPTIONS: PlanOption[] = [
     headline: `Lock now, unlock bigger later`,
     points: [
       `Your money stays locked for ${pkg.days} days`,
-      `At the end you receive about ${pkg.multiplier}× your stake in USD value`,
+      `At the end you receive about ${pkg.multiplier}× your stake in VFXT`,
       `Plus ${pkg.bonusTokenPct}% bonus VFXT tokens`,
       'Best if you can wait for the full term',
     ],
@@ -97,8 +97,8 @@ const PLAN_LABELS: Record<StakingPlanId, string> = {
 
 const HOW_TO_STAKE = [
   {
-    title: 'Add money to Fund Wallet',
-    body: 'Deposit USDT first. Staking always spends from your Fund Wallet.',
+    title: 'Add VFXT to Fund Wallet',
+    body: 'Deposit USDT (auto-converts) or VFXT. Staking always spends Fund Wallet tokens.',
   },
   {
     title: 'Pick a plan',
@@ -106,16 +106,13 @@ const HOW_TO_STAKE = [
   },
   {
     title: 'Enter amount and stake',
-    body: `Type how much to stake (minimum $${(MIN_STAKE_USD_CENTS / 100).toFixed(0)}) and confirm. Your position appears below right away.`,
+    body: 'Type how many VFXT tokens to stake and confirm. Your position appears below right away.',
   },
 ]
 
-function previewMinor(input: string) {
-  try {
-    return input ? Number(parseToMinor(input, 2)) : 0
-  } catch {
-    return 0
-  }
+function previewTokens(input: string) {
+  const n = Math.floor(Number(String(input).replace(/,/g, '')))
+  return Number.isFinite(n) && n > 0 ? n : 0
 }
 
 function formatStakingDate(value: unknown): string {
@@ -169,19 +166,33 @@ export function StakingPage() {
     enabled: Boolean(user?.uid),
   })
 
+  const platform = useQuery({
+    queryKey: ['platform', 'public'],
+    queryFn: getPublicPlatformSettings,
+  })
+  const tokensPerUsd = platform.data?.token?.tokensPerUsd ?? 10_000
+  const minStakeTokens =
+    platform.data?.plan && 'minStakeUsdCents' in (platform.data.plan as object)
+      ? usdCentsToVfxtTokens(
+          Number((platform.data.plan as { minStakeUsdCents?: number }).minStakeUsdCents) ||
+            10_000,
+          tokensPerUsd,
+        )
+      : MIN_STAKE_VFXT_TOKENS
+
   const form = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: { planId: 'daily_yield', amount: '100' },
+    defaultValues: { planId: 'daily_yield', amount: String(MIN_STAKE_VFXT_TOKENS) },
   })
   const { errors } = form.formState
   const planId = form.watch('planId')
   const amount = form.watch('amount')
-  const amountMinor = previewMinor(amount)
+  const amountMinor = previewTokens(amount)
   const selected = PLAN_OPTIONS.find((p) => p.id === planId) ?? PLAN_OPTIONS[0]
 
   const fundWallet = wallets.data?.find((w) => w.kind === 'fund')
   const fundAvailable = fundWallet?.availableMinor ?? 0
-  const belowMin = amountMinor > 0 && amountMinor < MIN_STAKE_USD_CENTS
+  const belowMin = amountMinor > 0 && amountMinor < minStakeTokens
   const exceedsFund = amountMinor > fundAvailable
 
   const dailyCredit = amountMinor > 0 ? dailyYieldCents(amountMinor) : 0
@@ -191,14 +202,14 @@ export function StakingPage() {
   const lockedReturn = lockedPkg && amountMinor > 0 ? amountMinor * lockedPkg.multiplier : 0
   const lockedBonusVfxt =
     lockedPkg && amountMinor > 0
-      ? Math.floor((usdCentsToVfxtTokens(amountMinor) * lockedPkg.bonusTokenPct) / 100)
+      ? Math.floor((amountMinor * lockedPkg.bonusTokenPct) / 100)
       : 0
 
   const mutation = useMutation({
     mutationFn: async (values: Values) => {
-      const minor = Number(parseToMinor(values.amount, 2))
-      if (minor < MIN_STAKE_USD_CENTS) {
-        throw new Error(`Minimum stake is $${(MIN_STAKE_USD_CENTS / 100).toFixed(0)}`)
+      const minor = previewTokens(values.amount)
+      if (minor < minStakeTokens) {
+        throw new Error(`Minimum stake is ${minStakeTokens.toLocaleString()} VFXT`)
       }
       if (minor > fundAvailable) {
         throw new Error('Not enough Fund Wallet balance. Deposit first, then stake.')
@@ -219,20 +230,23 @@ export function StakingPage() {
         planId: res.planId,
         amountMinor: res.amountMinor,
       })
-      form.reset({ planId: form.getValues('planId'), amount: '100' })
+      form.reset({
+        planId: form.getValues('planId'),
+        amount: String(minStakeTokens),
+      })
       await queryClient.invalidateQueries({ queryKey: ['staking'] })
       await queryClient.invalidateQueries({ queryKey: ['wallets'] })
     },
     onError: (e: Error) => toast.error(e.message),
   })
 
-  const usdMoney = (minor: number) => formatMinor(minor, { scale: 2, currency: 'USD' })
+  const tokenMoney = (tokens: number) => `${tokens.toLocaleString()} VFXT`
 
   if (success || previewSuccess) {
     const shown = success ?? {
       positionId: 'preview',
       planId: 'daily_yield' as StakingPlanId,
-      amountMinor: 10_000,
+      amountMinor: MIN_STAKE_VFXT_TOKENS,
     }
     const planLabel = PLAN_LABELS[shown.planId] ?? shown.planId
     const isDaily = shown.planId === 'daily_yield'
@@ -240,7 +254,7 @@ export function StakingPage() {
       <div className="mx-auto max-w-xl space-y-6">
         <SuccessReceipt
           title="Stake successful"
-          amount={usdMoney(shown.amountMinor)}
+          amount={tokenMoney(shown.amountMinor)}
           subtitle={
             isDaily
               ? 'Your daily income plan is live. The first ROI credits 24 hours from your stake time.'
@@ -279,7 +293,7 @@ export function StakingPage() {
     <div className="space-y-8">
       <PageHeader
         title="Stake & earn"
-        description="Put Fund Wallet money into a plan. Daily income pays you regularly. Lock plans pay a larger return when the term ends."
+        description="Stake VFXT from your Fund Wallet. Daily income and lock plans pay returns in VFXT tokens."
       />
 
       <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
@@ -342,7 +356,7 @@ export function StakingPage() {
                 <div>
                   <p className="text-[11px] font-medium text-ink-subtle">Fund Wallet</p>
                   <p className="tabular text-sm font-bold">
-                    {wallets.isLoading ? '…' : usdMoney(fundAvailable)}
+                    {wallets.isLoading ? '…' : tokenMoney(fundAvailable)}
                   </p>
                 </div>
               </div>
@@ -355,15 +369,14 @@ export function StakingPage() {
                 <input type="hidden" {...form.register('planId')} />
 
                 <div className="space-y-2">
-                  <Label htmlFor="amount">Stake amount (USD)</Label>
+                  <Label htmlFor="amount">Stake amount (VFXT)</Label>
                   <div className="relative">
-                    <AmountInputPrefix />
                     <Input
                       id="amount"
-                      inputMode="decimal"
-                      placeholder="100.00"
+                      inputMode="numeric"
+                      placeholder={String(minStakeTokens)}
                       autoComplete="off"
-                      className="tabular h-14 pl-11 pr-24 font-display text-2xl font-bold"
+                      className="tabular h-14 pr-24 font-display text-2xl font-bold"
                       aria-invalid={Boolean(errors.amount) || belowMin || exceedsFund}
                       {...form.register('amount')}
                     />
@@ -371,7 +384,7 @@ export function StakingPage() {
                       type="button"
                       disabled={!fundWallet || fundAvailable <= 0}
                       onClick={() =>
-                        form.setValue('amount', (fundAvailable / 100).toFixed(2), {
+                        form.setValue('amount', String(fundAvailable), {
                           shouldValidate: true,
                         })
                       }
@@ -382,11 +395,11 @@ export function StakingPage() {
                   </div>
                   <FieldError message={errors.amount?.message} />
                   <p className="text-xs text-ink-muted">
-                    Minimum ${(MIN_STAKE_USD_CENTS / 100).toFixed(0)}. Uses Fund Wallet only.
+                    Minimum {minStakeTokens.toLocaleString()} VFXT. Uses Fund Wallet only.
                   </p>
                   {belowMin ? (
                     <p className="text-xs font-medium text-warning">
-                      Amount is below the ${MIN_STAKE_USD_CENTS / 100} minimum.
+                      Amount is below the {minStakeTokens.toLocaleString()} VFXT minimum.
                     </p>
                   ) : null}
                   {exceedsFund ? (
@@ -395,16 +408,20 @@ export function StakingPage() {
                     </p>
                   ) : null}
                   <div className="flex flex-wrap gap-2 pt-1">
-                    {['100', '250', '500', '1000'].map((quick) => (
-                      <button
-                        key={quick}
-                        type="button"
-                        onClick={() => form.setValue('amount', quick, { shouldValidate: true })}
-                        className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink-muted transition-colors hover:border-accent hover:text-accent"
-                      >
-                        ${quick}
-                      </button>
-                    ))}
+                    {[minStakeTokens, minStakeTokens * 2, minStakeTokens * 5, minStakeTokens * 10].map(
+                      (quick) => (
+                        <button
+                          key={quick}
+                          type="button"
+                          onClick={() =>
+                            form.setValue('amount', String(quick), { shouldValidate: true })
+                          }
+                          className="rounded-full border border-line px-3 py-1 text-xs font-semibold text-ink-muted transition-colors hover:border-accent hover:text-accent"
+                        >
+                          {quick.toLocaleString()} VFXT
+                        </button>
+                      ),
+                    )}
                   </div>
                 </div>
 
@@ -414,14 +431,14 @@ export function StakingPage() {
                   </p>
                   {selected.kind === 'daily' ? (
                     <>
-                      <SummaryRow label="Estimated daily credit" value={usdMoney(dailyCredit)} strong />
-                      <SummaryRow label="Max total (no referral)" value={usdMoney(cap2x)} />
-                      <SummaryRow label="Max total (with 1+ referral)" value={usdMoney(cap3x)} />
+                      <SummaryRow label="Estimated daily credit" value={tokenMoney(dailyCredit)} strong />
+                      <SummaryRow label="Max total (no referral)" value={tokenMoney(cap2x)} />
+                      <SummaryRow label="Max total (with 1+ referral)" value={tokenMoney(cap3x)} />
                     </>
                   ) : (
                     <>
                       <SummaryRow label="Lock period" value={`${selected.days} days`} />
-                      <SummaryRow label="Approx. maturity payout" value={usdMoney(lockedReturn)} strong />
+                      <SummaryRow label="Approx. maturity payout" value={tokenMoney(lockedReturn)} strong />
                       <SummaryRow
                         label="Bonus VFXT at maturity"
                         value={lockedBonusVfxt.toLocaleString()}
@@ -448,7 +465,7 @@ export function StakingPage() {
                   disabled={mutation.isPending || belowMin || exceedsFund || amountMinor <= 0}
                   className="w-full"
                 >
-                  {mutation.isPending ? 'Starting stake…' : `Stake ${amountMinor > 0 ? usdMoney(amountMinor) : 'now'}`}
+                  {mutation.isPending ? 'Starting stake…' : `Stake ${amountMinor > 0 ? tokenMoney(amountMinor) : 'now'}`}
                 </Button>
               </form>
             </CardContent>
@@ -540,10 +557,10 @@ export function StakingPage() {
                         <Badge variant={p.status === 'active' ? 'success' : 'secondary'}>
                           {statusLabel(p.status)}
                         </Badge>
-                        <p className="mt-1 font-semibold">{usdMoney(p.principalMinor)}</p>
+                        <p className="mt-1 font-semibold">{tokenMoney(p.principalMinor)}</p>
                         <p className="text-xs text-ink-muted">
-                          Received {usdMoney(p.totalPaidMinor)}
-                          {p.capMinor > 0 ? ` · cap ${usdMoney(p.capMinor)}` : null}
+                          Received {tokenMoney(p.totalPaidMinor)}
+                          {p.capMinor > 0 ? ` · cap ${tokenMoney(p.capMinor)}` : null}
                         </p>
                       </div>
                     </div>

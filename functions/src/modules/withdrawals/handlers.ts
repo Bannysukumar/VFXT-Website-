@@ -9,7 +9,7 @@ import {
   requireAuth,
   requireAdminRole,
 } from '../../lib/permissions';
-import { parseAmountToMinor, assertPositiveMinor } from '../../lib/money';
+import { assertPositiveMinor } from '../../lib/money';
 import {
   buildIdempotencyKey,
   claimIdempotencyKey,
@@ -68,23 +68,47 @@ async function handleCreateWithdrawalRequest(
 
   const { amount, amountMinor: amountMinorInput, destination, method } =
     parsed.data;
-  const currency = 'USD' as const;
+  const currency = 'VFXT' as const;
+  // Withdrawal wallet is VFXT tokens — accept whole tokens only.
   const amountMinor =
-    amountMinorInput ?? parseAmountToMinor(amount ?? '0', 2);
+    amountMinorInput ??
+    Math.floor(Number.parseFloat(String(amount ?? '0').replace(/,/g, '')));
   assertPositiveMinor(amountMinor);
 
-  const { getWithdrawSettings } = await import('../platform/store');
-  const { splitWithdrawalCommission } = await import('../../config/plan');
+  const { getWithdrawSettings, getTokenEconomicsSettings } = await import(
+    '../platform/store'
+  );
+  const {
+    splitWithdrawalCommission,
+    usdCentsToVfxtTokens,
+    vfxtTokensToUsdCents,
+  } = await import('../../config/plan');
   const withdrawSettings = await getWithdrawSettings();
-  if (amountMinor < withdrawSettings.minWithdrawUsdCents) {
+  const tokenFx = await getTokenEconomicsSettings();
+  const minTokens = usdCentsToVfxtTokens(
+    withdrawSettings.minWithdrawUsdCents,
+    tokenFx.tokensPerUsd,
+  );
+  if (amountMinor < minTokens) {
     throw new AppError(
       'invalid-argument',
-      `Minimum withdrawal is $${(withdrawSettings.minWithdrawUsdCents / 100).toFixed(2)}`,
+      `Minimum withdrawal is ${minTokens.toLocaleString()} VFXT (≈ $${(withdrawSettings.minWithdrawUsdCents / 100).toFixed(2)})`,
+    );
+  }
+
+  const usdtAmountCents = vfxtTokensToUsdCents(
+    amountMinor,
+    tokenFx.tokensPerUsd,
+  );
+  if (usdtAmountCents < 1) {
+    throw new AppError(
+      'invalid-argument',
+      'Token amount too small to convert to USDT at the current price',
     );
   }
 
   const { commissionMinor, netMinor } = splitWithdrawalCommission(
-    amountMinor,
+    usdtAmountCents,
     withdrawSettings.commissionBps,
   );
   if (netMinor <= 0) {
@@ -156,6 +180,8 @@ async function handleCreateWithdrawalRequest(
         method: resolvedMethod,
         commissionMinor,
         netMinor,
+        usdtAmountCents,
+        tokensPerUsd: tokenFx.tokensPerUsd,
         commissionBps: withdrawSettings.commissionBps,
       },
     });
@@ -166,9 +192,11 @@ async function handleCreateWithdrawalRequest(
       walletId,
       currency,
       amountMinor,
+      usdtAmountCents,
       commissionMinor,
       netAmountMinor: netMinor,
       commissionBps: withdrawSettings.commissionBps,
+      tokensPerUsd: tokenFx.tokensPerUsd,
       status: 'processing',
       destination: toAddress,
       method: resolvedMethod,
@@ -214,13 +242,15 @@ async function handleCreateWithdrawalRequest(
         currency,
         referenceType: 'withdrawal',
         referenceId: withdrawalId,
-        description: `USDT BEP-20 sent ${txHash.slice(0, 10)}… (fee $${(commissionMinor / 100).toFixed(2)})`,
+        description: `USDT BEP-20 sent ${txHash.slice(0, 10)}… (${amountMinor.toLocaleString()} VFXT → $${(netMinor / 100).toFixed(2)}, fee $${(commissionMinor / 100).toFixed(2)})`,
         createdBy: 'system:crypto-withdraw',
         metadata: {
           txHash,
           destination: toAddress,
           commissionMinor,
           netMinor,
+          usdtAmountCents,
+          tokensPerUsd: tokenFx.tokensPerUsd,
           commissionBps: withdrawSettings.commissionBps,
         },
       });

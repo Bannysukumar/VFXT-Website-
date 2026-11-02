@@ -102,7 +102,7 @@ export async function payLevelCommissions(
           walletId: walletDocId(payeeId, 'level_income'),
           type: 'level_commission',
           amountMinor: amount,
-          currency: 'USD',
+          currency: 'VFXT',
           referenceType: 'staking_position',
           referenceId: params.positionId,
           description: `L${level} commission on stake`,

@@ -17,17 +17,17 @@ type Row = (DepositRequest | WithdrawalRequest) & {
   tokenSymbol?: string | null
 }
 
-function amountLabel(row: Row) {
+function amountLabel(row: Row, kind: 'deposit' | 'withdrawal') {
   const method = row.method ?? row.provider
-  const isVfxt =
+  const isVfxtDeposit =
     row.currency === 'VFXT' || method === 'vfxt_bep20' || row.tokenSymbol === 'VFXT'
-  if (isVfxt) {
-    // VFXT amountMinor is whole tokens (10), not USD cents.
+  // Withdrawals debit VFXT tokens; deposits may be USDT cents or VFXT tokens.
+  if (kind === 'withdrawal' || isVfxtDeposit) {
     return `${Number(row.amountMinor).toLocaleString()} VFXT`
   }
   return formatMinor(row.amountMinor, {
     scale: 2,
-    currency: row.currency === 'USD' ? 'USD' : undefined,
+    currency: 'USD',
   })
 }
 
@@ -89,7 +89,7 @@ export function RequestHistory({
                     <p className="min-w-0 truncate text-xs text-ink-muted">
                       {(kind === 'withdrawal' ? row.destination : row.note) || '—'}
                     </p>
-                    <p className="shrink-0 tabular text-sm font-semibold">{amountLabel(row)}</p>
+                    <p className="shrink-0 tabular text-sm font-semibold">{amountLabel(row, kind)}</p>
                   </div>
                   {kind === 'withdrawal' && row.txHash ? (
                     <div className="pl-12">
@@ -140,7 +140,7 @@ export function RequestHistory({
                           <BscTxLink txHash={row.txHash} compact />
                         </TD>
                       ) : null}
-                      <TD className="tabular text-right font-semibold">{amountLabel(row)}</TD>
+                      <TD className="tabular text-right font-semibold">{amountLabel(row, kind)}</TD>
                     </TR>
                   ))}
                 </TBody>

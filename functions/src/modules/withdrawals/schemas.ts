@@ -4,7 +4,7 @@ export const currencySchema = z.enum(['USD', 'VFXT']);
 
 export const createWithdrawalRequestSchema = z
   .object({
-    currency: currencySchema.default('USD'),
+    currency: currencySchema.default('VFXT'),
     amountMinor: z.number().int().positive().optional(),
     amount: z.string().min(1).max(32).optional(),
     destination: z.string().trim().min(5).max(200),

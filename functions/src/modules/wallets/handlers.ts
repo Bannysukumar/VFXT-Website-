@@ -4,7 +4,6 @@ import { z } from 'zod';
 import {
   ALLOWED_TRANSFERS,
   isTransferAllowed,
-  vfxtTokensToUsdCents,
   WalletKind,
   WALLET_CURRENCY,
 } from '../../config/plan';
@@ -38,7 +37,20 @@ export async function ensureUserWallets(
     const ref = db.collection(Collections.wallets).doc(walletId);
     const snap = await ref.get();
     if (snap.exists) {
-      wallets.push(snap.data() as WalletDoc);
+      const existing = snap.data() as WalletDoc;
+      // Keep metadata aligned with tokens-only plan (balances migrated separately).
+      if (existing.currency !== def.currency || existing.decimals !== def.decimals) {
+        batch.update(ref, {
+          currency: def.currency,
+          decimals: def.decimals,
+          kind: def.kind,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        writes += 1;
+        wallets.push({ ...existing, currency: def.currency, decimals: def.decimals, kind: def.kind });
+      } else {
+        wallets.push(existing);
+      }
       continue;
     }
 
@@ -124,9 +136,9 @@ const transferSchema = z
   .strict();
 
 /**
- * Server-validated wallet transfers.
+ * Server-validated wallet transfers (all VFXT → VFXT, 1:1).
  * Allowed: daily_roi→withdrawal, level_income→withdrawal,
- * direct_referral→staking|withdrawal (VFXT→USD conversion).
+ * direct_referral→staking|withdrawal.
  */
 export const transferBetweenWallets = onCall(
   CALLABLE_OPTS,
@@ -156,19 +168,13 @@ export const transferBetweenWallets = onCall(
       const fromWalletId = walletDocId(ctx.uid, fromKind);
       const toWalletId = walletDocId(ctx.uid, toKind);
 
-      const { getTokenEconomicsSettings } = await import('../platform/store');
-      const tokenFx = await getTokenEconomicsSettings();
-
-      // VFXT → USD routes convert whole tokens to cents at admin token price.
-      const creditAmount =
-        fromCurrency === 'VFXT' && toCurrency === 'USD'
-          ? vfxtTokensToUsdCents(amountMinor, tokenFx.tokensPerUsd)
-          : amountMinor;
+      // Tokens-only ledger: transfers are always 1:1 VFXT.
+      const creditAmount = amountMinor;
 
       if (creditAmount <= 0) {
         throw new AppError(
           'invalid-argument',
-          'Converted credit amount must be positive',
+          'Credit amount must be positive',
         );
       }
 

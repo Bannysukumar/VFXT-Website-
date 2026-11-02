@@ -54,8 +54,8 @@ function kindFromWallet(wallet: { id: string; currency: string; kind?: string })
   if (wallet.kind && wallet.kind in WALLET_META) return wallet.kind as WalletKind
   const suffix = wallet.id.split('_').slice(1).join('_')
   if (suffix in WALLET_META) return suffix as WalletKind
+  if (wallet.currency === 'VFXT' && suffix === 'vfxt') return 'vfxt'
   if (wallet.currency === 'USD') return 'fund'
-  if (wallet.currency === 'VFXT') return 'vfxt'
   return null
 }
 

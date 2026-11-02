@@ -152,15 +152,20 @@ export interface WithdrawalRequest {
   withdrawalId: string;
   userId: string;
   walletId: string;
+  /** Wallet ledger currency (VFXT tokens). */
   currency: WalletCurrency;
-  /** Gross amount debited from the user wallet (USD cents). */
+  /** Gross amount debited from withdrawal wallet (whole VFXT tokens). */
   amountMinor: number;
+  /** Gross USDT equivalent in cents (server price at request time). */
+  usdtAmountCents?: number;
   /** Fee kept by platform (USD cents). */
   commissionMinor?: number;
   /** Net USDT sent on-chain (USD cents). */
   netAmountMinor?: number;
   /** Fee rate applied (basis points). */
   commissionBps?: number;
+  /** Snapshot of tokensPerUsd used for conversion. */
+  tokensPerUsd?: number;
   status: WithdrawalStatus;
   destination: string;
   method: string;

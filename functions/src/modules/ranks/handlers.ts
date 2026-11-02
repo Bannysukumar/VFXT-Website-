@@ -39,14 +39,15 @@ async function tryPayRank(
   userRef: FirebaseFirestore.DocumentReference,
   user: UserProfile,
   now: number,
+  tokensPerUsd: number,
 ): Promise<boolean> {
   const db = getDb();
   const left = user.leftVolumeMinor ?? 0;
   const right = user.rightVolumeMinor ?? 0;
-  const payRank = qualifiedRank(left, right);
+  const payRank = qualifiedRank(left, right, tokensPerUsd);
   if (payRank <= 0) return false;
 
-  const threshold = rankThresholdCents(payRank);
+  const threshold = rankThresholdCents(payRank, tokensPerUsd);
   if (!threshold) return false;
 
   const lastPaidMs = toMillis(user.lastRankPaidAt);
@@ -68,7 +69,7 @@ async function tryPayRank(
     const u = fresh.data() as UserProfile;
     const leftNow = u.leftVolumeMinor ?? 0;
     const rightNow = u.rightVolumeMinor ?? 0;
-    const qNow = qualifiedRank(leftNow, rightNow);
+    const qNow = qualifiedRank(leftNow, rightNow, tokensPerUsd);
     if (qNow < payRank) return;
 
     const lastMs = toMillis(u.lastRankPaidAt);
@@ -88,7 +89,7 @@ async function tryPayRank(
       walletId: walletDocId(u.uid, 'level_income'),
       type: 'rank_reward',
       amountMinor: rewardMinor,
-      currency: 'USD',
+      currency: 'VFXT',
       referenceType: 'rank_payout',
       referenceId: payoutId,
       description: `Rank ${payRank} reward`,
@@ -126,6 +127,9 @@ export const getRankStatus = onCall(CALLABLE_OPTS, async (request) => {
   try {
     const ctx = requireAuth(request);
     const db = getDb();
+    const { getTokenEconomicsSettings } = await import('../platform/store');
+    const tokenFx = await getTokenEconomicsSettings();
+    const rate = tokenFx.tokensPerUsd;
     const snap = await db.collection(Collections.users).doc(ctx.uid).get();
     if (!snap.exists) {
       throw new AppError('not-found', 'User profile not found');
@@ -134,24 +138,25 @@ export const getRankStatus = onCall(CALLABLE_OPTS, async (request) => {
     const left = user.leftVolumeMinor ?? 0;
     const right = user.rightVolumeMinor ?? 0;
     const current = user.currentRank ?? 0;
-    const q = qualifiedRank(left, right);
+    const q = qualifiedRank(left, right, rate);
     const nextRank = current < 9 ? current + 1 : null;
-    const next = nextRank ? rankThresholdCents(nextRank) : null;
+    const next = nextRank ? rankThresholdCents(nextRank, rate) : null;
 
     return {
       currentRank: current,
       qualifiedRank: q,
       leftVolumeMinor: left,
       rightVolumeMinor: right,
+      currency: 'VFXT' as const,
       nextRank,
       nextLeftNeedMinor: next ? Math.max(0, next.leftMinor - left) : 0,
       nextRightNeedMinor: next ? Math.max(0, next.rightMinor - right) : 0,
       lastRewardAt: user.lastRankPaidAt ?? null,
       ranks: RANK_REWARDS.map((r) => ({
         rank: r.rank,
-        leftMinor: r.leftUsd * 100,
-        rightMinor: r.rightUsd * 100,
-        rewardMinor: r.rewardUsd * 100,
+        leftMinor: r.leftUsd * rate,
+        rightMinor: r.rightUsd * rate,
+        rewardMinor: r.rewardUsd * rate,
         cycleDays: r.cycleDays,
       })),
     };
@@ -176,11 +181,16 @@ export const processRankRewards = onSchedule(
     const pageSize = 100;
     let paid = 0;
     let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+    const { getTokenEconomicsSettings } = await import('../platform/store');
+    const tokenFx = await getTokenEconomicsSettings();
+    const rate = tokenFx.tokensPerUsd;
+    // Rank 1 threshold in VFXT tokens (was $1,000 in cents before tokens-only).
+    const minVolumeTokens = 1_000 * rate;
 
     for (let page = 0; page < 50; page += 1) {
       let query = db
         .collection(Collections.users)
-        .where('leftVolumeMinor', '>=', 100_000)
+        .where('leftVolumeMinor', '>=', minVolumeTokens)
         .orderBy('leftVolumeMinor')
         .orderBy('__name__')
         .limit(pageSize);
@@ -196,7 +206,7 @@ export const processRankRewards = onSchedule(
       for (const doc of snap.docs) {
         const user = { ...(doc.data() as UserProfile), uid: doc.id };
         try {
-          const ok = await tryPayRank(doc.ref, user, now);
+          const ok = await tryPayRank(doc.ref, user, now, rate);
           if (ok) paid += 1;
         } catch (err) {
           log.warn('rank_reward_failed', {

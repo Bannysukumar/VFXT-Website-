@@ -9,12 +9,13 @@ import {
   isDailyYieldDue,
   LOCKED_PACKAGES,
   lockedMaturityPayout,
-  MIN_STAKE_USD_CENTS,
+  MIN_STAKE_VFXT_TOKENS,
   nextDailyYieldCents,
   nextDailyYieldDueAtMs,
   payoutCapCents,
   shouldStopDailyYield,
   StakingPlanId,
+  usdCentsToVfxtTokens,
 } from '../../config/plan';
 import { FeatureFlags } from '../../config/features';
 import { CALLABLE_OPTS, toHttpsError } from '../../lib/callable';
@@ -89,9 +90,12 @@ export const getStakingPlans = onCall(CALLABLE_OPTS, async (request) => {
     requireAuth(request);
     requireStakingEnabled();
 
-    const { getPlanSettings } = await import('../platform/store');
+    const { getPlanSettings, getTokenEconomicsSettings } = await import('../platform/store');
     const plan = await getPlanSettings();
-    const minStake = plan.minStakeUsdCents || MIN_STAKE_USD_CENTS;
+    const tokenFx = await getTokenEconomicsSettings();
+    const minStake = plan.minStakeUsdCents
+      ? usdCentsToVfxtTokens(plan.minStakeUsdCents, tokenFx.tokensPerUsd)
+      : MIN_STAKE_VFXT_TOKENS;
 
     const plans = [
       {
@@ -103,7 +107,7 @@ export const getStakingPlans = onCall(CALLABLE_OPTS, async (request) => {
         nonWorkingCapX: plan.nonWorkingCapX || DAILY_YIELD.nonWorkingCapX,
         workingCapX: plan.workingCapX || DAILY_YIELD.workingCapX,
         minStakeMinor: minStake,
-        currency: 'USD' as const,
+        currency: 'VFXT' as const,
       },
       ...(plan.lockedPackages?.length
         ? plan.lockedPackages.filter((p) => p.enabled)
@@ -116,7 +120,7 @@ export const getStakingPlans = onCall(CALLABLE_OPTS, async (request) => {
         multiplier: p.multiplier,
         bonusTokenPct: p.bonusTokenPct,
         minStakeMinor: minStake,
-        currency: 'USD' as const,
+        currency: 'VFXT' as const,
       })),
     ];
 
@@ -145,10 +149,17 @@ async function handleCreateStakingPosition(
 
   const { planId, amountMinor, idempotencyKey } = parsed.data;
   assertPositiveMinor(amountMinor);
-  if (amountMinor < MIN_STAKE_USD_CENTS) {
+
+  const { getPlanSettings, getTokenEconomicsSettings } = await import('../platform/store');
+  const planSettings = await getPlanSettings();
+  const tokenFx = await getTokenEconomicsSettings();
+  const minStakeTokens = planSettings.minStakeUsdCents
+    ? usdCentsToVfxtTokens(planSettings.minStakeUsdCents, tokenFx.tokensPerUsd)
+    : MIN_STAKE_VFXT_TOKENS;
+  if (amountMinor < minStakeTokens) {
     throw new AppError(
       'invalid-argument',
-      `Minimum stake is ${MIN_STAKE_USD_CENTS} cents ($100)`,
+      `Minimum stake is ${minStakeTokens.toLocaleString()} VFXT`,
     );
   }
 
@@ -207,7 +218,7 @@ async function handleCreateStakingPosition(
         amountMinor,
         availableDelta: -amountMinor,
         reservedDelta: 0,
-        currency: 'USD',
+        currency: 'VFXT',
         referenceType: 'staking_position',
         referenceId: positionId,
         description: `Stake ${planId}`,
@@ -222,7 +233,7 @@ async function handleCreateStakingPosition(
         amountMinor,
         availableDelta: amountMinor,
         reservedDelta: 0,
-        currency: 'USD',
+        currency: 'VFXT',
         referenceType: 'staking_position',
         referenceId: positionId,
         description: `Staking principal locked (${planId})`,
@@ -509,7 +520,7 @@ export const processDailyYields = onSchedule(
                 walletId: walletDocId(p.userId, 'daily_roi'),
                 type: 'roi',
                 amountMinor: yieldCents,
-                currency: 'USD',
+                currency: 'VFXT',
                 referenceType: 'staking_position',
                 referenceId: p.positionId,
                 description: `Daily ROI day ${dayNumber}`,
@@ -566,8 +577,8 @@ export const processDailyYields = onSchedule(
  * Daily job: mature locked packages.
  *
  * Credits:
- * - principal * multiplier → withdrawal wallet (USD)
- * - principal_vfxt * bonusPct/100 → vfxt wallet (VFXT tokens)
+ * - principal * multiplier → withdrawal wallet (VFXT tokens)
+ * - principal * bonusPct/100 → vfxt wallet (VFXT tokens)
  * Debits staking wallet tracking balance by principal.
  */
 export const processLockedMaturities = onSchedule(
@@ -654,23 +665,23 @@ export const processLockedMaturities = onSchedule(
               walletId: walletDocId(p.userId, 'staking'),
               type: 'locked_maturity',
               amountMinor: p.principalMinor,
-              currency: 'USD',
+              currency: 'VFXT',
               referenceType: 'staking_position',
               referenceId: p.positionId,
               description: 'Locked package matured — release staking track',
               createdBy: 'system',
             });
 
-            // USD payout = principal * multiplier → withdrawal.
+            // Token payout = principal * multiplier → withdrawal.
             await creditAvailable(tx, db, {
               userId: p.userId,
               walletId: walletDocId(p.userId, 'withdrawal'),
               type: 'locked_maturity',
               amountMinor: usdCreditCents,
-              currency: 'USD',
+              currency: 'VFXT',
               referenceType: 'staking_position',
               referenceId: p.positionId,
-              description: `Locked maturity ${multiplier}X USD payout`,
+              description: `Locked maturity ${multiplier}X VFXT payout`,
               createdBy: 'system',
               metadata: { multiplier },
             });

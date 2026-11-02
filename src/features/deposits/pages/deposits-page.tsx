@@ -33,11 +33,7 @@ import { requestDeposit, type CreateDepositResult } from '@/services/wallet-serv
 import { checkDepositPayment } from '@/services/crypto-service'
 import { fetchMyDeposits } from '@/services/records-service'
 import { getPublicPlatformSettings } from '@/services/platform-service'
-import {
-  minVfxtTokensForOneCent,
-  usdCentsToVfxtTokens,
-  vfxtTokensToFundCents,
-} from '@/lib/plan'
+import { minVfxtTokensForOneCent, usdCentsToVfxtTokens } from '@/lib/plan'
 
 const ACTIVE_DEPOSIT_KEY = 'vfxt.activeDeposit.v1'
 
@@ -177,10 +173,12 @@ export function DepositsPage() {
     }
     return previewUsdtCents > 0 ? usdCentsToVfxtTokens(previewUsdtCents, tokensPerUsd) : 0
   })()
-  const previewFundUsd =
+  const previewFundTokens =
     asset === 'VFXT'
-      ? vfxtTokensToFundCents(previewVfxtTokens, tokensPerUsd) / 100
-      : previewUsdtCents / 100
+      ? previewVfxtTokens
+      : previewUsdtCents > 0
+        ? usdCentsToVfxtTokens(previewUsdtCents, tokensPerUsd)
+        : 0
 
   const payParams = active ? toPayParams(active) : null
   const activeAsset = active ? assetFromResult(active) : asset
@@ -441,7 +439,7 @@ export function DepositsPage() {
     <div className="min-w-0 space-y-8 overflow-x-hidden">
       <PageHeader
         title="Deposit"
-        description="Pay with USDT or VFXT on BNB Smart Chain (BEP-20). Verified payments credit your Fund Wallet (USD) for staking — not the VFXT Wallet."
+        description="Pay with USDT or VFXT on BNB Smart Chain (BEP-20). Verified payments credit VFXT tokens to your Fund Wallet for staking."
       />
 
       {(previewSuccess || (active?.depositAddress && payStatus === 'completed')) ? (
@@ -450,10 +448,10 @@ export function DepositsPage() {
             title="Payment successful"
             amount={
               previewSuccess
-                ? '$100.00'
+                ? `${(100 * tokensPerUsd).toLocaleString()} VFXT`
                 : assetFromResult(active!) === 'VFXT'
-                  ? `$${(vfxtTokensToFundCents(active!.amountMinor, tokensPerUsd) / 100).toFixed(2)}`
-                  : `$${(active!.amountMinor / 100).toFixed(2)}`
+                  ? `${active!.amountMinor.toLocaleString()} VFXT`
+                  : `${usdCentsToVfxtTokens(active!.amountMinor, tokensPerUsd).toLocaleString()} VFXT`
             }
             subtitle={
               previewSuccess
@@ -466,10 +464,10 @@ export function DepositsPage() {
               {
                 label: 'Fund Wallet credit',
                 value: previewSuccess
-                  ? '$100.00'
+                  ? `${(100 * tokensPerUsd).toLocaleString()} VFXT`
                   : assetFromResult(active!) === 'VFXT'
-                    ? `$${(vfxtTokensToFundCents(active!.amountMinor, tokensPerUsd) / 100).toFixed(2)}`
-                    : `$${(active!.amountMinor / 100).toFixed(2)}`,
+                    ? `${active!.amountMinor.toLocaleString()} VFXT`
+                    : `${usdCentsToVfxtTokens(active!.amountMinor, tokensPerUsd).toLocaleString()} VFXT`,
               },
               {
                 label: 'Network',
@@ -699,8 +697,8 @@ export function DepositsPage() {
             <CardHeader>
               <CardTitle>Deposit amount</CardTitle>
               <CardDescription>
-                USDT credits Fund Wallet 1:1 in USD. VFXT is converted to USD at the token price and
-                credited to Fund Wallet only.
+                USDT converts to VFXT at the admin price and credits Fund Wallet. VFXT deposits credit
+                Fund Wallet 1:1 in tokens.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -716,12 +714,12 @@ export function DepositsPage() {
                         {
                           id: 'USDT' as const,
                           title: 'USDT',
-                          body: 'Credits Fund Wallet in USD',
+                          body: 'Converts to VFXT in Fund Wallet',
                         },
                         {
                           id: 'VFXT' as const,
                           title: 'VFXT token',
-                          body: 'Converts to USD in Fund Wallet',
+                          body: 'Credits Fund Wallet in VFXT',
                         },
                       ] as const
                     ).map((option) => (
@@ -770,35 +768,26 @@ export function DepositsPage() {
                   <p className="text-xs text-ink-muted">
                     {asset === 'VFXT' ? (
                       <>
-                        Min {minVfxtTokens.toLocaleString()} VFXT. Converted at{' '}
-                        {tokensPerUsd.toLocaleString()} VFXT / $1 into Fund Wallet. Example: send{' '}
-                        <span className="font-semibold text-ink">
-                          {minVfxtTokens.toLocaleString()} VFXT
-                        </span>{' '}
-                        →{' '}
-                        <span className="font-semibold text-ink">
-                          $
-                          {(
-                            vfxtTokensToFundCents(minVfxtTokens, tokensPerUsd) / 100
-                          ).toFixed(2)}
-                        </span>{' '}
-                        Fund credit
-                        {previewFundUsd > 0
-                          ? ` · this amount ≈ $${previewFundUsd.toFixed(2)}`
+                        Min {minVfxtTokens.toLocaleString()} VFXT. Credits Fund Wallet 1:1 in tokens
+                        {previewFundTokens > 0
+                          ? ` · this amount → ${previewFundTokens.toLocaleString()} VFXT`
                           : ''}
                         .
                       </>
                     ) : (
                       <>
-                        Min deposit ${(minDepositCents / 100).toFixed(2)}. USDT credits Fund Wallet
-                        1:1 (USD). Example:{' '}
+                        Min deposit ${(minDepositCents / 100).toFixed(2)}. Converts at{' '}
+                        {tokensPerUsd.toLocaleString()} VFXT / $1. Example:{' '}
                         <span className="font-semibold text-ink">100 USDT</span> →{' '}
-                        <span className="font-semibold text-ink">$100.00</span> Fund Wallet
-                        {previewUsdtCents > 0 ? (
+                        <span className="font-semibold text-ink">
+                          {(100 * tokensPerUsd).toLocaleString()} VFXT
+                        </span>{' '}
+                        Fund Wallet
+                        {previewFundTokens > 0 ? (
                           <>
                             . This amount →{' '}
                             <span className="font-semibold text-ink">
-                              ${(previewUsdtCents / 100).toFixed(2)}
+                              {previewFundTokens.toLocaleString()} VFXT
                             </span>
                           </>
                         ) : null}
@@ -848,7 +837,7 @@ export function DepositsPage() {
             steps={[
               {
                 title: 'Choose USDT or VFXT',
-                body: 'USDT credits USD 1:1. VFXT converts to USD at the token price.',
+                body: 'USDT converts to VFXT at the admin price. VFXT credits tokens 1:1.',
               },
               {
                 title: 'Open wallet & pay',
@@ -856,7 +845,7 @@ export function DepositsPage() {
               },
               {
                 title: 'Fund Wallet credit',
-                body: 'Verified payments go to Fund Wallet only — ready to stake.',
+                body: 'Verified payments credit VFXT to Fund Wallet — ready to stake.',
               },
             ]}
           />

@@ -99,26 +99,26 @@ describe('VFXT plan math', () => {
   });
 
   it('credits 5% direct referral as VFXT tokens', () => {
-    // 5% of $100 = $5 = 500 cents → 50_000 VFXT
-    expect(directReferralBonusTokens(10_000)).toBe(50_000);
+    // 5% of 1_000_000 VFXT stake ($100) = 50_000 VFXT
+    expect(directReferralBonusTokens(1_000_000)).toBe(50_000);
   });
 
-  it('computes locked maturity USD + VFXT bonus', () => {
+  it('computes locked maturity token payout + VFXT bonus', () => {
     const payout = lockedMaturityPayout({
-      principalCents: 10_000,
+      principalCents: 1_000_000, // tokens
       multiplier: 3,
       bonusTokenPct: 50,
     });
-    expect(payout.usdCreditCents).toBe(30_000);
-    // 1_000_000 tokens * 50% = 500_000
+    expect(payout.usdCreditCents).toBe(3_000_000);
     expect(payout.bonusVfxtTokens).toBe(500_000);
   });
 
-  it('qualifies binary ranks from left/right volume', () => {
-    expect(qualifiedRank(50_000, 50_000)).toBe(0);
-    expect(qualifiedRank(100_000, 100_000)).toBe(1);
-    expect(qualifiedRank(500_000, 500_000)).toBe(3);
-    expect(qualifiedRank(10_000_000, 10_000_000)).toBe(9);
+  it('qualifies binary ranks from left/right VFXT volume', () => {
+    // Rank thresholds are USD × tokensPerUsd (default 10_000)
+    expect(qualifiedRank(5_000_000, 5_000_000)).toBe(0);
+    expect(qualifiedRank(10_000_000, 10_000_000)).toBe(1); // $1k
+    expect(qualifiedRank(50_000_000, 50_000_000)).toBe(3); // $5k
+    expect(qualifiedRank(1_000_000_000, 1_000_000_000)).toBe(9); // $100k
   });
 
   it('allows only documented wallet transfer routes', () => {

@@ -69,7 +69,7 @@ async function handleCreateDepositRequest(
   const depositSettings = await getDepositSettings();
   const tokenFx = await getTokenEconomicsSettings();
   if (wantVfxt) {
-    const { usdCentsToVfxtTokens, minVfxtTokensForOneCent, vfxtTokensToFundCents } =
+    const { usdCentsToVfxtTokens, minVfxtTokensForOneCent } =
       await import('../../config/plan');
     // Admin Min VFXT deposit is authoritative; dust floor only when unset.
     const configuredVfxtMin = depositSettings.minVfxtDepositTokens;
@@ -86,12 +86,6 @@ async function handleCreateDepositRequest(
       throw new AppError(
         'invalid-argument',
         `Minimum VFXT deposit is ${minTokens.toLocaleString()} tokens`,
-      );
-    }
-    if (vfxtTokensToFundCents(amountMinor, tokenFx.tokensPerUsd) < 1) {
-      throw new AppError(
-        'invalid-argument',
-        'VFXT amount is too small to credit Fund Wallet',
       );
     }
   } else if (amountMinor < depositSettings.minDepositUsdCents) {
@@ -278,7 +272,7 @@ async function handleApproveDeposit(
   let entryId = '';
 
   const { getTokenEconomicsSettings } = await import('../platform/store');
-  const { vfxtTokensToFundCents } = await import('../../config/plan');
+  const { usdCentsToVfxtTokens } = await import('../../config/plan');
   const tokenFx = await getTokenEconomicsSettings();
 
   const depositPreview = await db.collection(Collections.deposits).doc(depositId).get();
@@ -313,17 +307,17 @@ async function handleApproveDeposit(
       deposit.method === 'vfxt_bep20' ||
       deposit.currency === 'VFXT' ||
       deposit.tokenSymbol === 'VFXT';
-    const fundCents = isVfxt
-      ? vfxtTokensToFundCents(deposit.amountMinor, tokenFx.tokensPerUsd)
-      : deposit.amountMinor;
-    if (!Number.isFinite(fundCents) || fundCents < 1) {
+    const fundTokens = isVfxt
+      ? deposit.amountMinor
+      : usdCentsToVfxtTokens(deposit.amountMinor, tokenFx.tokensPerUsd);
+    if (!Number.isFinite(fundTokens) || fundTokens < 1) {
       throw new AppError(
         'failed-precondition',
         'Deposit amount too small to credit Fund Wallet',
       );
     }
 
-    // Always credit Fund Wallet only (never VFXT Wallet).
+    // Always credit Fund Wallet in VFXT tokens only (never VFXT Wallet).
     const fundWalletId = walletDocId(deposit.userId, 'fund');
     const { applyLedgerEntries } = await import('../wallets/ledger');
     const credits = await applyLedgerEntries(tx, db, [
@@ -332,10 +326,10 @@ async function handleApproveDeposit(
         walletId: fundWalletId,
         type: 'deposit_credit',
         direction: 'credit',
-        amountMinor: fundCents,
-        availableDelta: fundCents,
+        amountMinor: fundTokens,
+        availableDelta: fundTokens,
         reservedDelta: 0,
-        currency: 'USD',
+        currency: 'VFXT',
         referenceType: 'deposit',
         referenceId: depositId,
         description: `Deposit approved (${deposit.method})`,
@@ -343,8 +337,10 @@ async function handleApproveDeposit(
         metadata: {
           method: deposit.method,
           tokensPerUsd: tokenFx.tokensPerUsd,
-          paidTokens: isVfxt ? deposit.amountMinor : null,
-          fundCentsCredited: fundCents,
+          paidUsdtCents: isVfxt ? null : deposit.amountMinor,
+          paidVfxtTokens: isVfxt ? deposit.amountMinor : null,
+          fundTokensCredited: fundTokens,
+          fundCentsCredited: fundTokens,
         },
       },
     ]);
@@ -353,9 +349,10 @@ async function handleApproveDeposit(
     tx.update(depositRef, {
       status: 'approved',
       walletId: fundWalletId,
-      currency: 'USD',
-      vfxtTokensCredited: 0,
-      fundCentsCredited: fundCents,
+      currency: 'VFXT',
+      vfxtTokensCredited: fundTokens,
+      fundTokensCredited: fundTokens,
+      fundCentsCredited: fundTokens,
       tokensPerUsd: tokenFx.tokensPerUsd,
       reviewedBy: ctx.uid,
       reviewedAt: FieldValue.serverTimestamp(),
@@ -377,15 +374,17 @@ async function handleApproveDeposit(
     .get();
   const deposit = depositSnap.data() as DepositRequest;
   const fundCredited = Number(
-    (deposit as DepositRequest & { fundCentsCredited?: number }).fundCentsCredited ??
+    (deposit as DepositRequest & { fundTokensCredited?: number; fundCentsCredited?: number })
+      .fundTokensCredited ??
+      (deposit as DepositRequest & { fundCentsCredited?: number }).fundCentsCredited ??
       deposit.amountMinor,
   );
   await createNotification({
     userId: deposit.userId,
     type: 'deposit_approved',
     title: 'Deposit approved',
-    body: `Your deposit of $${(fundCredited / 100).toFixed(2)} has been credited to Fund Wallet.`,
-    data: { depositId, fundCents: fundCredited },
+    body: `Your deposit of ${fundCredited.toLocaleString()} VFXT has been credited to Fund Wallet.`,
+    data: { depositId, fundTokens: fundCredited, fundCents: fundCredited },
   });
 
   log.info('deposit_approved', { depositId, entryId, actorId: ctx.uid });

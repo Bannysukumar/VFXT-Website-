@@ -218,7 +218,7 @@ async function creditDepositFromChain(params: {
   const token = depositTokenMeta(params);
 
   const { getTokenEconomicsSettings } = await import('../platform/store');
-  const { vfxtTokensToFundCents } = await import('../../config/plan');
+  const { usdCentsToVfxtTokens } = await import('../../config/plan');
   const { walletDocId } = await import('../wallets/types');
   const { ensureUserWallets } = await import('../wallets/handlers');
   await ensureUserWallets(db, params.userId);
@@ -227,14 +227,13 @@ async function creditDepositFromChain(params: {
     params.method === 'vfxt_bep20' || token.symbol === 'VFXT'
       ? 'vfxt_bep20'
       : 'usdt_bep20';
-  // All deposits credit Fund Wallet (USD) only — never VFXT Wallet.
-  // USDT: amountMinor is USD cents. VFXT: convert whole tokens → USD cents at tokensPerUsd.
-  const paidVfxtTokens = method === 'vfxt_bep20' ? params.amountMinor : null;
-  const fundCents =
+  // All deposits credit Fund Wallet in VFXT tokens only — never VFXT Wallet.
+  // USDT cents → tokens at tokensPerUsd. VFXT deposits credit tokens 1:1.
+  const fundTokens =
     method === 'vfxt_bep20'
-      ? vfxtTokensToFundCents(params.amountMinor, tokenFx.tokensPerUsd)
-      : params.amountMinor;
-  if (!Number.isFinite(fundCents) || fundCents < 1) {
+      ? params.amountMinor
+      : usdCentsToVfxtTokens(params.amountMinor, tokenFx.tokensPerUsd);
+  if (!Number.isFinite(fundTokens) || fundTokens < 1) {
     throw new AppError(
       'failed-precondition',
       'Deposit amount too small to credit Fund Wallet',
@@ -261,10 +260,10 @@ async function creditDepositFromChain(params: {
         walletId: fundWalletId,
         type: 'deposit_credit' as const,
         direction: 'credit' as const,
-        amountMinor: fundCents,
-        availableDelta: fundCents,
+        amountMinor: fundTokens,
+        availableDelta: fundTokens,
         reservedDelta: 0,
-        currency: 'USD' as const,
+        currency: 'VFXT' as const,
         referenceType: 'deposit',
         referenceId: params.depositId,
         description: `${token.symbol} BEP-20 deposit ${params.txHash.slice(0, 10)}…`,
@@ -276,8 +275,11 @@ async function creditDepositFromChain(params: {
           token: token.address,
           tokenSymbol: token.symbol,
           tokensPerUsd: tokenFx.tokensPerUsd,
-          paidTokens: paidVfxtTokens,
-          fundCentsCredited: fundCents,
+          paidUsdtCents: method === 'usdt_bep20' ? params.amountMinor : null,
+          paidVfxtTokens: method === 'vfxt_bep20' ? params.amountMinor : null,
+          fundTokensCredited: fundTokens,
+          // Legacy field for older clients/history.
+          fundCentsCredited: fundTokens,
         },
       },
     ]);
@@ -293,12 +295,13 @@ async function creditDepositFromChain(params: {
       status: 'completed',
       method,
       walletId: fundWalletId,
-      currency: 'USD',
+      currency: 'VFXT',
       txHash: params.txHash,
       tokenSymbol: token.symbol,
       tokenAddress: token.address,
-      vfxtTokensCredited: 0,
-      fundCentsCredited: fundCents,
+      vfxtTokensCredited: fundTokens,
+      fundTokensCredited: fundTokens,
+      fundCentsCredited: fundTokens,
       tokensPerUsd: tokenFx.tokensPerUsd,
       reviewedBy: 'system:crypto-monitor',
       reviewedAt: FieldValue.serverTimestamp(),
@@ -312,12 +315,13 @@ async function creditDepositFromChain(params: {
     title: 'Deposit confirmed',
     body:
       method === 'vfxt_bep20'
-        ? `Payment verified. ${params.amountMinor.toLocaleString()} VFXT → $${(fundCents / 100).toFixed(2)} credited to Fund Wallet.`
-        : `Payment verified. $${(fundCents / 100).toFixed(2)} credited to Fund Wallet.`,
+        ? `Payment verified. ${fundTokens.toLocaleString()} VFXT credited to Fund Wallet.`
+        : `Payment verified. $${(params.amountMinor / 100).toFixed(2)} USDT → ${fundTokens.toLocaleString()} VFXT credited to Fund Wallet.`,
     data: {
       depositId: params.depositId,
       txHash: params.txHash,
-      fundCents,
+      fundTokens,
+      fundCents: fundTokens,
       token: token.symbol,
     },
   });

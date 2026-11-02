@@ -1,10 +1,10 @@
 /**
  * VFXT business-plan constants and pure helpers (server-authoritative).
  *
- * Money:
- * - USD wallets store integer cents (decimals=2).
- * - VFXT wallets store whole tokens as integers (decimals=0).
- * - Price: $0.0001 / VFXT ⇒ $1 = 10_000 VFXT ⇒ usdCents → tokens = cents * 100.
+ * Money (tokens-only ledger):
+ * - Fund / staking / ROI / level / withdrawal / referral / vfxt store whole VFXT tokens (decimals=0).
+ * - USDT appears only at deposit intake (convert → tokens) and withdrawal payout (tokens → USDT).
+ * - Price: default $0.0001 / VFXT ⇒ $1 = 10_000 VFXT.
  */
 
 export const VFXT_PRICE_USD = 0.0001;
@@ -14,10 +14,13 @@ export const VFXT_PER_USDT = 10_000;
 export const DEFAULT_VFXT_PER_USD = VFXT_PER_USDT;
 /** VFXT wallet decimals — whole tokens. */
 export const VFXT_DECIMALS = 0;
-/** USD wallet decimals — cents. */
+/** Legacy USD wallet decimals — cents (withdraw USDT wire amounts only). */
 export const USD_DECIMALS = 2;
 
+/** Legacy USD min stake ($100). Prefer MIN_STAKE_VFXT_TOKENS for new stakes. */
 export const MIN_STAKE_USD_CENTS = 10_000; // $100
+/** Default min stake in whole VFXT tokens ($100 at default price). */
+export const MIN_STAKE_VFXT_TOKENS = MIN_STAKE_USD_CENTS * (VFXT_PER_USDT / 100);
 
 export const DAILY_YIELD = {
   /** 1% of principal per day = 100 bps. */
@@ -127,29 +130,28 @@ export const WALLET_KINDS: readonly WalletKind[] = [
 ] as const;
 
 export const WALLET_CURRENCY: Record<WalletKind, 'USD' | 'VFXT'> = {
-  fund: 'USD',
-  staking: 'USD',
-  daily_roi: 'USD',
-  level_income: 'USD',
+  fund: 'VFXT',
+  staking: 'VFXT',
+  daily_roi: 'VFXT',
+  level_income: 'VFXT',
   direct_referral: 'VFXT',
-  withdrawal: 'USD',
+  withdrawal: 'VFXT',
   vfxt: 'VFXT',
 };
 
 export const WALLET_DECIMALS: Record<WalletKind, number> = {
-  fund: USD_DECIMALS,
-  staking: USD_DECIMALS,
-  daily_roi: USD_DECIMALS,
-  level_income: USD_DECIMALS,
+  fund: VFXT_DECIMALS,
+  staking: VFXT_DECIMALS,
+  daily_roi: VFXT_DECIMALS,
+  level_income: VFXT_DECIMALS,
   direct_referral: VFXT_DECIMALS,
-  withdrawal: USD_DECIMALS,
+  withdrawal: VFXT_DECIMALS,
   vfxt: VFXT_DECIMALS,
 };
 
 /**
- * Allowed transferBetweenWallets routes.
+ * Allowed transferBetweenWallets routes (all VFXT → VFXT, 1:1).
  * fund → staking is only via createStakingPosition (not listed here).
- * direct_referral (VFXT) → staking/withdrawal converts tokens → USD cents.
  */
 export const ALLOWED_TRANSFERS: ReadonlyArray<{
   from: WalletKind;
@@ -193,19 +195,15 @@ export function vfxtTokensToUsdCents(
 }
 
 /**
- * VFXT → Fund Wallet USD cents for deposits.
- * Rounds to nearest cent and never returns 0 for a positive token amount
- * (Fund Wallet is integer cents; dust still credits at least $0.01).
+ * @deprecated Fund Wallet is tokens now — use the token amount directly.
+ * Kept for older call sites; returns whole tokens unchanged.
  */
 export function vfxtTokensToFundCents(
   tokens: number,
-  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
+  _tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
 ): number {
   if (!Number.isInteger(tokens) || tokens <= 0) return 0;
-  if (!Number.isInteger(tokensPerUsd) || tokensPerUsd <= 0) {
-    throw new Error('tokensPerUsd must be a positive integer');
-  }
-  return Math.max(1, Math.round((tokens * 100) / tokensPerUsd));
+  return tokens;
 }
 
 /** Minimum whole VFXT tokens that map to at least $0.01 Fund credit. */
@@ -271,22 +269,19 @@ export function nextDailyYieldCents(params: {
   return Math.min(raw, remaining);
 }
 
-/** Level commission in USD cents for a stake (floor). */
+/** Level commission in whole VFXT tokens for a stake (floor). */
 export function levelCommissionCents(
-  stakeCents: number,
+  stakeTokens: number,
   level: number,
 ): number {
   if (level < 1 || level > LEVEL_COMMISSION_BPS.length) return 0;
   const bps = LEVEL_COMMISSION_BPS[level - 1]!;
-  return Math.floor((stakeCents * bps) / 10_000);
+  return Math.floor((stakeTokens * bps) / 10_000);
 }
 
-/** Direct referral bonus as whole VFXT tokens (5% of stake). */
-export function directReferralBonusTokens(stakeCents: number): number {
-  const bonusCents = Math.floor(
-    (stakeCents * DIRECT_REFERRAL_BONUS_BPS) / 10_000,
-  );
-  return usdCentsToVfxtTokens(bonusCents);
+/** Direct referral bonus as whole VFXT tokens (5% of stake tokens). */
+export function directReferralBonusTokens(stakeTokens: number): number {
+  return Math.floor((stakeTokens * DIRECT_REFERRAL_BONUS_BPS) / 10_000);
 }
 
 /** Unlock: earn level N only if upline has ≥ N direct referrals. */
@@ -302,24 +297,28 @@ export function getLockedPackage(id: LockedPackageId) {
 }
 
 /**
- * Locked maturity payouts:
- * - USD credit = principalCents * multiplier → withdrawal (or fund)
- * - VFXT bonus = principalVfxtTokens * bonusTokenPct / 100 → vfxt wallet
+ * Locked maturity payouts (tokens-only):
+ * - token credit = principalTokens * multiplier → withdrawal
+ * - VFXT bonus = principalTokens * bonusTokenPct / 100 → vfxt wallet
  */
 export function lockedMaturityPayout(params: {
   principalCents: number;
   multiplier: number;
   bonusTokenPct: number;
 }): { usdCreditCents: number; bonusVfxtTokens: number } {
-  const usdCreditCents = params.principalCents * params.multiplier;
-  const principalTokens = usdCentsToVfxtTokens(params.principalCents);
+  const principalTokens = params.principalCents;
+  const usdCreditCents = principalTokens * params.multiplier;
   const bonusVfxtTokens = Math.floor(
     (principalTokens * params.bonusTokenPct) / 100,
   );
   return { usdCreditCents, bonusVfxtTokens };
 }
 
-export function rankThresholdCents(rank: number): {
+/** Rank thresholds / reward in whole VFXT tokens (USD table × tokensPerUsd). */
+export function rankThresholdCents(
+  rank: number,
+  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
+): {
   leftMinor: number;
   rightMinor: number;
   rewardMinor: number;
@@ -327,23 +326,30 @@ export function rankThresholdCents(rank: number): {
 } | null {
   const row = RANK_REWARDS.find((r) => r.rank === rank);
   if (!row) return null;
+  const rate = Number.isInteger(tokensPerUsd) && tokensPerUsd > 0
+    ? tokensPerUsd
+    : DEFAULT_VFXT_PER_USD;
   return {
-    leftMinor: row.leftUsd * 100,
-    rightMinor: row.rightUsd * 100,
-    rewardMinor: row.rewardUsd * 100,
+    leftMinor: row.leftUsd * rate,
+    rightMinor: row.rightUsd * rate,
+    rewardMinor: row.rewardUsd * rate,
     cycleDays: row.cycleDays,
   };
 }
 
-/** Highest rank whose left/right volume thresholds are both met (0 if none). */
+/** Highest rank whose left/right volume thresholds are both met (0 if none). Volumes are VFXT tokens. */
 export function qualifiedRank(
   leftVolumeMinor: number,
   rightVolumeMinor: number,
+  tokensPerUsd: number = DEFAULT_VFXT_PER_USD,
 ): number {
+  const rate = Number.isInteger(tokensPerUsd) && tokensPerUsd > 0
+    ? tokensPerUsd
+    : DEFAULT_VFXT_PER_USD;
   let best = 0;
   for (const row of RANK_REWARDS) {
-    const leftNeed = row.leftUsd * 100;
-    const rightNeed = row.rightUsd * 100;
+    const leftNeed = row.leftUsd * rate;
+    const rightNeed = row.rightUsd * rate;
     if (leftVolumeMinor >= leftNeed && rightVolumeMinor >= rightNeed) {
       best = row.rank;
     } else {

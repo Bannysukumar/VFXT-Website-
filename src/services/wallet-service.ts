@@ -133,7 +133,7 @@ export async function requestWithdrawal(input: {
   return callFunction<
     {
       amountMinor: number
-      currency: 'USD'
+      currency: 'USD' | 'VFXT'
       destination: string
       idempotencyKey: string
       note?: string
@@ -142,7 +142,7 @@ export async function requestWithdrawal(input: {
     { withdrawalId: string; txHash: string | null; status: string }
   >('createWithdrawalRequest', {
     amountMinor: input.amountMinor,
-    currency: 'USD',
+    currency: input.currency ?? 'VFXT',
     destination: input.destination,
     idempotencyKey: input.idempotencyKey,
     note: input.note,

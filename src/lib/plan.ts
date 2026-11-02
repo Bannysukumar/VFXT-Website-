@@ -2,7 +2,9 @@
 
 export const VFXT_PRICE_USD = 0.0001
 export const VFXT_PER_USDT = 10_000
-export const MIN_STAKE_USD_CENTS = 10_000 // $100
+export const MIN_STAKE_USD_CENTS = 10_000 // $100 (legacy)
+/** Default min stake in whole VFXT tokens ($100 at 10_000 VFXT/$). */
+export const MIN_STAKE_VFXT_TOKENS = MIN_STAKE_USD_CENTS * (VFXT_PER_USDT / 100)
 
 export const DAILY_YIELD = {
   dailyRateBps: 100, // 1% = 100 basis points of principal
@@ -48,23 +50,23 @@ export const WALLET_META: Record<
 > = {
   fund: {
     label: 'Fund Wallet',
-    description: 'Deposits and platform funding for staking.',
-    currency: 'USD',
+    description: 'VFXT from deposits — stake from here.',
+    currency: 'VFXT',
   },
   staking: {
     label: 'Staking Wallet',
-    description: 'Active / locked staking principal.',
-    currency: 'USD',
+    description: 'Active / locked staking principal (VFXT).',
+    currency: 'VFXT',
   },
   daily_roi: {
     label: 'Daily ROI Wallet',
-    description: '1% daily yield credits (regular plan).',
-    currency: 'USD',
+    description: '1% daily yield credits in VFXT.',
+    currency: 'VFXT',
   },
   level_income: {
     label: 'Level Income Wallet',
-    description: 'Seven-level affiliate commissions on capital.',
-    currency: 'USD',
+    description: 'Seven-level affiliate commissions in VFXT.',
+    currency: 'VFXT',
   },
   direct_referral: {
     label: 'Direct Referral Wallet',
@@ -73,12 +75,12 @@ export const WALLET_META: Record<
   },
   withdrawal: {
     label: 'Withdrawal Wallet',
-    description: 'Eligible balance for withdrawal requests.',
-    currency: 'USD',
+    description: 'VFXT ready to cash out as USDT at the admin price.',
+    currency: 'VFXT',
   },
   vfxt: {
     label: 'VFXT Wallet',
-    description: 'Utility token balance (10,000 VFXT = 1 USDT).',
+    description: 'Utility / mining token balance (not used for staking).',
     currency: 'VFXT',
   },
 }
@@ -97,10 +99,10 @@ export function vfxtTokensToUsdCents(tokens: number, tokensPerUsd = DEFAULT_VFXT
   return Math.floor((tokens * 100) / tokensPerUsd)
 }
 
-/** VFXT → Fund Wallet cents (round nearest, min $0.01 for positive token amounts). */
-export function vfxtTokensToFundCents(tokens: number, tokensPerUsd = DEFAULT_VFXT_PER_USD): number {
-  if (!Number.isFinite(tokens) || tokens <= 0 || tokensPerUsd <= 0) return 0
-  return Math.max(1, Math.round((tokens * 100) / tokensPerUsd))
+/** @deprecated Fund is tokens — returns whole tokens unchanged. */
+export function vfxtTokensToFundCents(tokens: number, _tokensPerUsd = DEFAULT_VFXT_PER_USD): number {
+  if (!Number.isFinite(tokens) || tokens <= 0) return 0
+  return Math.floor(tokens)
 }
 
 export function minVfxtTokensForOneCent(tokensPerUsd = DEFAULT_VFXT_PER_USD): number {

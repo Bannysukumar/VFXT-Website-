@@ -525,8 +525,8 @@ export function AdminSettingsPage() {
           <CardHeader>
             <CardTitle className="font-sans text-lg">Deposit &amp; token price</CardTitle>
             <CardDescription>
-              Successful USDT deposits credit Fund Wallet (USD for staking) and VFXT tokens at your
-              rate.
+              USDT deposits convert to VFXT at your price and credit Fund Wallet. VFXT deposits credit
+              Fund Wallet 1:1 in tokens. Staking and income use tokens only.
             </CardDescription>
           </CardHeader>
           <CardContent className="grid max-w-md gap-4">
