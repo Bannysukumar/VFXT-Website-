@@ -58,6 +58,15 @@ const mapDeposit = (id: string, data: DocumentData): DepositRequest => ({
   fundCentsCredited:
     data.fundCentsCredited != null ? Number(data.fundCentsCredited) : null,
   txHash: typeof data.txHash === 'string' ? data.txHash : null,
+  manualReview: data.manualReview === true,
+  manualReviewReason:
+    typeof data.manualReviewReason === 'string' ? data.manualReviewReason : null,
+  observedAmountDisplay:
+    typeof data.observedAmountDisplay === 'string' ? data.observedAmountDisplay : null,
+  observedUsdCents:
+    data.observedUsdCents != null ? Number(data.observedUsdCents) : null,
+  suggestedCreditMinor:
+    data.suggestedCreditMinor != null ? Number(data.suggestedCreditMinor) : null,
   idempotencyKey: data.idempotencyKey ?? '',
   note: data.note,
   reviewedBy: data.reviewedBy,

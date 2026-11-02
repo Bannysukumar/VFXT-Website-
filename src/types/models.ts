@@ -114,6 +114,11 @@ export interface DepositRequest {
   chainId?: number | null
   fundCentsCredited?: number | null
   txHash?: string | null
+  manualReview?: boolean | null
+  manualReviewReason?: string | null
+  observedAmountDisplay?: string | null
+  observedUsdCents?: number | null
+  suggestedCreditMinor?: number | null
   idempotencyKey: string
   note?: string
   reviewedBy?: string

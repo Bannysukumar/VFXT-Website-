@@ -24,6 +24,7 @@ import {
 import {
   findIncomingUsdtTransfer,
   getHotWalletUsdtBalance,
+  inspectDepositTx,
   verifyUsdtDepositTx,
 } from './bsc-usdt';
 
@@ -353,6 +354,18 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         depositId,
       };
     }
+    if (dep.status === 'pending' && dep.manualReview) {
+      return {
+        status: 'pending' as const,
+        txHash: (dep.txHash as string) ?? null,
+        depositId,
+        manualReview: true,
+        suggestedCreditMinor:
+          dep.suggestedCreditMinor != null ? Number(dep.suggestedCreditMinor) : null,
+        observedAmountDisplay:
+          typeof dep.observedAmountDisplay === 'string' ? dep.observedAmountDisplay : null,
+      };
+    }
     if (dep.status === 'rejected' || dep.status === 'cancelled' || dep.status === 'expired') {
       return { status: dep.status as string, txHash: null, depositId };
     }
@@ -435,6 +448,88 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
 
     const token = depositTokenMeta(dep);
 
+    const queueManualReview = async (input: {
+      reason: string;
+      txHash: string;
+      observedWei?: string | null;
+      observedDisplay?: string | null;
+      observedUsdCents?: number | null;
+      from?: string | null;
+      suggestedCreditMinor?: number | null;
+    }) => {
+      const txRef = db.collection(Collections.usedCryptoTx).doc(input.txHash.toLowerCase());
+      const usedSnap = await txRef.get();
+      if (usedSnap.exists && usedSnap.data()?.depositId !== depositId) {
+        throw new AppError(
+          'already-exists',
+          'This transaction was already used for another deposit',
+        );
+      }
+
+      const isVfxt = token.symbol === 'VFXT';
+      let suggested =
+        input.suggestedCreditMinor != null && Number.isFinite(input.suggestedCreditMinor)
+          ? Math.max(0, Math.floor(Number(input.suggestedCreditMinor)))
+          : null;
+      if (suggested == null && input.observedWei) {
+        try {
+          const wei = BigInt(input.observedWei);
+          suggested = isVfxt
+            ? Number(wei / 10n ** BigInt(token.decimals))
+            : Number(wei / 10n ** 16n); // USDT cents
+        } catch {
+          suggested = null;
+        }
+      }
+
+      await snap.ref.update({
+        status: 'pending',
+        manualReview: true,
+        manualReviewReason: input.reason.slice(0, 1000),
+        txHash: input.txHash,
+        observedWei: input.observedWei ?? null,
+        observedAmountDisplay: input.observedDisplay ?? null,
+        observedUsdCents: input.observedUsdCents ?? null,
+        observedFrom: input.from ?? null,
+        suggestedCreditMinor: suggested,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+
+      if (!usedSnap.exists) {
+        await txRef.set({
+          txHash: input.txHash.toLowerCase(),
+          depositId,
+          userId: ctx.uid,
+          pendingManualReview: true,
+          createdAt: FieldValue.serverTimestamp(),
+        });
+      }
+
+      await createNotification({
+        userId: ctx.uid,
+        type: 'deposit_pending_review',
+        title: 'Deposit sent for review',
+        body: 'We could not auto-match your payment. An admin will review and credit the correct amount.',
+        data: { depositId, txHash: input.txHash },
+      });
+
+      log.info('deposit_queued_manual_review', {
+        depositId,
+        txHash: input.txHash,
+        reason: input.reason.slice(0, 200),
+        suggestedCreditMinor: suggested,
+      });
+
+      return {
+        status: 'pending' as const,
+        txHash: input.txHash,
+        depositId,
+        manualReview: true,
+        suggestedCreditMinor: suggested,
+        observedAmountDisplay: input.observedDisplay ?? null,
+      };
+    };
+
     let found;
     try {
       if (clientTxHash) {
@@ -461,7 +556,52 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       }
     } catch (scanErr) {
       if (clientTxHash && scanErr instanceof AppError) {
-        throw scanErr;
+        const msg = scanErr.message || '';
+        // Still confirming on-chain — keep waiting, don't escalate yet.
+        if (/Waiting for confirmations/i.test(msg)) {
+          throw scanErr;
+        }
+
+        const details = (scanErr.details ?? {}) as {
+          observedWei?: string;
+          observedDisplay?: string;
+          amountUsdCents?: number;
+          from?: string;
+        };
+
+        let observedWei = details.observedWei ?? null;
+        let observedDisplay = details.observedDisplay ?? null;
+        let observedUsdCents = details.amountUsdCents ?? null;
+        let from = details.from ?? null;
+
+        if (!observedWei) {
+          try {
+            const inspected = await inspectDepositTx({
+              txHash: clientTxHash,
+              notBeforeMs: createdAt - 60_000,
+              requireConfirmations: false,
+              toAddress: receiveAddress,
+              tokenAddress: token.address,
+              tokenSymbol: token.symbol,
+              tokenDecimals: token.decimals,
+            });
+            observedWei = inspected.amountWei.toString();
+            observedDisplay = inspected.amountDisplay ?? null;
+            observedUsdCents = inspected.amountUsdCents;
+            from = inspected.from;
+          } catch {
+            /* keep reason-only manual review */
+          }
+        }
+
+        return queueManualReview({
+          reason: msg,
+          txHash: clientTxHash,
+          observedWei,
+          observedDisplay,
+          observedUsdCents,
+          from,
+        });
       }
       // Public RPCs rate-limit eth_getLogs — keep the deposit open instead of 500.
       log.warn('check_deposit_scan_deferred', {
@@ -481,6 +621,35 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
     }
 
     if (!found) {
+      if (clientTxHash) {
+        try {
+          const inspected = await inspectDepositTx({
+            txHash: clientTxHash,
+            notBeforeMs: createdAt - 60_000,
+            requireConfirmations: false,
+            toAddress: receiveAddress,
+            tokenAddress: token.address,
+            tokenSymbol: token.symbol,
+            tokenDecimals: token.decimals,
+          });
+          return queueManualReview({
+            reason: 'Automatic match failed — queued for admin review',
+            txHash: clientTxHash,
+            observedWei: inspected.amountWei.toString(),
+            observedDisplay: inspected.amountDisplay ?? null,
+            observedUsdCents: inspected.amountUsdCents,
+            from: inspected.from,
+          });
+        } catch (inspectErr) {
+          return queueManualReview({
+            reason:
+              inspectErr instanceof Error
+                ? inspectErr.message
+                : 'Could not verify transaction automatically',
+            txHash: clientTxHash,
+          });
+        }
+      }
       return {
         status: 'awaiting_payment' as const,
         txHash: null,

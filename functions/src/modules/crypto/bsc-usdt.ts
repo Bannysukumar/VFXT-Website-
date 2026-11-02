@@ -251,6 +251,8 @@ export interface DetectedDeposit {
   amountUsdCents: number;
   blockNumber: number;
   confirmations: number;
+  /** Human token amount when inspected (may be under/over the unique expected). */
+  amountDisplay?: string;
 }
 
 async function getLogsChunked(
@@ -329,6 +331,83 @@ async function parseMatchingTransferLog(
 }
 
 /**
+ * Read a client-supplied tx without requiring the exact unique amount.
+ * Used for auto-credit (exact match) and for manual-review suggestions (underpay).
+ */
+export async function inspectDepositTx(params: {
+  txHash: string;
+  notBeforeMs?: number;
+  requireConfirmations?: boolean;
+  toAddress?: string;
+  tokenAddress?: string;
+  tokenSymbol?: string;
+  tokenDecimals?: number;
+}): Promise<DetectedDeposit> {
+  const hot = await getHotWallet();
+  const { getHotWalletByAddress } = await import('./hot-wallet');
+  const receiveAddress = getAddress(params.toAddress || hot.address);
+  const tokenAddress = getAddress(params.tokenAddress || USDT_BEP20_ADDRESS);
+  const tokenSymbol = params.tokenSymbol || 'USDT';
+  const tokenDecimals = params.tokenDecimals ?? USDT_DECIMALS;
+  const bound = await getHotWalletByAddress(receiveAddress);
+  const rpcUrl = bound?.rpcUrl || hot.rpcUrl;
+
+  return withRpcFallback(rpcUrl, async (provider) => {
+    const receipt = await provider.getTransactionReceipt(params.txHash);
+    if (!receipt || receipt.status !== 1) {
+      throw new AppError('failed-precondition', 'Transaction not found or failed on BSC');
+    }
+
+    const latest = await provider.getBlockNumber();
+    const confirmations = latest - receipt.blockNumber + 1;
+    if (params.requireConfirmations !== false && confirmations < DEPOSIT_CONFIRMATIONS) {
+      throw new AppError(
+        'failed-precondition',
+        `Waiting for confirmations (${confirmations}/${DEPOSIT_CONFIRMATIONS})`,
+      );
+    }
+
+    const transferTopic = id('Transfer(address,address,uint256)');
+    const toTopic = zeroPadValue(receiveAddress, 32);
+    const logs = await provider.getLogs({
+      address: tokenAddress,
+      fromBlock: receipt.blockNumber,
+      toBlock: receipt.blockNumber,
+      topics: [transferTopic, null, toTopic],
+    });
+
+    const match = logs.find(
+      (entry) => entry.transactionHash.toLowerCase() === params.txHash.toLowerCase(),
+    );
+    if (!match) {
+      throw new AppError(
+        'failed-precondition',
+        `Tx has no ${tokenSymbol} transfer to the deposit address`,
+      );
+    }
+
+    const amountWei = BigInt(match.data);
+    if (params.notBeforeMs != null) {
+      const block = await provider.getBlock(receipt.blockNumber);
+      if (!block || block.timestamp * 1000 < params.notBeforeMs) {
+        throw new AppError('failed-precondition', 'Transaction is outside the deposit window');
+      }
+    }
+
+    return {
+      txHash: match.transactionHash,
+      from: getAddress('0x' + (match.topics[1] ?? '').slice(26)),
+      to: receiveAddress,
+      amountWei,
+      amountUsdCents: usdtWeiToUsdCents(amountWei),
+      blockNumber: receipt.blockNumber,
+      confirmations,
+      amountDisplay: formatUnits(amountWei, tokenDecimals),
+    };
+  });
+}
+
+/**
  * Verify a client-supplied tx hash against chain (token, to, amount, status).
  */
 export async function verifyUsdtDepositTx(params: {
@@ -346,71 +425,33 @@ export async function verifyUsdtDepositTx(params: {
   tokenSymbol?: string;
   tokenDecimals?: number;
 }): Promise<DetectedDeposit | null> {
-  const hot = await getHotWallet();
-  const { getHotWalletByAddress } = await import('./hot-wallet');
-  const receiveAddress = getAddress(params.toAddress || hot.address);
-  const tokenAddress = getAddress(params.tokenAddress || USDT_BEP20_ADDRESS);
-  const tokenSymbol = params.tokenSymbol || 'USDT';
-  const tokenDecimals = params.tokenDecimals ?? USDT_DECIMALS;
-  const bound = await getHotWalletByAddress(receiveAddress);
-  const rpcUrl = bound?.rpcUrl || hot.rpcUrl;
   if (await params.isTxUsed(params.txHash)) return null;
 
-  return withRpcFallback(rpcUrl, async (provider) => {
-    const receipt = await provider.getTransactionReceipt(params.txHash);
-    if (!receipt || receipt.status !== 1) {
-      throw new AppError('failed-precondition', 'Transaction not found or failed on BSC');
-    }
-
-    const latest = await provider.getBlockNumber();
-    const confirmations = latest - receipt.blockNumber + 1;
-    if (confirmations < DEPOSIT_CONFIRMATIONS) {
-      throw new AppError(
-        'failed-precondition',
-        `Waiting for confirmations (${confirmations}/${DEPOSIT_CONFIRMATIONS})`,
-      );
-    }
-
-    const transferTopic = id('Transfer(address,address,uint256)');
-    const toTopic = zeroPadValue(receiveAddress, 32);
-    const logs = await provider.getLogs({
-      address: tokenAddress,
-      fromBlock: receipt.blockNumber,
-      toBlock: receipt.blockNumber,
-      topics: [transferTopic, null, toTopic],
-    });
-
-    const match = logs.find((entry) => entry.transactionHash.toLowerCase() === params.txHash.toLowerCase());
-    if (!match) {
-      throw new AppError(
-        'failed-precondition',
-        `Tx has no ${tokenSymbol} transfer to the deposit address`,
-      );
-    }
-
-    const amountWei = BigInt(match.data);
-    if (!acceptedWeiSet(params).has(amountWei.toString())) {
-      throw new AppError(
-        'failed-precondition',
-        `Amount mismatch: got ${formatUnits(amountWei, tokenDecimals)} ${tokenSymbol}`,
-      );
-    }
-
-    const block = await provider.getBlock(receipt.blockNumber);
-    if (!block || block.timestamp * 1000 < params.notBeforeMs) {
-      throw new AppError('failed-precondition', 'Transaction is outside the deposit window');
-    }
-
-    return {
-      txHash: match.transactionHash,
-      from: getAddress('0x' + (match.topics[1] ?? '').slice(26)),
-      to: receiveAddress,
-      amountWei,
-      amountUsdCents: usdtWeiToUsdCents(amountWei),
-      blockNumber: receipt.blockNumber,
-      confirmations,
-    };
+  const tokenSymbol = params.tokenSymbol || 'USDT';
+  const tokenDecimals = params.tokenDecimals ?? USDT_DECIMALS;
+  const detected = await inspectDepositTx({
+    txHash: params.txHash,
+    notBeforeMs: params.notBeforeMs,
+    toAddress: params.toAddress,
+    tokenAddress: params.tokenAddress,
+    tokenSymbol,
+    tokenDecimals,
   });
+
+  if (!acceptedWeiSet(params).has(detected.amountWei.toString())) {
+    throw new AppError(
+      'failed-precondition',
+      `Amount mismatch: got ${formatUnits(detected.amountWei, tokenDecimals)} ${tokenSymbol}`,
+      {
+        observedWei: detected.amountWei.toString(),
+        observedDisplay: formatUnits(detected.amountWei, tokenDecimals),
+        amountUsdCents: detected.amountUsdCents,
+        from: detected.from,
+      },
+    );
+  }
+
+  return detected;
 }
 
 /**

@@ -4,8 +4,8 @@ import { Copy, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Input, Textarea } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 export function StatusTabs<T extends string>({
@@ -179,6 +179,95 @@ export function RejectDialog({
           >
             {pending ? <Loader2 className="animate-spin" /> : null}
             Reject request
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Admin enter/confirm how much Fund credit to apply (supports underpaid txs). */
+export function ApproveDepositDialog({
+  open,
+  onOpenChange,
+  pending,
+  assetLabel,
+  requestedLabel,
+  observedLabel,
+  reason,
+  txHash,
+  defaultAmount,
+  amountHint,
+  onConfirm,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  pending: boolean
+  assetLabel: string
+  requestedLabel: string
+  observedLabel?: string | null
+  reason?: string | null
+  txHash?: string | null
+  /** Prefill in human units (USDT dollars or VFXT tokens). */
+  defaultAmount: string
+  amountHint: string
+  onConfirm: (humanAmount: string) => void
+}) {
+  const [amount, setAmount] = useState(defaultAmount)
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (next) setAmount(defaultAmount)
+        else setAmount('')
+        onOpenChange(next)
+      }}
+    >
+      <DialogContent>
+        <DialogTitle>Approve deposit — credit amount</DialogTitle>
+        <DialogDescription>
+          Enter how much to credit for this {assetLabel} payment. Use the observed on-chain amount
+          when the member underpaid.
+        </DialogDescription>
+        <div className="mt-4 space-y-3 text-sm">
+          <p>
+            <span className="text-ink-muted">Requested:</span>{' '}
+            <span className="font-medium text-ink">{requestedLabel}</span>
+          </p>
+          {observedLabel ? (
+            <p>
+              <span className="text-ink-muted">Observed on-chain:</span>{' '}
+              <span className="font-medium text-ink">{observedLabel}</span>
+            </p>
+          ) : null}
+          {reason ? (
+            <p className="rounded-lg bg-panel-elevated px-3 py-2 text-xs text-ink-muted">{reason}</p>
+          ) : null}
+          {txHash ? (
+            <p className="break-all font-mono text-[11px] text-ink-muted">{txHash}</p>
+          ) : null}
+          <div className="space-y-2 pt-1">
+            <Label htmlFor="approve-credit-amount">{amountHint}</Label>
+            <Input
+              id="approve-credit-amount"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder={defaultAmount}
+            />
+          </div>
+        </div>
+        <div className="mt-6 flex justify-end gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="accent"
+            disabled={amount.trim().length < 1 || pending}
+            onClick={() => onConfirm(amount.trim())}
+          >
+            {pending ? <Loader2 className="animate-spin" /> : null}
+            Approve & credit
           </Button>
         </div>
       </DialogContent>

@@ -53,6 +53,9 @@ export async function checkDepositPayment(depositId: string, txHash?: string) {
       expectedWei?: string
       paymentTag?: number
       amountNormalized?: boolean
+      manualReview?: boolean
+      suggestedCreditMinor?: number | null
+      observedAmountDisplay?: string | null
     }
   >('checkDepositPayment', { depositId, ...(txHash ? { txHash } : {}) })
 }

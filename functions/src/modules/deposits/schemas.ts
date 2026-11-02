@@ -22,6 +22,13 @@ export const createDepositRequestSchema = z
 export const approveDepositSchema = z
   .object({
     depositId: z.string().min(1).max(128),
+    /**
+     * Admin-entered credit amount:
+     * - USDT deposits: USD cents (e.g. 950 = $9.50)
+     * - VFXT deposits: whole tokens
+     * When omitted, uses the deposit's original amountMinor.
+     */
+    creditAmountMinor: z.number().int().positive().optional(),
     idempotencyKey: z.string().min(8).max(128).optional(),
   })
   .strict();

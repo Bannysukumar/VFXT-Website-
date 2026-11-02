@@ -263,7 +263,7 @@ async function handleApproveDeposit(
     throw new AppError('invalid-argument', parsed.error.message);
   }
 
-  const { depositId } = parsed.data;
+  const { depositId, creditAmountMinor } = parsed.data;
   const idemKey =
     parsed.data.idempotencyKey ??
     buildIdempotencyKey('deposit.approve', depositId, ctx.uid);
@@ -307,9 +307,17 @@ async function handleApproveDeposit(
       deposit.method === 'vfxt_bep20' ||
       deposit.currency === 'VFXT' ||
       deposit.tokenSymbol === 'VFXT';
+    const paidMinor =
+      creditAmountMinor != null && Number.isFinite(creditAmountMinor)
+        ? Math.floor(creditAmountMinor)
+        : deposit.amountMinor;
+    if (!Number.isInteger(paidMinor) || paidMinor < 1) {
+      throw new AppError('invalid-argument', 'Credit amount must be a positive integer');
+    }
+
     const fundTokens = isVfxt
-      ? deposit.amountMinor
-      : usdCentsToVfxtTokens(deposit.amountMinor, tokenFx.tokensPerUsd);
+      ? paidMinor
+      : usdCentsToVfxtTokens(paidMinor, tokenFx.tokensPerUsd);
     if (!Number.isFinite(fundTokens) || fundTokens < 1) {
       throw new AppError(
         'failed-precondition',
@@ -337,8 +345,12 @@ async function handleApproveDeposit(
         metadata: {
           method: deposit.method,
           tokensPerUsd: tokenFx.tokensPerUsd,
-          paidUsdtCents: isVfxt ? null : deposit.amountMinor,
-          paidVfxtTokens: isVfxt ? deposit.amountMinor : null,
+          paidUsdtCents: isVfxt ? null : paidMinor,
+          paidVfxtTokens: isVfxt ? paidMinor : null,
+          requestedAmountMinor: deposit.amountMinor,
+          creditAmountMinor: paidMinor,
+          manualReview: Boolean((deposit as DepositRequest & { manualReview?: boolean }).manualReview),
+          txHash: deposit.txHash ?? null,
           fundTokensCredited: fundTokens,
           fundCentsCredited: fundTokens,
         },
@@ -346,14 +358,38 @@ async function handleApproveDeposit(
     ]);
     entryId = credits[0]?.entryId ?? '';
 
+    const txHash =
+      typeof deposit.txHash === 'string' && deposit.txHash.startsWith('0x')
+        ? deposit.txHash.toLowerCase()
+        : null;
+    if (txHash) {
+      const usedRef = db.collection(Collections.usedCryptoTx).doc(txHash);
+      tx.set(
+        usedRef,
+        {
+          txHash,
+          depositId,
+          userId: deposit.userId,
+          pendingManualReview: false,
+          approvedBy: ctx.uid,
+          createdAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
     tx.update(depositRef, {
       status: 'approved',
       walletId: fundWalletId,
       currency: 'VFXT',
+      amountMinor: paidMinor,
+      requestedAmountMinor: deposit.amountMinor,
+      creditAmountMinor: paidMinor,
       vfxtTokensCredited: fundTokens,
       fundTokensCredited: fundTokens,
       fundCentsCredited: fundTokens,
       tokensPerUsd: tokenFx.tokensPerUsd,
+      manualReview: Boolean((deposit as DepositRequest & { manualReview?: boolean }).manualReview),
       reviewedBy: ctx.uid,
       reviewedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -427,6 +463,21 @@ async function handleRejectDeposit(
         'failed-precondition',
         `Deposit status is ${deposit.status}, expected pending`,
       );
+    }
+    const txHash =
+      typeof deposit.txHash === 'string' && deposit.txHash.startsWith('0x')
+        ? deposit.txHash.toLowerCase()
+        : null;
+    if (txHash) {
+      const usedRef = db.collection(Collections.usedCryptoTx).doc(txHash);
+      const usedSnap = await tx.get(usedRef);
+      if (
+        usedSnap.exists &&
+        usedSnap.data()?.depositId === depositId &&
+        usedSnap.data()?.pendingManualReview
+      ) {
+        tx.delete(usedRef);
+      }
     }
     tx.update(depositRef, {
       status: 'rejected',

@@ -14,11 +14,19 @@ export async function setAdminRole(uid: string, adminRole: AdminRole | null) {
   })
 }
 
-export async function approveDeposit(depositId: string, idempotencyKey: string) {
-  return callFunction<{ depositId: string; idempotencyKey: string }, { ok: true }>(
-    'approveDeposit',
-    { depositId, idempotencyKey },
-  )
+export async function approveDeposit(
+  depositId: string,
+  idempotencyKey: string,
+  creditAmountMinor?: number,
+) {
+  return callFunction<
+    { depositId: string; idempotencyKey: string; creditAmountMinor?: number },
+    { ok: true }
+  >('approveDeposit', {
+    depositId,
+    idempotencyKey,
+    ...(creditAmountMinor != null ? { creditAmountMinor } : {}),
+  })
 }
 
 export async function rejectDeposit(depositId: string, reason: string) {

@@ -309,6 +309,23 @@ export function DepositsPage() {
           return
         }
 
+        if (res.status === 'pending' || res.manualReview) {
+          setPayStatus('pending')
+          saveActiveDeposit({ ...active, status: 'pending' })
+          clearActiveDeposit()
+          if (!opts?.silent) {
+            toast.message('Sent for admin review', {
+              description:
+                res.observedAmountDisplay
+                  ? `Detected ${res.observedAmountDisplay} ${paySymbol}. Admin will credit the correct amount.`
+                  : 'We could not auto-match this payment. Admin will review your transaction hash.',
+            })
+          }
+          await queryClient.invalidateQueries({ queryKey: ['my-deposits'] })
+          setActive(null)
+          return
+        }
+
         if (res.status === 'expired' || res.status === 'cancelled' || res.status === 'rejected') {
           setPayStatus(res.status)
           clearActiveDeposit()
