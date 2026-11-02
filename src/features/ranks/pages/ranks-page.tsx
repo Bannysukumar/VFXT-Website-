@@ -46,7 +46,11 @@ export function RanksPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="text-sm text-ink-muted">
-            {status.currentRank ? 'Qualified and earning on cycle' : 'Keep building volume to unlock Rank 1'}
+            {status.currentRank
+              ? status.salaryMaxCycles
+                ? `Salary cycles ${status.salaryCyclesPaid ?? 0}/${status.salaryMaxCycles} at this rank`
+                : 'Qualified and earning on cycle'
+              : 'Keep building volume to unlock Rank 1'}
           </CardContent>
         </Card>
         <Card>
@@ -135,7 +139,7 @@ export function RanksPage() {
                     <p className="font-semibold">Rank {r.rank}</p>
                     <p className="mt-1 text-sm text-ink-muted">
                       ${r.leftUsd.toLocaleString()} left · ${r.rightUsd.toLocaleString()} right · $
-                      {r.rewardUsd} every {r.cycleDays} days
+                      {r.rewardUsd} every {r.cycleDays} days · up to {r.maxCycles} cycles
                     </p>
                   </div>
                   <Badge

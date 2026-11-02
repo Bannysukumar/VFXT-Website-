@@ -98,16 +98,19 @@ export const DIRECT_REFERRAL_BONUS_BPS = 500;
  * Binary rank rewards. Volumes and rewards expressed in whole USD,
  * converted to cents via helpers.
  */
+/** Default max salary cycles per rank before payouts pause until next rank. */
+export const DEFAULT_RANK_MAX_CYCLES = 12;
+
 export const RANK_REWARDS = [
-  { rank: 1, leftUsd: 1_000, rightUsd: 1_000, rewardUsd: 10, cycleDays: 7 },
-  { rank: 2, leftUsd: 2_000, rightUsd: 2_000, rewardUsd: 20, cycleDays: 7 },
-  { rank: 3, leftUsd: 5_000, rightUsd: 5_000, rewardUsd: 50, cycleDays: 7 },
-  { rank: 4, leftUsd: 10_000, rightUsd: 10_000, rewardUsd: 100, cycleDays: 15 },
-  { rank: 5, leftUsd: 15_000, rightUsd: 15_000, rewardUsd: 150, cycleDays: 15 },
-  { rank: 6, leftUsd: 20_000, rightUsd: 20_000, rewardUsd: 200, cycleDays: 15 },
-  { rank: 7, leftUsd: 30_000, rightUsd: 30_000, rewardUsd: 300, cycleDays: 30 },
-  { rank: 8, leftUsd: 50_000, rightUsd: 50_000, rewardUsd: 500, cycleDays: 30 },
-  { rank: 9, leftUsd: 100_000, rightUsd: 100_000, rewardUsd: 1_000, cycleDays: 30 },
+  { rank: 1, leftUsd: 1_000, rightUsd: 1_000, rewardUsd: 10, cycleDays: 7, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 2, leftUsd: 2_000, rightUsd: 2_000, rewardUsd: 20, cycleDays: 7, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 3, leftUsd: 5_000, rightUsd: 5_000, rewardUsd: 50, cycleDays: 7, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 4, leftUsd: 10_000, rightUsd: 10_000, rewardUsd: 100, cycleDays: 15, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 5, leftUsd: 15_000, rightUsd: 15_000, rewardUsd: 150, cycleDays: 15, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 6, leftUsd: 20_000, rightUsd: 20_000, rewardUsd: 200, cycleDays: 15, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 7, leftUsd: 30_000, rightUsd: 30_000, rewardUsd: 300, cycleDays: 30, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 8, leftUsd: 50_000, rightUsd: 50_000, rewardUsd: 500, cycleDays: 30, maxCycles: DEFAULT_RANK_MAX_CYCLES },
+  { rank: 9, leftUsd: 100_000, rightUsd: 100_000, rewardUsd: 1_000, cycleDays: 30, maxCycles: DEFAULT_RANK_MAX_CYCLES },
 ] as const;
 
 export type WalletKind =
@@ -323,6 +326,7 @@ export function rankThresholdCents(
   rightMinor: number;
   rewardMinor: number;
   cycleDays: number;
+  maxCycles: number;
 } | null {
   const row = RANK_REWARDS.find((r) => r.rank === rank);
   if (!row) return null;
@@ -334,6 +338,7 @@ export function rankThresholdCents(
     rightMinor: row.rightUsd * rate,
     rewardMinor: row.rewardUsd * rate,
     cycleDays: row.cycleDays,
+    maxCycles: row.maxCycles ?? DEFAULT_RANK_MAX_CYCLES,
   };
 }
 

@@ -14,6 +14,7 @@ import { UserProfile } from '../../types/models';
 import { ensureUserWallets } from '../wallets/handlers';
 import { creditAvailable } from '../wallets/ledger';
 import { walletDocId } from '../wallets/types';
+import { userHasActiveStake } from './active-stake';
 
 export async function countDirectReferrals(
   db: Firestore,
@@ -70,6 +71,17 @@ export async function payLevelCommissions(
 
     const directs = await countDirectReferrals(db, payeeId);
     if (!isLevelUnlocked(directs, level)) {
+      uplineId = nextUpline;
+      continue;
+    }
+
+    // Inactive stake → this upliner earns nothing; higher upline can still earn their level.
+    if (!(await userHasActiveStake(db, payeeId))) {
+      log.info('level_commission_skipped_no_active_stake', {
+        payeeId,
+        level,
+        stakerId: params.stakerId,
+      });
       uplineId = nextUpline;
       continue;
     }
@@ -145,6 +157,14 @@ export async function payDirectReferralBonus(
   if (!stakerSnap.exists) return;
   const sponsorId = (stakerSnap.data() as UserProfile).referredBy;
   if (!sponsorId) return;
+
+  if (!(await userHasActiveStake(db, sponsorId))) {
+    log.info('direct_bonus_skipped_no_active_stake', {
+      sponsorId,
+      stakerId: params.stakerId,
+    });
+    return;
+  }
 
   const tokens = directReferralBonusTokens(params.stakeCents);
   if (tokens <= 0) return;

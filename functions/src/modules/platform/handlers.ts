@@ -106,6 +106,8 @@ const platformPatchSchema = z
               rightUsd: z.number().min(0),
               rewardUsd: z.number().min(0),
               cycleDays: z.number().int().positive(),
+              /** Max salary payouts at this rank before stop (resets on next rank). Default 12. */
+              maxCycles: z.number().int().positive().max(10_000).default(12),
               enabled: z.boolean(),
             }),
           )

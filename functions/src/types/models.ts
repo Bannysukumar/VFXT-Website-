@@ -39,6 +39,10 @@ export interface UserProfile {
   currentRank: number;
   lastRankPaidAt: ServerTimestamp | null;
   rankCycleStart: ServerTimestamp | null;
+  /** Rank currently counting salary cycles against. */
+  rankSalaryRank?: number | null;
+  /** How many salary payouts have been created for rankSalaryRank. */
+  rankSalaryCyclesPaid?: number | null;
   adminRole: AdminRole | null;
   role: 'user' | 'admin';
   createdAt: ServerTimestamp;

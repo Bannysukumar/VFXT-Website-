@@ -46,7 +46,19 @@ function deepMergePlatform(
 export async function getPlatformSettings(): Promise<PlatformSettings> {
   const snap = await getDb().collection(Collections.config).doc(PLATFORM_DOC).get();
   if (!snap.exists) return structuredClone(DEFAULT_PLATFORM_SETTINGS);
-  return deepMergePlatform(DEFAULT_PLATFORM_SETTINGS, snap.data() as Partial<PlatformSettings>);
+  const merged = deepMergePlatform(
+    DEFAULT_PLATFORM_SETTINGS,
+    snap.data() as Partial<PlatformSettings>,
+  );
+  // Backfill maxCycles on older rank rows saved before the field existed.
+  merged.plan.rankRewards = (merged.plan.rankRewards ?? []).map((r) => ({
+    ...r,
+    maxCycles:
+      Number.isFinite(Number(r.maxCycles)) && Number(r.maxCycles) > 0
+        ? Math.floor(Number(r.maxCycles))
+        : 12,
+  }));
+  return merged;
 }
 
 export async function savePlatformSettings(

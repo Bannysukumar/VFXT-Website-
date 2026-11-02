@@ -27,6 +27,8 @@ interface RankRewardRow {
   rightUsd: number
   rewardUsd: number
   cycleDays: number
+  /** Max salary payouts at this rank; resets when member reaches the next rank. */
+  maxCycles: number
   enabled: boolean
 }
 
@@ -53,7 +55,15 @@ export function AdminPlanPage() {
     setLevelCommissionBps(Array.isArray(p.levelCommissionBps) ? p.levelCommissionBps.join(', ') : '')
     setDirectReferralBonusBps(String(p.directReferralBonusBps ?? ''))
     setLockedPackages((p.lockedPackages as LockedPackageRow[]) ?? [])
-    setRankRewards((p.rankRewards as RankRewardRow[]) ?? [])
+    setRankRewards(
+      ((p.rankRewards as RankRewardRow[]) ?? []).map((r) => ({
+        ...r,
+        maxCycles:
+          Number.isFinite(Number(r.maxCycles)) && Number(r.maxCycles) > 0
+            ? Number(r.maxCycles)
+            : 12,
+      })),
+    )
     const t = settings.data?.token as Record<string, unknown> | undefined
     const per = Number(t?.tokensPerUsd ?? 10_000)
     if (Number.isFinite(per) && per > 0) setTokensPerUsd(per)
@@ -238,6 +248,8 @@ export function AdminPlanPage() {
           <p className="text-sm text-ink-muted">
             Enter USD thresholds/rewards — the server multiplies by{' '}
             {tokensPerUsd.toLocaleString()} to get VFXT volume and payout amounts.
+            Salary stops after <span className="font-medium text-ink">Cycles</span> payouts at
+            that rank, then resumes when the member reaches the next rank (default 12).
           </p>
         </CardHeader>
         <CardContent className="p-0">
@@ -249,6 +261,7 @@ export function AdminPlanPage() {
                 <TH>Right $</TH>
                 <TH>Reward $</TH>
                 <TH>Cycle days</TH>
+                <TH>Cycles</TH>
                 <TH>Enabled</TH>
               </tr>
             </THead>
@@ -296,6 +309,20 @@ export function AdminPlanPage() {
                       onChange={(e) => {
                         const next = [...rankRewards]
                         next[i] = { ...row, cycleDays: Number(e.target.value) }
+                        setRankRewards(next)
+                      }}
+                    />
+                  </TD>
+                  <TD>
+                    <Input
+                      className="h-9 w-20"
+                      value={row.maxCycles}
+                      onChange={(e) => {
+                        const next = [...rankRewards]
+                        next[i] = {
+                          ...row,
+                          maxCycles: Math.max(1, Number(e.target.value) || 12),
+                        }
                         setRankRewards(next)
                       }}
                     />

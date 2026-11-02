@@ -45,12 +45,26 @@ export interface AffiliateDashboard {
 
 export interface RankStatus {
   currentRank: number
+  qualifiedRank?: number
   leftVolumeMinor: number
   rightVolumeMinor: number
   nextRank: number | null
   nextLeftNeedMinor: number
   nextRightNeedMinor: number
   lastRewardAt?: string | null
+  salaryRank?: number | null
+  salaryCyclesPaid?: number
+  salaryMaxCycles?: number
+  salaryCyclesRemaining?: number
+  ranks?: Array<{
+    rank: number
+    leftMinor: number
+    rightMinor: number
+    rewardMinor: number
+    cycleDays: number
+    maxCycles: number
+    enabled?: boolean
+  }>
 }
 
 export async function getStakingPlans() {

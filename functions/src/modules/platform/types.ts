@@ -68,6 +68,11 @@ export interface RankRewardConfig {
   rightUsd: number;
   rewardUsd: number;
   cycleDays: number;
+  /**
+   * Max salary payouts while holding this rank.
+   * After this many cycles, salary stops until the member qualifies for a higher rank.
+   */
+  maxCycles: number;
   enabled: boolean;
 }
 
@@ -183,15 +188,15 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
       { id: 'locked_700', days: 700, multiplier: 7, bonusTokenPct: 150, label: '700-day · 7X', enabled: true },
     ],
     rankRewards: [
-      { rank: 1, leftUsd: 1_000, rightUsd: 1_000, rewardUsd: 10, cycleDays: 7, enabled: true },
-      { rank: 2, leftUsd: 2_000, rightUsd: 2_000, rewardUsd: 20, cycleDays: 7, enabled: true },
-      { rank: 3, leftUsd: 5_000, rightUsd: 5_000, rewardUsd: 50, cycleDays: 7, enabled: true },
-      { rank: 4, leftUsd: 10_000, rightUsd: 10_000, rewardUsd: 100, cycleDays: 15, enabled: true },
-      { rank: 5, leftUsd: 15_000, rightUsd: 15_000, rewardUsd: 150, cycleDays: 15, enabled: true },
-      { rank: 6, leftUsd: 20_000, rightUsd: 20_000, rewardUsd: 200, cycleDays: 15, enabled: true },
-      { rank: 7, leftUsd: 30_000, rightUsd: 30_000, rewardUsd: 300, cycleDays: 30, enabled: true },
-      { rank: 8, leftUsd: 50_000, rightUsd: 50_000, rewardUsd: 500, cycleDays: 30, enabled: true },
-      { rank: 9, leftUsd: 100_000, rightUsd: 100_000, rewardUsd: 1_000, cycleDays: 30, enabled: true },
+      { rank: 1, leftUsd: 1_000, rightUsd: 1_000, rewardUsd: 10, cycleDays: 7, maxCycles: 12, enabled: true },
+      { rank: 2, leftUsd: 2_000, rightUsd: 2_000, rewardUsd: 20, cycleDays: 7, maxCycles: 12, enabled: true },
+      { rank: 3, leftUsd: 5_000, rightUsd: 5_000, rewardUsd: 50, cycleDays: 7, maxCycles: 12, enabled: true },
+      { rank: 4, leftUsd: 10_000, rightUsd: 10_000, rewardUsd: 100, cycleDays: 15, maxCycles: 12, enabled: true },
+      { rank: 5, leftUsd: 15_000, rightUsd: 15_000, rewardUsd: 150, cycleDays: 15, maxCycles: 12, enabled: true },
+      { rank: 6, leftUsd: 20_000, rightUsd: 20_000, rewardUsd: 200, cycleDays: 15, maxCycles: 12, enabled: true },
+      { rank: 7, leftUsd: 30_000, rightUsd: 30_000, rewardUsd: 300, cycleDays: 30, maxCycles: 12, enabled: true },
+      { rank: 8, leftUsd: 50_000, rightUsd: 50_000, rewardUsd: 500, cycleDays: 30, maxCycles: 12, enabled: true },
+      { rank: 9, leftUsd: 100_000, rightUsd: 100_000, rewardUsd: 1_000, cycleDays: 30, maxCycles: 12, enabled: true },
     ],
   },
   deposit: {
