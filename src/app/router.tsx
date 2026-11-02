@@ -1,8 +1,10 @@
-import { lazy, type ComponentType } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { lazy, type ComponentType, useEffect } from 'react'
+import { createBrowserRouter, useRouteError, isRouteErrorResponse } from 'react-router-dom'
 import { PublicShell } from '@/components/layout/public-shell'
 import { AppShell } from '@/components/layout/app-shell'
 import { AdminRoute, ProtectedRoute } from '@/features/auth/components/protected-route'
+import { handleStaleChunkError, isStaleChunkError, reloadForNewDeploy } from '@/lib/chunk-reload'
+import { Button } from '@/components/ui/button'
 
 /** Lazy-load a named page export so admin/app code is not in the first paint bundle. */
 function lazyNamed<T extends Record<string, unknown>>(
@@ -10,10 +12,51 @@ function lazyNamed<T extends Record<string, unknown>>(
   exportName: keyof T & string,
 ) {
   return lazy(async () => {
-    const mod = await loader()
-    const Comp = mod[exportName] as ComponentType
-    return { default: Comp }
+    try {
+      const mod = await loader()
+      const Comp = mod[exportName] as ComponentType
+      return { default: Comp }
+    } catch (err) {
+      // Old tab after deploy → missing hashed chunk. Reload to pick up new index.html.
+      if (handleStaleChunkError(err)) {
+        return { default: () => null }
+      }
+      throw err
+    }
   })
+}
+
+function RouteErrorPage() {
+  const error = useRouteError()
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}`
+    : error instanceof Error
+      ? error.message
+      : 'Unexpected application error'
+
+  useEffect(() => {
+    if (isStaleChunkError(error)) {
+      reloadForNewDeploy()
+    }
+  }, [error])
+
+  if (isStaleChunkError(error)) {
+    return (
+      <div className="container-page flex min-h-dvh flex-col items-center justify-center gap-3 text-center">
+        <p className="text-sm text-ink-muted">Updating the app…</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container-page flex min-h-dvh flex-col items-center justify-center gap-4 text-center">
+      <h1 className="text-2xl font-semibold text-ink">Something went wrong</h1>
+      <p className="max-w-md text-sm text-ink-muted">{message}</p>
+      <Button type="button" onClick={() => window.location.reload()}>
+        Refresh page
+      </Button>
+    </div>
+  )
 }
 
 const HomePage = lazyNamed(() => import('@/features/marketing/home-page'), 'HomePage')
@@ -183,6 +226,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <PublicShell />,
+    errorElement: <RouteErrorPage />,
     children: [
       { index: true, element: <HomePage /> },
       { path: 'about', element: <AboutPage /> },
@@ -205,6 +249,7 @@ export const router = createBrowserRouter([
   {
     path: '/app',
     element: <ProtectedRoute />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         element: <AppShell />,
@@ -230,6 +275,7 @@ export const router = createBrowserRouter([
   {
     path: '/admin',
     element: <AdminRoute />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         element: <AppShell variant="admin" />,
