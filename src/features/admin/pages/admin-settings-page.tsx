@@ -70,6 +70,7 @@ export function AdminSettingsPage() {
   const [footerColumns, setFooterColumns] = useState<FooterColumn[]>(DEFAULT_FOOTER_COLUMNS)
   const [footerSocials, setFooterSocials] = useState<SocialLink[]>([])
   const [minDepositUsdCents, setMinDepositUsdCents] = useState('')
+  const [minVfxtDepositTokens, setMinVfxtDepositTokens] = useState('')
   const [tokensPerUsd, setTokensPerUsd] = useState('')
   const [tokenPriceUsd, setTokenPriceUsd] = useState('')
   const [multiWalletEnabled, setMultiWalletEnabled] = useState(false)
@@ -131,6 +132,7 @@ export function AdminSettingsPage() {
     const d = s.deposit as Record<string, unknown> | undefined
     if (d) {
       setMinDepositUsdCents(String(d.minDepositUsdCents ?? ''))
+      setMinVfxtDepositTokens(String(d.minVfxtDepositTokens ?? ''))
     }
     const t = s.token as Record<string, unknown> | undefined
     if (t) {
@@ -224,9 +226,20 @@ export function AdminSettingsPage() {
       toast.error('Set a valid token price or VFXT per $1')
       return
     }
+    const minUsd = Number.parseInt(minDepositUsdCents, 10)
+    const minVfxt = Number.parseInt(minVfxtDepositTokens, 10)
+    if (!Number.isFinite(minUsd) || minUsd <= 0) {
+      toast.error('Set a valid minimum USDT deposit (USD cents)')
+      return
+    }
+    if (!Number.isFinite(minVfxt) || minVfxt <= 0) {
+      toast.error('Set a valid minimum VFXT deposit (whole tokens)')
+      return
+    }
     save.mutate({
       deposit: {
-        minDepositUsdCents: Number.parseInt(minDepositUsdCents, 10),
+        minDepositUsdCents: minUsd,
+        minVfxtDepositTokens: minVfxt,
       },
       token: {
         tokensPerUsd: per,
@@ -518,14 +531,26 @@ export function AdminSettingsPage() {
           </CardHeader>
           <CardContent className="grid max-w-md gap-4">
             <div className="space-y-2">
-              <Label>Min deposit (USD cents)</Label>
+              <Label>Min USDT deposit (USD cents)</Label>
               <Input
                 value={minDepositUsdCents}
                 onChange={(e) => setMinDepositUsdCents(e.target.value)}
                 placeholder="1000 = $10"
               />
               <p className="text-xs text-ink-muted">
-                ${(Number(minDepositUsdCents || 0) / 100).toFixed(2)} minimum
+                ${(Number(minDepositUsdCents || 0) / 100).toFixed(2)} minimum for USDT deposits
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Min VFXT deposit (tokens)</Label>
+              <Input
+                value={minVfxtDepositTokens}
+                onChange={(e) => setMinVfxtDepositTokens(e.target.value)}
+                placeholder="100000"
+                inputMode="numeric"
+              />
+              <p className="text-xs text-ink-muted">
+                {Number(minVfxtDepositTokens || 0).toLocaleString()} VFXT minimum for token deposits
               </p>
             </div>
             <div className="space-y-2">

@@ -95,8 +95,10 @@ export interface WithdrawSettings {
 }
 
 export interface DepositSettings {
-  /** Minimum deposit amount in USD cents. */
+  /** Minimum USDT/USD deposit amount in USD cents. */
   minDepositUsdCents: number;
+  /** Minimum whole VFXT tokens for vfxt_bep20 deposits. */
+  minVfxtDepositTokens: number;
 }
 
 export interface TokenEconomicsSettings {
@@ -194,6 +196,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   },
   deposit: {
     minDepositUsdCents: 1_000, // $10
+    minVfxtDepositTokens: 100_000,
   },
   token: {
     tokensPerUsd: 10_000, // $0.0001 / VFXT

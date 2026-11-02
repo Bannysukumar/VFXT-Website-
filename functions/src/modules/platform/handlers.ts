@@ -116,6 +116,7 @@ const platformPatchSchema = z
     deposit: z
       .object({
         minDepositUsdCents: z.number().int().positive().optional(),
+        minVfxtDepositTokens: z.number().int().positive().max(1_000_000_000_000).optional(),
       })
       .optional(),
     token: z
@@ -149,6 +150,7 @@ export const getPublicPlatformSettings = onCall(CALLABLE_OPTS, async () => {
       footer: s.footer,
       deposit: {
         minDepositUsdCents: s.deposit.minDepositUsdCents,
+        minVfxtDepositTokens: s.deposit.minVfxtDepositTokens,
       },
       token: {
         tokensPerUsd: s.token.tokensPerUsd,

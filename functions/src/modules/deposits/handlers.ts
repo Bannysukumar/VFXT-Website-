@@ -72,7 +72,8 @@ async function handleCreateDepositRequest(
     const { usdCentsToVfxtTokens } = await import('../../config/plan');
     const minTokens = Math.max(
       1,
-      usdCentsToVfxtTokens(depositSettings.minDepositUsdCents, tokenFx.tokensPerUsd),
+      depositSettings.minVfxtDepositTokens ||
+        usdCentsToVfxtTokens(depositSettings.minDepositUsdCents, tokenFx.tokensPerUsd),
     );
     if (amountMinor < minTokens) {
       throw new AppError(

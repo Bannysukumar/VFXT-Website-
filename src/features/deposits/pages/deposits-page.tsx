@@ -114,7 +114,11 @@ export function DepositsPage() {
 
   const tokensPerUsd = platform.data?.token?.tokensPerUsd ?? 10_000
   const minDepositCents = platform.data?.deposit?.minDepositUsdCents ?? 1000
-  const minVfxtTokens = Math.max(1, usdCentsToVfxtTokens(minDepositCents, tokensPerUsd))
+  const minVfxtTokens = Math.max(
+    1,
+    platform.data?.deposit?.minVfxtDepositTokens ||
+      usdCentsToVfxtTokens(minDepositCents, tokensPerUsd),
+  )
   const quickAmounts = asset === 'VFXT' ? quickAmountsVfxt : quickAmountsUsdt
 
   const previewUsdtCents = (() => {

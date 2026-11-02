@@ -57,6 +57,7 @@ export interface PublicPlatformSettings {
   footer: FooterSettings
   deposit: {
     minDepositUsdCents: number
+    minVfxtDepositTokens: number
   }
   token: {
     tokensPerUsd: number
