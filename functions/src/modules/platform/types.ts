@@ -196,7 +196,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   },
   deposit: {
     minDepositUsdCents: 1_000, // $10
-    minVfxtDepositTokens: 100_000,
+    minVfxtDepositTokens: 10,
   },
   token: {
     tokensPerUsd: 10_000, // $0.0001 / VFXT

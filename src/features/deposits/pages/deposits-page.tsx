@@ -149,11 +149,16 @@ export function DepositsPage() {
 
   const tokensPerUsd = platform.data?.token?.tokensPerUsd ?? 10_000
   const minDepositCents = platform.data?.deposit?.minDepositUsdCents ?? 1000
+  // Admin Min VFXT deposit wins; one-cent floor only when unset.
+  const configuredVfxtMin = platform.data?.deposit?.minVfxtDepositTokens
   const minVfxtTokens = Math.max(
     1,
-    platform.data?.deposit?.minVfxtDepositTokens ||
-      usdCentsToVfxtTokens(minDepositCents, tokensPerUsd),
-    minVfxtTokensForOneCent(tokensPerUsd),
+    Number.isFinite(configuredVfxtMin) && (configuredVfxtMin ?? 0) > 0
+      ? Math.floor(Number(configuredVfxtMin))
+      : Math.max(
+          usdCentsToVfxtTokens(minDepositCents, tokensPerUsd),
+          minVfxtTokensForOneCent(tokensPerUsd),
+        ),
   )
   const quickAmounts = asset === 'VFXT' ? quickAmountsVfxt : quickAmountsUsdt
 

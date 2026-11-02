@@ -546,11 +546,12 @@ export function AdminSettingsPage() {
               <Input
                 value={minVfxtDepositTokens}
                 onChange={(e) => setMinVfxtDepositTokens(e.target.value)}
-                placeholder="100000"
+                placeholder="10"
                 inputMode="numeric"
               />
               <p className="text-xs text-ink-muted">
                 {Number(minVfxtDepositTokens || 0).toLocaleString()} VFXT minimum for token deposits
+                (this value is enforced as-is on /app/deposits)
               </p>
             </div>
             <div className="space-y-2">

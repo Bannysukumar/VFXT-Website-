@@ -71,11 +71,16 @@ async function handleCreateDepositRequest(
   if (wantVfxt) {
     const { usdCentsToVfxtTokens, minVfxtTokensForOneCent, vfxtTokensToFundCents } =
       await import('../../config/plan');
+    // Admin Min VFXT deposit is authoritative; dust floor only when unset.
+    const configuredVfxtMin = depositSettings.minVfxtDepositTokens;
     const minTokens = Math.max(
       1,
-      depositSettings.minVfxtDepositTokens ||
-        usdCentsToVfxtTokens(depositSettings.minDepositUsdCents, tokenFx.tokensPerUsd),
-      minVfxtTokensForOneCent(tokenFx.tokensPerUsd),
+      Number.isFinite(configuredVfxtMin) && configuredVfxtMin > 0
+        ? Math.floor(configuredVfxtMin)
+        : Math.max(
+            usdCentsToVfxtTokens(depositSettings.minDepositUsdCents, tokenFx.tokensPerUsd),
+            minVfxtTokensForOneCent(tokenFx.tokensPerUsd),
+          ),
     );
     if (amountMinor < minTokens) {
       throw new AppError(
