@@ -15,11 +15,12 @@ type Row = (DepositRequest | WithdrawalRequest) & {
 }
 
 function amountLabel(row: Row) {
+  const method = (row as { method?: string }).method ?? row.provider
+  const tokenSymbol = (row as { tokenSymbol?: string | null }).tokenSymbol
   const isVfxt =
-    row.currency === 'VFXT' ||
-    (row as { method?: string }).method === 'vfxt_bep20' ||
-    (row as { tokenSymbol?: string }).tokenSymbol === 'VFXT'
+    row.currency === 'VFXT' || method === 'vfxt_bep20' || tokenSymbol === 'VFXT'
   if (isVfxt) {
+    // VFXT amountMinor is whole tokens (10), not USD cents.
     return `${Number(row.amountMinor).toLocaleString()} VFXT`
   }
   return formatMinor(row.amountMinor, {

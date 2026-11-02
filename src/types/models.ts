@@ -102,6 +102,9 @@ export interface DepositRequest {
   status: TransactionStatus
   provider?: string
   providerRef?: string
+  /** Crypto rail when applicable (e.g. vfxt_bep20 / usdt_bep20). */
+  method?: string
+  tokenSymbol?: string | null
   idempotencyKey: string
   note?: string
   reviewedBy?: string

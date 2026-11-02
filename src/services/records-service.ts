@@ -48,6 +48,8 @@ const mapDeposit = (id: string, data: DocumentData): DepositRequest => ({
   status: data.status as TransactionStatus,
   provider: data.provider ?? data.method,
   providerRef: data.providerRef,
+  method: typeof data.method === 'string' ? data.method : undefined,
+  tokenSymbol: typeof data.tokenSymbol === 'string' ? data.tokenSymbol : null,
   idempotencyKey: data.idempotencyKey ?? '',
   note: data.note,
   reviewedBy: data.reviewedBy,
