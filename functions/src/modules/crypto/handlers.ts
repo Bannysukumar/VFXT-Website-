@@ -218,7 +218,7 @@ async function creditDepositFromChain(params: {
   const token = depositTokenMeta(params);
 
   const { getTokenEconomicsSettings } = await import('../platform/store');
-  const { usdCentsToVfxtTokens, vfxtTokensToUsdCents } = await import('../../config/plan');
+  const { vfxtTokensToUsdCents } = await import('../../config/plan');
   const { walletDocId } = await import('../wallets/types');
   const { ensureUserWallets } = await import('../wallets/handlers');
   await ensureUserWallets(db, params.userId);
@@ -227,18 +227,22 @@ async function creditDepositFromChain(params: {
     params.method === 'vfxt_bep20' || token.symbol === 'VFXT'
       ? 'vfxt_bep20'
       : 'usdt_bep20';
-  // USDT path: amountMinor = USD cents → convert to VFXT.
-  // VFXT path: amountMinor = whole tokens sent on-chain → recover 1:1.
-  const vfxtTokens =
-    method === 'vfxt_bep20'
-      ? params.amountMinor
-      : usdCentsToVfxtTokens(params.amountMinor, tokenFx.tokensPerUsd);
+  // All deposits credit Fund Wallet (USD) only — never VFXT Wallet.
+  // USDT: amountMinor is USD cents. VFXT: convert whole tokens → USD cents at tokensPerUsd.
+  const paidVfxtTokens = method === 'vfxt_bep20' ? params.amountMinor : null;
   const fundCents =
     method === 'vfxt_bep20'
       ? vfxtTokensToUsdCents(params.amountMinor, tokenFx.tokensPerUsd)
       : params.amountMinor;
+  if (!Number.isFinite(fundCents) || fundCents < 1) {
+    throw new AppError(
+      'failed-precondition',
+      method === 'vfxt_bep20'
+        ? `Deposit too small to credit Fund Wallet (need enough VFXT for at least $0.01 at ${tokenFx.tokensPerUsd.toLocaleString()} VFXT / $1)`
+        : 'Deposit amount too small to credit Fund Wallet',
+    );
+  }
   const fundWalletId = walletDocId(params.userId, 'fund');
-  const vfxtWalletId = walletDocId(params.userId, 'vfxt');
 
   await db.runTransaction(async (tx) => {
     const used = await tx.get(txRef);
@@ -253,9 +257,8 @@ async function creditDepositFromChain(params: {
     }
 
     // All wallet reads must happen before any writes in this transaction.
-    const mutations = [];
-    if (fundCents > 0) {
-      mutations.push({
+    await applyLedgerEntries(tx, db, [
+      {
         userId: params.userId,
         walletId: fundWalletId,
         type: 'deposit_credit' as const,
@@ -274,40 +277,12 @@ async function creditDepositFromChain(params: {
           chainId: BSC_CHAIN_ID,
           token: token.address,
           tokenSymbol: token.symbol,
-          vfxtTokens,
           tokensPerUsd: tokenFx.tokensPerUsd,
-          paidTokens: method === 'vfxt_bep20' ? params.amountMinor : null,
+          paidTokens: paidVfxtTokens,
+          fundCentsCredited: fundCents,
         },
-      });
-    }
-    if (vfxtTokens > 0) {
-      mutations.push({
-        userId: params.userId,
-        walletId: vfxtWalletId,
-        type: 'deposit_credit' as const,
-        direction: 'credit' as const,
-        amountMinor: vfxtTokens,
-        availableDelta: vfxtTokens,
-        reservedDelta: 0,
-        currency: 'VFXT' as const,
-        referenceType: 'deposit',
-        referenceId: params.depositId,
-        description:
-          method === 'vfxt_bep20'
-            ? `VFXT BEP-20 deposit — ${vfxtTokens.toLocaleString()} tokens recovered`
-            : `VFXT credited from USDT deposit (${tokenFx.tokensPerUsd}/$1)`,
-        createdBy: 'system:crypto-monitor',
-        metadata: {
-          txHash: params.txHash,
-          amountUsdCents: fundCents,
-          tokensPerUsd: tokenFx.tokensPerUsd,
-          paidWith: token.symbol,
-        },
-      });
-    }
-    if (mutations.length > 0) {
-      await applyLedgerEntries(tx, db, mutations);
-    }
+      },
+    ]);
 
     tx.set(txRef, {
       txHash: params.txHash.toLowerCase(),
@@ -319,10 +294,12 @@ async function creditDepositFromChain(params: {
     tx.update(depositRef, {
       status: 'completed',
       method,
+      walletId: fundWalletId,
+      currency: 'USD',
       txHash: params.txHash,
       tokenSymbol: token.symbol,
       tokenAddress: token.address,
-      vfxtTokensCredited: vfxtTokens,
+      vfxtTokensCredited: 0,
       fundCentsCredited: fundCents,
       tokensPerUsd: tokenFx.tokensPerUsd,
       reviewedBy: 'system:crypto-monitor',
@@ -337,14 +314,12 @@ async function creditDepositFromChain(params: {
     title: 'Deposit confirmed',
     body:
       method === 'vfxt_bep20'
-        ? `Payment verified. ${vfxtTokens.toLocaleString()} VFXT recovered to your token wallet.`
-        : vfxtTokens > 0
-          ? `Payment verified. ${(params.amountMinor / 100).toFixed(2)} USDT → ${vfxtTokens.toLocaleString()} VFXT credited.`
-          : `Your ${token.symbol} (BEP-20) payment was verified and credited.`,
+        ? `Payment verified. ${params.amountMinor.toLocaleString()} VFXT → $${(fundCents / 100).toFixed(2)} credited to Fund Wallet.`
+        : `Payment verified. $${(fundCents / 100).toFixed(2)} credited to Fund Wallet.`,
     data: {
       depositId: params.depositId,
       txHash: params.txHash,
-      vfxtTokens,
+      fundCents,
       token: token.symbol,
     },
   });
