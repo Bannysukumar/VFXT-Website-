@@ -16,7 +16,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.VFXTWallet"
-        tools:replace="android:dataExtractionRules,android:fullBackupContent,android:allowBackup">
+        tools:replace="android:dataExtractionRules,android:fullBackupContent">
         <activity
             android:name=".MainActivity"
             android:exported="true"

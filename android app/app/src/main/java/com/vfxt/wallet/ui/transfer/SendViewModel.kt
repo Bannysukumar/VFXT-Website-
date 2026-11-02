@@ -58,7 +58,7 @@ class SendViewModel @Inject constructor(
     private val rpc: EvmRpc,
 ) : ViewModel() {
 
-    private val initialTokenKey: String? = savedStateHandle["tokenKey"]?.lowercase()
+    private val initialTokenKey: String? = savedStateHandle.get<String>("tokenKey")?.lowercase()
     private val initialAmount: String = savedStateHandle.get<String>("amount").orEmpty()
     private val _state = MutableStateFlow(
         SendUiState(
