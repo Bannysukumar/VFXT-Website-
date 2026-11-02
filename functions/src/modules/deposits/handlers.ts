@@ -105,6 +105,36 @@ async function handleCreateDepositRequest(
     throw new AppError('not-found', 'Fund wallet not found');
   }
 
+  // Close prior open crypto deposits so users don't stack conflicting awaiting payments.
+  try {
+    const prior = await db
+      .collection(Collections.deposits)
+      .where('userId', '==', ctx.uid)
+      .orderBy('createdAt', 'desc')
+      .limit(25)
+      .get();
+    const batch = db.batch();
+    let cancelled = 0;
+    for (const doc of prior.docs) {
+      const st = String(doc.data().status || '');
+      if (st !== 'awaiting_payment' && st !== 'pending') continue;
+      const m = String(doc.data().method || '');
+      if (m !== 'usdt_bep20' && m !== 'vfxt_bep20') continue;
+      batch.update(doc.ref, {
+        status: 'cancelled',
+        rejectionReason: 'Superseded by a newer deposit request',
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      cancelled += 1;
+    }
+    if (cancelled > 0) await batch.commit();
+  } catch (err) {
+    log.warn('deposit_prior_cancel_failed', {
+      uid: ctx.uid,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   const depositId = uuidv4();
   const useCrypto =
     method === 'usdt_bep20' ||

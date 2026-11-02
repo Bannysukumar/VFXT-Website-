@@ -129,3 +129,71 @@ export function depositWeiCandidates(dep: {
   const base = resolveDepositBaseWei(dep);
   return expected === base ? [expected] : [expected, base];
 }
+
+/**
+ * Round (base) amounts may match many open deposits. Only the oldest open
+ * deposit for the same amount + asset + receive address may claim a base payment.
+ */
+export async function canAcceptBaseWeiPayment(
+  db: Firestore,
+  depositId: string,
+  dep: {
+    amountMinor?: number;
+    method?: string | null;
+    tokenSymbol?: string | null;
+    depositAddress?: string | null;
+    createdAt?: { toMillis?: () => number } | null;
+  },
+): Promise<boolean> {
+  const asset = resolveDepositAsset(dep);
+  const method = asset === 'VFXT' ? 'vfxt_bep20' : 'usdt_bep20';
+  const amountMinor = Number(dep.amountMinor);
+  const address = (dep.depositAddress || '').toLowerCase();
+
+  const open = await db
+    .collection(Collections.deposits)
+    .where('status', 'in', ['pending', 'awaiting_payment'])
+    .limit(100)
+    .get();
+
+  const peers = open.docs
+    .map((doc) => ({ id: doc.id, data: doc.data() }))
+    .filter((row) => {
+      if (Number(row.data.amountMinor) !== amountMinor) return false;
+      const rowMethod = String(row.data.method || '');
+      if (rowMethod && rowMethod !== method) return false;
+      if (row.data.tokenSymbol && row.data.tokenSymbol !== asset) return false;
+      const rowAddr = String(row.data.depositAddress || '').toLowerCase();
+      if (address && rowAddr && rowAddr !== address) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const am = a.data.createdAt?.toMillis?.() ?? 0;
+      const bm = b.data.createdAt?.toMillis?.() ?? 0;
+      return am - bm;
+    });
+
+  return peers[0]?.id === depositId;
+}
+
+/** Candidates for verification — base wei only if this deposit may claim it. */
+export async function depositWeiCandidatesForCredit(
+  db: Firestore,
+  depositId: string,
+  dep: {
+    expectedWei?: string | null;
+    amountMinor?: number;
+    method?: string | null;
+    tokenSymbol?: string | null;
+    depositAddress?: string | null;
+    createdAt?: { toMillis?: () => number } | null;
+  },
+): Promise<bigint[]> {
+  const expected = resolveDepositExpectedWei(dep);
+  const base = resolveDepositBaseWei(dep);
+  if (expected === base) return [expected];
+  if (await canAcceptBaseWeiPayment(db, depositId, dep)) {
+    return [expected, base];
+  }
+  return [expected];
+}

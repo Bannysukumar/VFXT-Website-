@@ -3,11 +3,13 @@ import type { TransactionStatus } from '@/types/models'
 
 const variants: Record<TransactionStatus, 'success' | 'warning' | 'danger' | 'info' | 'secondary'> = {
   pending: 'warning',
+  awaiting_payment: 'warning',
   approved: 'success',
   processing: 'info',
   completed: 'success',
   rejected: 'danger',
   cancelled: 'secondary',
+  expired: 'secondary',
   failed: 'danger',
 }
 

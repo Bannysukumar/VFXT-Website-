@@ -107,6 +107,13 @@ export interface DepositRequest {
   /** Crypto rail when applicable (e.g. vfxt_bep20 / usdt_bep20). */
   method?: string
   tokenSymbol?: string | null
+  tokenAddress?: string | null
+  depositAddress?: string | null
+  expectedWei?: string | null
+  qrPayload?: string | null
+  chainId?: number | null
+  fundCentsCredited?: number | null
+  txHash?: string | null
   idempotencyKey: string
   note?: string
   reviewedBy?: string

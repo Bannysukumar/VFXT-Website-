@@ -362,9 +362,15 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       : null;
     const hot = bound ?? (await pickDepositHotWallet());
     const receiveAddress = savedDepositAddress || hot.address;
-    const { depositWeiCandidates, resolveDepositExpectedWei } = await import('./unique-amount');
+    const {
+      depositWeiCandidatesForCredit,
+      resolveDepositExpectedWei,
+    } = await import('./unique-amount');
     const expectedWei = resolveDepositExpectedWei(dep);
-    const acceptedWeis = depositWeiCandidates(dep);
+    const acceptedWeis = await depositWeiCandidatesForCredit(db, depositId, {
+      ...dep,
+      depositAddress: receiveAddress,
+    });
     const createdAt = dep.createdAt?.toMillis?.() ?? Date.now() - DEPOSIT_TTL_MS;
     if (Date.now() - createdAt > DEPOSIT_TTL_MS) {
       await snap.ref.update({
@@ -381,6 +387,36 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         .get();
       return used.exists;
     };
+
+    // If this deposit already owns the pasted tx, treat as completed.
+    if (clientTxHash) {
+      const usedSnap = await db
+        .collection(Collections.usedCryptoTx)
+        .doc(clientTxHash.toLowerCase())
+        .get();
+      if (usedSnap.exists) {
+        const usedDepId = usedSnap.data()?.depositId;
+        if (usedDepId === depositId) {
+          if (dep.status !== 'completed' && dep.status !== 'approved') {
+            await snap.ref.update({
+              status: 'completed',
+              txHash: clientTxHash,
+              updatedAt: FieldValue.serverTimestamp(),
+            });
+          }
+          return {
+            status: 'completed' as const,
+            txHash: clientTxHash,
+            depositId,
+            fundCentsCredited: Number(dep.fundCentsCredited ?? 0) || null,
+          };
+        }
+        throw new AppError(
+          'already-exists',
+          'This transaction was already used for another deposit',
+        );
+      }
+    }
 
     const token = depositTokenMeta(dep);
 
@@ -456,16 +492,19 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
             status: 'completed' as const,
             txHash: (fresh.data()?.txHash as string) ?? found.txHash,
             depositId,
+            fundCentsCredited: Number(fresh.data()?.fundCentsCredited ?? 0) || null,
           };
         }
       }
       throw creditErr;
     }
 
+    const fresh = await snap.ref.get();
     return {
       status: 'completed' as const,
       txHash: found.txHash,
       depositId,
+      fundCentsCredited: Number(fresh.data()?.fundCentsCredited ?? 0) || null,
     };
   } catch (err) {
     throw toHttpsError(err);
@@ -505,7 +544,10 @@ export const monitorCryptoDeposits = onSchedule(
       return;
     }
 
-    const { depositWeiCandidates, resolveDepositExpectedWei } = await import('./unique-amount');
+    const {
+      depositWeiCandidatesForCredit,
+      resolveDepositExpectedWei,
+    } = await import('./unique-amount');
     const ordered = [...pending.docs].sort((a, b) => {
       const am = a.data().createdAt?.toMillis?.() ?? 0;
       const bm = b.data().createdAt?.toMillis?.() ?? 0;
@@ -524,7 +566,7 @@ export const monitorCryptoDeposits = onSchedule(
       }
       try {
         const expectedWei = resolveDepositExpectedWei(dep);
-        const acceptedWeis = depositWeiCandidates(dep);
+        const acceptedWeis = await depositWeiCandidatesForCredit(db, doc.id, dep);
         const token = depositTokenMeta(dep);
         const found = await findIncomingUsdtTransfer({
           expectedWei,
@@ -541,17 +583,24 @@ export const monitorCryptoDeposits = onSchedule(
           },
         });
         if (!found) continue;
-        await creditDepositFromChain({
-          depositId: doc.id,
-          txHash: found.txHash,
-          from: found.from,
-          amountMinor: Number(dep.amountMinor),
-          userId: dep.userId,
-          walletId: dep.walletId,
-          method: String(dep.method || ''),
-          tokenSymbol: token.symbol,
-          tokenAddress: token.address,
-        });
+        try {
+          await creditDepositFromChain({
+            depositId: doc.id,
+            txHash: found.txHash,
+            from: found.from,
+            amountMinor: Number(dep.amountMinor),
+            userId: dep.userId,
+            walletId: dep.walletId,
+            method: String(dep.method || ''),
+            tokenSymbol: token.symbol,
+            tokenAddress: token.address,
+          });
+        } catch (creditErr) {
+          if (creditErr instanceof AppError && creditErr.code === 'already-exists') {
+            continue;
+          }
+          throw creditErr;
+        }
         log.info('deposit_auto_credited', {
           depositId: doc.id,
           txHash: found.txHash,

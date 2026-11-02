@@ -262,7 +262,9 @@ export function DepositsPage() {
         if (res.status === 'completed' || res.status === 'approved') {
           setPayStatus('completed')
           saveActiveDeposit({ ...active, status: 'completed' })
-          toast.success('Payment verified — Fund Wallet credited')
+          if (!opts?.silent) {
+            toast.success('Payment verified — Fund Wallet credited')
+          }
           await Promise.all([
             queryClient.invalidateQueries({ queryKey: ['wallets'] }),
             queryClient.invalidateQueries({ queryKey: ['ledger'] }),
@@ -316,13 +318,49 @@ export function DepositsPage() {
       const st = String(d.status)
       return st === 'awaiting_payment' || st === 'pending'
     })
-    if (!open) return
-    // History rows are slim — only resume if we still have session payload.
+    if (!open?.depositAddress) return
     const saved = loadActiveDeposit()
     if (saved?.depositId === open.id && saved.depositAddress) {
       setActive(saved)
       setPayStatus(saved.status || 'awaiting_payment')
+      return
     }
+    // Reconstruct pay UI from Firestore history so refresh doesn't lose the payment screen.
+    const symbol =
+      open.method === 'vfxt_bep20' || open.tokenSymbol === 'VFXT' ? 'VFXT' : 'USDT'
+    let amountDisplay =
+      symbol === 'VFXT' ? String(open.amountMinor) : (open.amountMinor / 100).toFixed(2)
+    if (open.expectedWei) {
+      try {
+        const wei = BigInt(open.expectedWei)
+        const whole = wei / 10n ** 18n
+        const frac = (wei % 10n ** 18n).toString().padStart(18, '0').replace(/0+$/, '')
+        amountDisplay = frac ? `${whole.toString()}.${frac}` : whole.toString()
+      } catch {
+        /* keep fallback */
+      }
+    }
+    const reconstructed: CreateDepositResult = {
+      depositId: open.id,
+      status: String(open.status),
+      method: open.method || (symbol === 'VFXT' ? 'vfxt_bep20' : 'usdt_bep20'),
+      depositAddress: open.depositAddress,
+      amountUsdt: amountDisplay,
+      amountMinor: open.amountMinor,
+      network: 'BSC (BEP-20)',
+      token: symbol,
+      tokenAddress: open.tokenAddress ?? null,
+      qrPayload:
+        open.qrPayload ??
+        (open.tokenAddress && open.expectedWei
+          ? `ethereum:${open.tokenAddress}@56/transfer?address=${open.depositAddress}&uint256=${open.expectedWei}`
+          : null),
+      chainId: open.chainId ?? 56,
+      expectedWei: open.expectedWei ?? null,
+    }
+    setActive(reconstructed)
+    setPayStatus(String(open.status) || 'awaiting_payment')
+    saveActiveDeposit(reconstructed)
   }, [history.data, active, payStatus, dismissActive])
 
   useEffect(() => {
