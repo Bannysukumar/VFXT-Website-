@@ -148,7 +148,16 @@ export function WalletRegisterPage() {
         </div>
       </div>
 
-      <form className="space-y-5" onSubmit={onSubmit} noValidate>
+      <form
+        className="space-y-5"
+        method="post"
+        action="#"
+        onSubmit={(event) => {
+          event.preventDefault()
+          void onSubmit(event)
+        }}
+        noValidate
+      >
         <div className="space-y-2">
           <Label htmlFor="referralCode">
             Referral code <span className="text-danger">*</span>

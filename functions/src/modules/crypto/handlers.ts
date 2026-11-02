@@ -18,12 +18,41 @@ import {
   BSC_CHAIN_ID,
   DEPOSIT_TTL_MS,
   USDT_BEP20_ADDRESS,
+  VFXT_BEP20_ADDRESS,
+  VFXT_TOKEN_DECIMALS,
 } from '../../config/bsc';
 import {
   findIncomingUsdtTransfer,
   getHotWalletUsdtBalance,
   verifyUsdtDepositTx,
 } from './bsc-usdt';
+
+function depositTokenMeta(dep: {
+  method?: string | null;
+  tokenSymbol?: string | null;
+  tokenAddress?: string | null;
+}): { symbol: 'USDT' | 'VFXT'; address: string; decimals: number } {
+  if (
+    dep.method === 'vfxt_bep20' ||
+    dep.tokenSymbol === 'VFXT' ||
+    (typeof dep.tokenAddress === 'string' &&
+      dep.tokenAddress.toLowerCase() === VFXT_BEP20_ADDRESS.toLowerCase())
+  ) {
+    return {
+      symbol: 'VFXT',
+      address: VFXT_BEP20_ADDRESS,
+      decimals: VFXT_TOKEN_DECIMALS,
+    };
+  }
+  return {
+    symbol: 'USDT',
+    address:
+      typeof dep.tokenAddress === 'string' && dep.tokenAddress.startsWith('0x')
+        ? dep.tokenAddress
+        : USDT_BEP20_ADDRESS,
+    decimals: 18,
+  };
+}
 import {
   addHotWalletToPool,
   getHotWalletByAddress,
@@ -179,18 +208,37 @@ async function creditDepositFromChain(params: {
   amountMinor: number;
   userId: string;
   walletId: string;
+  method?: string;
+  tokenSymbol?: string | null;
+  tokenAddress?: string | null;
 }): Promise<void> {
   const db = getDb();
   const txRef = db.collection(Collections.usedCryptoTx).doc(params.txHash.toLowerCase());
   const depositRef = db.collection(Collections.deposits).doc(params.depositId);
+  const token = depositTokenMeta(params);
 
   const { getTokenEconomicsSettings } = await import('../platform/store');
-  const { usdCentsToVfxtTokens } = await import('../../config/plan');
+  const { usdCentsToVfxtTokens, vfxtTokensToUsdCents } = await import('../../config/plan');
   const { walletDocId } = await import('../wallets/types');
   const { ensureUserWallets } = await import('../wallets/handlers');
   await ensureUserWallets(db, params.userId);
   const tokenFx = await getTokenEconomicsSettings();
-  const vfxtTokens = usdCentsToVfxtTokens(params.amountMinor, tokenFx.tokensPerUsd);
+  const method =
+    params.method === 'vfxt_bep20' || token.symbol === 'VFXT'
+      ? 'vfxt_bep20'
+      : 'usdt_bep20';
+  // USDT path: amountMinor = USD cents → convert to VFXT.
+  // VFXT path: amountMinor = whole tokens sent on-chain → recover 1:1.
+  const vfxtTokens =
+    method === 'vfxt_bep20'
+      ? params.amountMinor
+      : usdCentsToVfxtTokens(params.amountMinor, tokenFx.tokensPerUsd);
+  const fundCents =
+    method === 'vfxt_bep20'
+      ? vfxtTokensToUsdCents(params.amountMinor, tokenFx.tokensPerUsd)
+      : params.amountMinor;
+  const fundWalletId = walletDocId(params.userId, 'fund');
+  const vfxtWalletId = walletDocId(params.userId, 'vfxt');
 
   await db.runTransaction(async (tx) => {
     const used = await tx.get(txRef);
@@ -212,51 +260,62 @@ async function creditDepositFromChain(params: {
     });
 
     // Fund wallet (USD) — used for staking packages.
-    await creditAvailable(tx, db, {
-      userId: params.userId,
-      walletId: params.walletId,
-      type: 'deposit_credit',
-      amountMinor: params.amountMinor,
-      currency: 'USD',
-      referenceType: 'deposit',
-      referenceId: params.depositId,
-      description: `USDT BEP-20 deposit ${params.txHash.slice(0, 10)}…`,
-      createdBy: 'system:crypto-monitor',
-      metadata: {
-        txHash: params.txHash,
-        from: params.from,
-        chainId: BSC_CHAIN_ID,
-        token: USDT_BEP20_ADDRESS,
-        vfxtTokens,
-        tokensPerUsd: tokenFx.tokensPerUsd,
-      },
-    });
+    if (fundCents > 0) {
+      await creditAvailable(tx, db, {
+        userId: params.userId,
+        walletId: fundWalletId,
+        type: 'deposit_credit',
+        amountMinor: fundCents,
+        currency: 'USD',
+        referenceType: 'deposit',
+        referenceId: params.depositId,
+        description: `${token.symbol} BEP-20 deposit ${params.txHash.slice(0, 10)}…`,
+        createdBy: 'system:crypto-monitor',
+        metadata: {
+          txHash: params.txHash,
+          from: params.from,
+          chainId: BSC_CHAIN_ID,
+          token: token.address,
+          tokenSymbol: token.symbol,
+          vfxtTokens,
+          tokensPerUsd: tokenFx.tokensPerUsd,
+          paidTokens: method === 'vfxt_bep20' ? params.amountMinor : null,
+        },
+      });
+    }
 
-    // VFXT wallet — tokens at admin price for token balance / staking use.
+    // VFXT wallet — 1:1 for VFXT deposits; converted from USDT otherwise.
     if (vfxtTokens > 0) {
       await creditAvailable(tx, db, {
         userId: params.userId,
-        walletId: walletDocId(params.userId, 'vfxt'),
+        walletId: vfxtWalletId,
         type: 'deposit_credit',
         amountMinor: vfxtTokens,
         currency: 'VFXT',
         referenceType: 'deposit',
         referenceId: params.depositId,
-        description: `VFXT credited from USDT deposit (${tokenFx.tokensPerUsd}/$1)`,
+        description:
+          method === 'vfxt_bep20'
+            ? `VFXT BEP-20 deposit — ${vfxtTokens.toLocaleString()} tokens recovered`
+            : `VFXT credited from USDT deposit (${tokenFx.tokensPerUsd}/$1)`,
         createdBy: 'system:crypto-monitor',
         metadata: {
           txHash: params.txHash,
-          amountUsdCents: params.amountMinor,
+          amountUsdCents: fundCents,
           tokensPerUsd: tokenFx.tokensPerUsd,
+          paidWith: token.symbol,
         },
       });
     }
 
     tx.update(depositRef, {
       status: 'completed',
-      method: 'usdt_bep20',
+      method,
       txHash: params.txHash,
+      tokenSymbol: token.symbol,
+      tokenAddress: token.address,
       vfxtTokensCredited: vfxtTokens,
+      fundCentsCredited: fundCents,
       tokensPerUsd: tokenFx.tokensPerUsd,
       reviewedBy: 'system:crypto-monitor',
       reviewedAt: FieldValue.serverTimestamp(),
@@ -269,13 +328,16 @@ async function creditDepositFromChain(params: {
     type: 'deposit_completed',
     title: 'Deposit confirmed',
     body:
-      vfxtTokens > 0
-        ? `Payment verified. ${(params.amountMinor / 100).toFixed(2)} USDT → ${vfxtTokens.toLocaleString()} VFXT credited (ready to stake).`
-        : 'Your USDT (BEP-20) payment was verified and credited.',
+      method === 'vfxt_bep20'
+        ? `Payment verified. ${vfxtTokens.toLocaleString()} VFXT recovered to your token wallet.`
+        : vfxtTokens > 0
+          ? `Payment verified. ${(params.amountMinor / 100).toFixed(2)} USDT → ${vfxtTokens.toLocaleString()} VFXT credited.`
+          : `Your ${token.symbol} (BEP-20) payment was verified and credited.`,
     data: {
       depositId: params.depositId,
       txHash: params.txHash,
       vfxtTokens,
+      token: token.symbol,
     },
   });
 }
@@ -338,6 +400,8 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       return used.exists;
     };
 
+    const token = depositTokenMeta(dep);
+
     let found;
     try {
       if (clientTxHash) {
@@ -347,6 +411,9 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
           notBeforeMs: createdAt - 60_000,
           isTxUsed,
           toAddress: receiveAddress,
+          tokenAddress: token.address,
+          tokenSymbol: token.symbol,
+          tokenDecimals: token.decimals,
         });
       } else {
         found = await findIncomingUsdtTransfer({
@@ -354,6 +421,7 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
           notBeforeMs: createdAt - 60_000,
           isTxUsed,
           toAddress: receiveAddress,
+          tokenAddress: token.address,
         });
       }
     } catch (scanErr) {
@@ -389,6 +457,9 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       amountMinor: Number(dep.amountMinor),
       userId: dep.userId,
       walletId: dep.walletId,
+      method: String(dep.method || ''),
+      tokenSymbol: token.symbol,
+      tokenAddress: token.address,
     });
 
     return {
@@ -412,12 +483,21 @@ export const monitorCryptoDeposits = onSchedule(
     const db = getDb();
     let pending;
     try {
-      pending = await db
-        .collection(Collections.deposits)
-        .where('method', '==', 'usdt_bep20')
-        .where('status', 'in', ['pending', 'awaiting_payment'])
-        .limit(40)
-        .get();
+      const [usdtSnap, vfxtSnap] = await Promise.all([
+        db
+          .collection(Collections.deposits)
+          .where('method', '==', 'usdt_bep20')
+          .where('status', 'in', ['pending', 'awaiting_payment'])
+          .limit(40)
+          .get(),
+        db
+          .collection(Collections.deposits)
+          .where('method', '==', 'vfxt_bep20')
+          .where('status', 'in', ['pending', 'awaiting_payment'])
+          .limit(40)
+          .get(),
+      ]);
+      pending = { docs: [...usdtSnap.docs, ...vfxtSnap.docs] };
     } catch (err) {
       log.warn('monitor_deposits_query_failed', {
         error: err instanceof Error ? err.message : String(err),
@@ -444,10 +524,12 @@ export const monitorCryptoDeposits = onSchedule(
       }
       try {
         const expectedWei = resolveDepositExpectedWei(dep);
+        const token = depositTokenMeta(dep);
         const found = await findIncomingUsdtTransfer({
           expectedWei,
           notBeforeMs: createdAt - 60_000,
           toAddress: (dep.depositAddress as string) || undefined,
+          tokenAddress: token.address,
           isTxUsed: async (txHash) => {
             const used = await db
               .collection(Collections.usedCryptoTx)
@@ -464,11 +546,15 @@ export const monitorCryptoDeposits = onSchedule(
           amountMinor: Number(dep.amountMinor),
           userId: dep.userId,
           walletId: dep.walletId,
+          method: String(dep.method || ''),
+          tokenSymbol: token.symbol,
+          tokenAddress: token.address,
         });
         log.info('deposit_auto_credited', {
           depositId: doc.id,
           txHash: found.txHash,
           expectedWei: expectedWei.toString(),
+          token: token.symbol,
         });
       } catch (err) {
         log.warn('deposit_monitor_item_failed', {

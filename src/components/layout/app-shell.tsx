@@ -615,7 +615,7 @@ export function AppShell({ variant = 'user' }: { variant?: 'user' | 'admin' }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-          className="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8"
+          className="mx-auto w-full min-w-0 max-w-7xl flex-1 overflow-x-hidden px-4 py-8 sm:px-6 lg:px-8"
         >
           <Outlet />
         </motion.main>

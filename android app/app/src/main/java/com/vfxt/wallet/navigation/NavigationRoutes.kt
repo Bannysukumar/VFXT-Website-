@@ -29,7 +29,12 @@ sealed interface RootRoute {
     @Serializable data object WalletManagement : RootRoute
     @Serializable data object SecuritySettings : RootRoute
     @Serializable data object ChangePin : RootRoute
-    @Serializable data class Send(val tokenKey: String? = null, val recipient: String? = null) : RootRoute
+    @Serializable data class Send(
+        val tokenKey: String? = null,
+        val recipient: String? = null,
+        /** Human token amount from a website / deep-link payment request. */
+        val amount: String? = null,
+    ) : RootRoute
     @Serializable data object Receive : RootRoute
     @Serializable data class Swap(val fromTokenKey: String? = null) : RootRoute
     @Serializable data object Activity : RootRoute

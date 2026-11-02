@@ -81,9 +81,50 @@ export async function registerWithEmail(input: {
   return credential.user
 }
 
+function mapAuthError(error: unknown): Error {
+  if (!(error instanceof Error)) return new Error('Sign-in failed')
+  const code = 'code' in error && typeof (error as { code?: unknown }).code === 'string'
+    ? (error as { code: string }).code
+    : ''
+  if (code === 'auth/network-request-failed') {
+    return new Error(
+      'Could not reach Firebase Auth. Check your connection, disable ad-block/VPN for this site, then try again.',
+    )
+  }
+  if (code === 'auth/unauthorized-domain') {
+    return new Error(
+      'This domain is not authorized for Firebase Auth. Add it under Authentication → Settings → Authorized domains.',
+    )
+  }
+  if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+    return new Error('Invalid email or password')
+  }
+  return error
+}
+
+async function withAuthRetry<T>(fn: () => Promise<T>, attempts = 2): Promise<T> {
+  let last: unknown
+  for (let i = 0; i < attempts; i += 1) {
+    try {
+      return await fn()
+    } catch (error) {
+      last = error
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String((error as { code: unknown }).code)
+          : ''
+      if (code !== 'auth/network-request-failed' || i === attempts - 1) {
+        throw mapAuthError(error)
+      }
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    }
+  }
+  throw mapAuthError(last)
+}
+
 export async function loginWithEmail(email: string, password: string): Promise<User> {
   const auth = requireAuth()
-  const credential = await signInWithEmailAndPassword(auth, email, password)
+  const credential = await withAuthRetry(() => signInWithEmailAndPassword(auth, email, password))
   return credential.user
 }
 

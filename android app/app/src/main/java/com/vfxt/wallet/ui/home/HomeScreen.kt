@@ -521,13 +521,20 @@ private fun BalanceHero(overview: WalletOverview, network: EvmNetwork?, hidden: 
 
 // --- Previews (sample data is confined to previews) ---------------------------------------
 
-private val previewHoldings = TokenRegistry.defaultTokens(TokenRegistry.defaultNetwork).mapIndexed { i, token ->
-    Holding(
-        token = token,
-        rawBalance = BigInteger.TEN.pow(token.decimals).multiply(BigInteger.valueOf(listOf(3L, 250L, 12000L)[i])),
-        fiatValue = BigDecimal(listOf("1830.12", "250.00", "504.00")[i]),
-        change24hPercent = BigDecimal(listOf("2.41", "0.01", "-1.30")[i]),
-    )
+// A function, not a top-level val: a val would run when this file's class loads on real devices
+// (crashing the app if the token list ever outgrows the sample values).
+private fun previewHoldings(): List<Holding> {
+    val amounts = listOf(3L, 250L, 12000L)
+    val fiat = listOf("1830.12", "250.00", "504.00")
+    val change = listOf("2.41", "0.01", "-1.30")
+    return TokenRegistry.defaultTokens(TokenRegistry.defaultNetwork).mapIndexed { i, token ->
+        Holding(
+            token = token,
+            rawBalance = BigInteger.TEN.pow(token.decimals).multiply(BigInteger.valueOf(amounts[i % amounts.size])),
+            fiatValue = BigDecimal(fiat[i % fiat.size]),
+            change24hPercent = BigDecimal(change[i % change.size]),
+        )
+    }
 }
 
 @Preview(name = "Home – no wallet")
@@ -538,7 +545,7 @@ private fun HomeNoWalletPreview() {
             HomeContent(
                 state = HomeUiState(
                     isLoading = false,
-                    overview = WalletOverview(null, previewHoldings.map { it.copy(rawBalance = null, fiatValue = null, change24hPercent = null) }, emptyList(), null, null),
+                    overview = WalletOverview(null, previewHoldings().map { it.copy(rawBalance = null, fiatValue = null, change24hPercent = null) }, emptyList(), null, null),
                 ),
                 onRefresh = {}, onToggleBalance = {}, onCreateWallet = {}, onImportWallet = {}, onNotify = {},
             )
@@ -556,7 +563,7 @@ private fun HomeSamplePreview() {
                     isLoading = false,
                     overview = WalletOverview(
                         account = WalletAccount("1", "Main wallet", "0x0000000000000000000000000000000000000001"),
-                        holdings = previewHoldings,
+                        holdings = previewHoldings(),
                         activity = listOf(
                             ActivityItem("a", ActivityType.Received, "USDT", BigDecimal("120"), ActivityStatus.Confirmed, 1_761_900_000_000, null),
                             ActivityItem("b", ActivityType.MiningReward, "VFXT", BigDecimal("42.5"), ActivityStatus.Pending, 1_761_800_000_000, null),

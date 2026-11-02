@@ -11,7 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PageHeader } from '@/components/shared/page-header'
-import { LogoMark } from '@/components/shared/logo'
+import { LogoTile } from '@/components/shared/logo'
 import { Reveal } from '@/components/motion/reveal'
 import { CtaBand, MarketingHero, SectionHeading, StatsBand } from '@/features/marketing/marketing-hero'
 import { PhoneShowcaseBand, WalletPhone } from '@/features/marketing/phone-mockup'
@@ -55,7 +55,7 @@ function TokenCoin() {
         style={{ transformStyle: 'preserve-3d' }}
       >
         <div className="grid size-[85%] place-items-center rounded-full border-2 border-white/30 bg-gradient-to-br from-accent to-accent-strong">
-          <LogoMark className="size-16 sm:size-20" />
+          <LogoTile className="size-16 sm:size-20 rounded-[22%]" />
         </div>
       </motion.div>
     </div>
@@ -75,7 +75,7 @@ function TokenDetails() {
         <div className="relative overflow-hidden bg-brand p-6 text-white">
           <div className="relative flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <LogoMark className="size-11 ring-1 ring-white/15 rounded-lg" />
+              <LogoTile className="size-11 rounded-lg" />
               <div>
                 <p className="font-display text-lg font-bold">
                   {VFXT_TOKEN.name} / {VFXT_TOKEN.symbol}

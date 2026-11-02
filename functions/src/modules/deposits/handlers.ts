@@ -54,15 +54,33 @@ async function handleCreateDepositRequest(
 
   const { amount, amountMinor: amountMinorInput, method, reference, note } =
     parsed.data;
-  // Deposits always credit the fund wallet (USD cents).
-  const currency = 'USD' as const;
+  const wantVfxt = method === 'vfxt_bep20';
+  // USDT deposits: amountMinor = USD cents. VFXT deposits: amountMinor = whole tokens.
+  const currency = wantVfxt ? ('VFXT' as const) : ('USD' as const);
   const amountMinor =
-    amountMinorInput ?? parseAmountToMinor(amount ?? '0', 2);
+    amountMinorInput ??
+    (wantVfxt
+      ? Math.floor(Number(amount ?? '0'))
+      : parseAmountToMinor(amount ?? '0', 2));
   assertPositiveMinor(amountMinor);
 
   const { getDepositSettings } = await import('../platform/store');
+  const { getTokenEconomicsSettings } = await import('../platform/store');
   const depositSettings = await getDepositSettings();
-  if (amountMinor < depositSettings.minDepositUsdCents) {
+  const tokenFx = await getTokenEconomicsSettings();
+  if (wantVfxt) {
+    const { usdCentsToVfxtTokens } = await import('../../config/plan');
+    const minTokens = Math.max(
+      1,
+      usdCentsToVfxtTokens(depositSettings.minDepositUsdCents, tokenFx.tokensPerUsd),
+    );
+    if (amountMinor < minTokens) {
+      throw new AppError(
+        'invalid-argument',
+        `Minimum VFXT deposit is ${minTokens.toLocaleString()} tokens`,
+      );
+    }
+  } else if (amountMinor < depositSettings.minDepositUsdCents) {
     throw new AppError(
       'invalid-argument',
       `Minimum deposit is $${(depositSettings.minDepositUsdCents / 100).toFixed(2)}`,
@@ -71,22 +89,30 @@ async function handleCreateDepositRequest(
 
   const db = getDb();
   await ensureUserWallets(db, ctx.uid);
-  const walletId = walletDocId(ctx.uid, 'fund');
+  // Primary credit target: fund (USD) for USDT; VFXT wallet for token deposits.
+  const walletId = walletDocId(ctx.uid, wantVfxt ? 'vfxt' : 'fund');
   const walletSnap = await db.collection(Collections.wallets).doc(walletId).get();
   if (!walletSnap.exists) {
-    throw new AppError('not-found', 'Fund wallet not found');
+    throw new AppError('not-found', wantVfxt ? 'VFXT wallet not found' : 'Fund wallet not found');
   }
 
   const depositId = uuidv4();
-  const useCrypto = method === 'usdt_bep20' || method === 'manual' || !method;
+  const useCrypto =
+    method === 'usdt_bep20' ||
+    method === 'vfxt_bep20' ||
+    method === 'manual' ||
+    !method;
 
   let depositAddress: string | null = null;
   let expectedWei: string | null = null;
   let chainId: number | null = null;
   let status: DepositRequest['status'] = 'pending';
   let resolvedMethod = method || 'manual';
+  let tokenSymbol: string | null = null;
+  let tokenAddress: string | null = null;
+  let tokensPerUsdUsed: number | null = wantVfxt ? tokenFx.tokensPerUsd : null;
 
-  let amountUsdt = (amountMinor / 100).toFixed(2);
+  let amountUsdt = wantVfxt ? String(amountMinor) : (amountMinor / 100).toFixed(2);
   let paymentTag: number | null = null;
   let qrPayload: string | null = null;
 
@@ -94,18 +120,25 @@ async function handleCreateDepositRequest(
     try {
       const { pickDepositHotWallet } = await import('../crypto/hot-wallet');
       const { allocateUniqueDepositWei } = await import('../crypto/unique-amount');
-      const { BSC_CHAIN_ID, USDT_BEP20_ADDRESS } = await import('../../config/bsc');
+      const {
+        BSC_CHAIN_ID,
+        USDT_BEP20_ADDRESS,
+        VFXT_BEP20_ADDRESS,
+      } = await import('../../config/bsc');
       const hot = await pickDepositHotWallet();
-      const unique = await allocateUniqueDepositWei(db, amountMinor);
+      const asset = wantVfxt ? 'VFXT' : 'USDT';
+      const unique = await allocateUniqueDepositWei(db, amountMinor, { asset });
       depositAddress = hot.address;
       expectedWei = unique.expectedWei;
-      amountUsdt = unique.amountUsdt;
+      amountUsdt = unique.amountDisplay;
       paymentTag = unique.paymentTag;
       chainId = BSC_CHAIN_ID;
       status = 'awaiting_payment';
-      resolvedMethod = 'usdt_bep20';
+      resolvedMethod = wantVfxt ? 'vfxt_bep20' : 'usdt_bep20';
+      tokenSymbol = asset;
+      tokenAddress = wantVfxt ? VFXT_BEP20_ADDRESS : USDT_BEP20_ADDRESS;
       // EIP-681 style QR so wallets can prefill the exact unique amount.
-      qrPayload = `ethereum:${USDT_BEP20_ADDRESS}@${BSC_CHAIN_ID}/transfer?address=${depositAddress}&uint256=${expectedWei}`;
+      qrPayload = `ethereum:${tokenAddress}@${BSC_CHAIN_ID}/transfer?address=${depositAddress}&uint256=${expectedWei}`;
     } catch (err) {
       if (err instanceof AppError && err.code === 'resource-exhausted') {
         throw err;
@@ -134,6 +167,9 @@ async function handleCreateDepositRequest(
     paymentTag,
     txHash: null,
     chainId,
+    tokenSymbol,
+    tokenAddress,
+    tokensPerUsd: tokensPerUsdUsed,
     expiresAt: null,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -148,6 +184,7 @@ async function handleCreateDepositRequest(
     method: resolvedMethod,
     paymentTag,
     expectedWei,
+    tokenSymbol,
   });
 
   return {
@@ -158,10 +195,8 @@ async function handleCreateDepositRequest(
     amountUsdt,
     amountMinor,
     network: depositAddress ? 'BSC (BEP-20)' : null,
-    token: depositAddress ? 'USDT' : null,
-    tokenAddress: depositAddress
-      ? '0x55d398326f99059fF775485246999027B3197955'
-      : null,
+    token: tokenSymbol,
+    tokenAddress,
     qrPayload,
     chainId,
     expectedWei,

@@ -14,7 +14,7 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react'
-import { LogoMark } from '@/components/shared/logo'
+import { LogoTile } from '@/components/shared/logo'
 import { cn } from '@/lib/utils'
 
 const ease = [0.22, 1, 0.36, 1] as const
@@ -111,7 +111,7 @@ function HomeScreen() {
       <StatusBar />
       <div className="flex items-center justify-between px-4 pt-2">
         <div className="flex items-center gap-2">
-          <LogoMark className="size-7 rounded-lg" />
+          <LogoTile className="size-7 rounded-lg" />
           <div>
             <p className="text-[9px] text-white/45">Main wallet</p>
             <p className="text-[11px] font-semibold">0x7a…3f91</p>

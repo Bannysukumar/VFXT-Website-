@@ -122,13 +122,18 @@ export interface DepositRequest {
   reviewedBy: string | null;
   reviewedAt: ServerTimestamp | null;
   rejectionReason: string | null;
-  /** On-chain payment fields (USDT BEP-20). */
+  /** On-chain payment fields (USDT / VFXT BEP-20). */
   depositAddress?: string | null;
   expectedWei?: string | null;
   /** Unique dust tag so same-dollar deposits don't collide on one hot wallet. */
   paymentTag?: number | null;
   txHash?: string | null;
   chainId?: number | null;
+  /** On-chain asset for crypto deposits. */
+  tokenSymbol?: string | null;
+  tokenAddress?: string | null;
+  /** Snapshot of VFXT/$ used when creating a VFXT deposit. */
+  tokensPerUsd?: number | null;
   expiresAt?: ServerTimestamp | null;
   createdAt: ServerTimestamp;
   updatedAt: ServerTimestamp;

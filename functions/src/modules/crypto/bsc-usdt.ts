@@ -322,10 +322,18 @@ export async function verifyUsdtDepositTx(params: {
   isTxUsed: (txHash: string) => Promise<boolean>;
   /** Deposit-assigned receive address (required for multi-wallet pools). */
   toAddress?: string;
+  /** ERC-20 contract to verify (defaults to BSC USDT). */
+  tokenAddress?: string;
+  /** Display symbol for error messages. */
+  tokenSymbol?: string;
+  tokenDecimals?: number;
 }): Promise<DetectedDeposit | null> {
   const hot = await getHotWallet();
   const { getHotWalletByAddress } = await import('./hot-wallet');
   const receiveAddress = getAddress(params.toAddress || hot.address);
+  const tokenAddress = getAddress(params.tokenAddress || USDT_BEP20_ADDRESS);
+  const tokenSymbol = params.tokenSymbol || 'USDT';
+  const tokenDecimals = params.tokenDecimals ?? USDT_DECIMALS;
   const bound = await getHotWalletByAddress(receiveAddress);
   const rpcUrl = bound?.rpcUrl || hot.rpcUrl;
   if (await params.isTxUsed(params.txHash)) return null;
@@ -348,7 +356,7 @@ export async function verifyUsdtDepositTx(params: {
     const transferTopic = id('Transfer(address,address,uint256)');
     const toTopic = zeroPadValue(receiveAddress, 32);
     const logs = await provider.getLogs({
-      address: USDT_BEP20_ADDRESS,
+      address: tokenAddress,
       fromBlock: receipt.blockNumber,
       toBlock: receipt.blockNumber,
       topics: [transferTopic, null, toTopic],
@@ -358,7 +366,7 @@ export async function verifyUsdtDepositTx(params: {
     if (!match) {
       throw new AppError(
         'failed-precondition',
-        'Tx has no USDT transfer to the deposit address',
+        `Tx has no ${tokenSymbol} transfer to the deposit address`,
       );
     }
 
@@ -366,7 +374,7 @@ export async function verifyUsdtDepositTx(params: {
     if (amountWei !== params.expectedWei) {
       throw new AppError(
         'failed-precondition',
-        `Amount mismatch: got ${formatUnits(amountWei, USDT_DECIMALS)} USDT`,
+        `Amount mismatch: got ${formatUnits(amountWei, tokenDecimals)} ${tokenSymbol}`,
       );
     }
 
@@ -397,10 +405,13 @@ export async function findIncomingUsdtTransfer(params: {
   isTxUsed: (txHash: string) => Promise<boolean>;
   /** Deposit-assigned receive address (required for multi-wallet pools). */
   toAddress?: string;
+  /** ERC-20 contract to scan (defaults to BSC USDT). */
+  tokenAddress?: string;
 }): Promise<DetectedDeposit | null> {
   const hot = await getHotWallet();
   const { getHotWalletByAddress } = await import('./hot-wallet');
   const receiveAddress = getAddress(params.toAddress || hot.address);
+  const tokenAddress = getAddress(params.tokenAddress || USDT_BEP20_ADDRESS);
   const bound = await getHotWalletByAddress(receiveAddress);
   const rpcUrl = bound?.rpcUrl || hot.rpcUrl;
 
@@ -412,7 +423,7 @@ export async function findIncomingUsdtTransfer(params: {
     const toTopic = zeroPadValue(receiveAddress, 32);
 
     const logs = await getLogsChunked(provider, {
-      address: USDT_BEP20_ADDRESS,
+      address: tokenAddress,
       fromBlock,
       toBlock: latest,
       topics: [transferTopic, null, toTopic],

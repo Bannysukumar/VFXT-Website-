@@ -91,6 +91,12 @@ export function usdCentsToVfxtTokens(cents: number, tokensPerUsd = DEFAULT_VFXT_
   return Math.floor((cents * tokensPerUsd) / 100)
 }
 
+/** Whole VFXT tokens → USD cents (truncates toward zero). */
+export function vfxtTokensToUsdCents(tokens: number, tokensPerUsd = DEFAULT_VFXT_PER_USD): number {
+  if (!Number.isFinite(tokens) || tokens < 0 || tokensPerUsd <= 0) return 0
+  return Math.floor((tokens * 100) / tokensPerUsd)
+}
+
 export function splitWithdrawalCommission(
   amountMinor: number,
   commissionBps: number,

@@ -1,8 +1,11 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app'
 import {
+  browserLocalPersistence,
   browserSessionPersistence,
   connectAuthEmulator,
   getAuth,
+  indexedDBLocalPersistence,
+  initializeAuth,
   setPersistence,
   type Auth,
 } from 'firebase/auth'
@@ -28,6 +31,28 @@ let storage: FirebaseStorage | null = null
 let appCheck: AppCheck | null = null
 let emulatorsConnected = false
 
+/**
+ * Prefer the page origin as authDomain when it matches the configured host.
+ * With an aaPanel/nginx reverse-proxy for `/__/auth/*`, this keeps Auth
+ * same-origin and avoids third-party storage blocks on mobile Chrome.
+ */
+function resolveAuthDomain(): string {
+  const configured = env.VITE_FIREBASE_AUTH_DOMAIN || ''
+  if (typeof window === 'undefined') return configured
+  const host = window.location.hostname
+  if (!host || host === 'localhost' || host === '127.0.0.1') return configured
+  if (
+    configured === host ||
+    configured.endsWith('.firebaseapp.com') ||
+    configured.endsWith('.web.app')
+  ) {
+    // If env already points at this custom host, use it; otherwise keep
+    // firebaseapp.com until `/__/auth` is proxied on the custom domain.
+    if (configured === host) return host
+  }
+  return configured
+}
+
 export function getFirebaseApp(): FirebaseApp {
   if (!hasFirebaseConfig()) {
     throw new Error(
@@ -40,7 +65,7 @@ export function getFirebaseApp(): FirebaseApp {
       getApps()[0] ??
       initializeApp({
         apiKey: env.VITE_FIREBASE_API_KEY,
-        authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+        authDomain: resolveAuthDomain(),
         projectId: env.VITE_FIREBASE_PROJECT_ID,
         storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
         messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
@@ -54,7 +79,16 @@ export function getFirebaseApp(): FirebaseApp {
 
 export function getFirebaseAuth(): Auth {
   if (!auth) {
-    auth = getAuth(getFirebaseApp())
+    const firebaseApp = getFirebaseApp()
+    try {
+      // indexedDB first avoids iframe/session races that surface as
+      // auth/network-request-failed on some mobile Chrome builds.
+      auth = initializeAuth(firebaseApp, {
+        persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      })
+    } catch {
+      auth = getAuth(firebaseApp)
+    }
   }
   return auth
 }

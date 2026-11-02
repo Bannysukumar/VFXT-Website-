@@ -58,8 +58,14 @@ class SendViewModel @Inject constructor(
     private val rpc: EvmRpc,
 ) : ViewModel() {
 
-    private val initialTokenKey: String? = savedStateHandle["tokenKey"]
-    private val _state = MutableStateFlow(SendUiState(recipient = savedStateHandle.get<String>("recipient").orEmpty()))
+    private val initialTokenKey: String? = savedStateHandle["tokenKey"]?.lowercase()
+    private val initialAmount: String = savedStateHandle.get<String>("amount").orEmpty()
+    private val _state = MutableStateFlow(
+        SendUiState(
+            recipient = savedStateHandle.get<String>("recipient").orEmpty(),
+            amountInput = initialAmount,
+        ),
+    )
     val state: StateFlow<SendUiState> = _state.asStateFlow()
 
     init {
@@ -69,11 +75,16 @@ class SendViewModel @Inject constructor(
                     val sendable = tokens.filter { it.isAvailable }
                     _state.update { s ->
                         val keep = s.token?.takeIf { cur -> sendable.any { it.key == cur.key && it.networkId == network.id } }
+                        val fromDeepLink = initialTokenKey
+                            ?.let { key -> sendable.firstOrNull { it.key.equals(key, ignoreCase = true) } }
                         s.copy(
                             network = network,
                             account = account,
                             tokens = sendable,
-                            token = keep ?: sendable.firstOrNull { it.key == initialTokenKey } ?: sendable.firstOrNull(),
+                            token = keep ?: fromDeepLink ?: sendable.firstOrNull { it.key == initialTokenKey }
+                                ?: sendable.firstOrNull(),
+                            // Keep deep-link amount until the user edits or picks another token.
+                            amountInput = s.amountInput.ifBlank { initialAmount },
                         )
                     }
                     refreshBalance()

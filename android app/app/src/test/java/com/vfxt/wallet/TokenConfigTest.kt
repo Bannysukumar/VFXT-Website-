@@ -18,6 +18,12 @@ class TokenConfigTest {
     }
 
     @Test
+    fun firstLaunchDefaultsToBscMainnet() {
+        assertEquals(com.vfxt.wallet.blockchain.networks.Networks.BscMainnet, TokenRegistry.defaultNetwork)
+        assertEquals(56L, TokenRegistry.defaultNetwork.chainId)
+    }
+
+    @Test
     fun bscMainnetListsCurrentVfxtContract() {
         val vfxt = TokenRegistry.defaultTokens(com.vfxt.wallet.blockchain.networks.Networks.BscMainnet)
             .first { it.symbol == "VFXT" }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 export function ProcessSteps({
   title,
@@ -55,9 +56,16 @@ export function AmountInputPrefix() {
 
 export function SummaryRow({ label, value, strong }: { label: string; value: ReactNode; strong?: boolean }) {
   return (
-    <div className="flex items-center justify-between py-2 text-sm">
-      <span className="text-ink-muted">{label}</span>
-      <span className={strong ? 'tabular font-display text-lg font-bold' : 'tabular font-medium'}>{value}</span>
+    <div className="flex flex-col gap-1 py-2 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+      <span className="shrink-0 text-ink-muted">{label}</span>
+      <span
+        className={cn(
+          'min-w-0 max-w-full break-all [overflow-wrap:anywhere] sm:text-right',
+          strong ? 'tabular font-display text-base font-bold sm:text-lg' : 'tabular font-medium',
+        )}
+      >
+        {value}
+      </span>
     </div>
   )
 }

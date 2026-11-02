@@ -76,8 +76,16 @@ class MainActivity : FragmentActivity() {
 
     private fun handleDeepLink(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme.equals("wc", ignoreCase = true)) {
-            walletConnect.submitPairingUri(data.toString())
+        when {
+            data.scheme.equals("wc", ignoreCase = true) -> {
+                walletConnect.submitPairingUri(data.toString())
+            }
+            data.scheme.equals("vfxtwallet", ignoreCase = true) -> {
+                val pay = com.vfxt.wallet.navigation.PendingPaymentLink.parse(data)
+                if (pay != null) {
+                    com.vfxt.wallet.navigation.PendingPaymentLink.offer(pay)
+                }
+            }
         }
     }
 }

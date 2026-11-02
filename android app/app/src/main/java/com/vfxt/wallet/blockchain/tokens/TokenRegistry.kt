@@ -126,5 +126,6 @@ object TokenRegistry {
         return builtIns + listOfNotNull(vfxt(network))
     }
 
-    val defaultNetwork: EvmNetwork = if (BuildConfig.DEBUG) Networks.BscTestnet else Networks.BscMainnet
+    /** Network selected on first launch (and after removing the active custom network), in every build. */
+    val defaultNetwork: EvmNetwork = Networks.BscMainnet
 }

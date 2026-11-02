@@ -3,7 +3,7 @@ import type * as React from 'react'
 import { cn } from '@/lib/utils'
 
 const alertVariants = cva(
-  'relative grid w-full grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-xl border px-4 py-3.5 text-sm [&>:not(svg)]:col-start-2 [&>svg]:row-span-2 [&>svg]:mt-0.5 [&>svg]:size-4',
+  'relative grid w-full min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 overflow-hidden rounded-xl border px-4 py-3.5 text-sm [&>:not(svg)]:col-start-2 [&>svg]:row-span-2 [&>svg]:mt-0.5 [&>svg]:size-4',
   {
     variants: {
       variant: {
@@ -34,5 +34,13 @@ export function AlertDescription({
   className,
   ...props
 }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <div className={cn('text-sm leading-relaxed text-ink-muted', className)} {...props} />
+  return (
+    <div
+      className={cn(
+        'min-w-0 break-words text-sm leading-relaxed text-ink-muted [overflow-wrap:anywhere]',
+        className,
+      )}
+      {...props}
+    />
+  )
 }

@@ -2,23 +2,45 @@ import { formatUnits } from 'ethers';
 import type { Firestore } from 'firebase-admin/firestore';
 import { Collections } from '../../lib/firebase';
 import { AppError } from '../../lib/errors';
-import { USDT_DECIMALS, usdCentsToUsdtWei } from '../../config/bsc';
+import {
+  USDT_DECIMALS,
+  VFXT_TOKEN_DECIMALS,
+  usdCentsToUsdtWei,
+} from '../../config/bsc';
 
-/** Max concurrent same-dollar open deposits we can disambiguate. */
+/** Max concurrent same-amount open deposits we can disambiguate. */
 const MAX_PAYMENT_TAG = 999_999;
 
+export type DepositAsset = 'USDT' | 'VFXT';
+
 /**
- * Each open deposit gets a unique on-chain USDT wei amount:
- *   baseWei(amountMinor) + paymentTag
- * so 4 users depositing "$100" each send a slightly different exact amount
- * (e.g. 100.000000000000001234) and only their matching transfer credits them.
- * Ledger still credits the requested amountMinor (full dollars/cents).
+ * USDT: amountMinor = USD cents → USDT wei (1:1).
+ * VFXT: amountMinor = whole tokens → VFXT wei (18 decimals). Enter 100 → send ~100 VFXT.
+ */
+function baseWeiForAsset(amountMinor: number, asset: DepositAsset): bigint {
+  if (asset === 'VFXT') {
+    if (!Number.isInteger(amountMinor) || amountMinor <= 0) {
+      throw new AppError('invalid-argument', 'VFXT amount must be a positive whole token count');
+    }
+    return BigInt(amountMinor) * 10n ** BigInt(VFXT_TOKEN_DECIMALS);
+  }
+  return usdCentsToUsdtWei(amountMinor);
+}
+
+/**
+ * Each open deposit gets a unique on-chain wei amount:
+ *   baseWei(amountMinor, asset) + paymentTag
+ * so concurrent same-amount deposits don't collide on one hot wallet.
  */
 export async function allocateUniqueDepositWei(
   db: Firestore,
   amountMinor: number,
-): Promise<{ expectedWei: string; amountUsdt: string; paymentTag: number }> {
-  const base = usdCentsToUsdtWei(amountMinor);
+  options?: { asset?: DepositAsset },
+): Promise<{ expectedWei: string; amountDisplay: string; paymentTag: number }> {
+  const asset: DepositAsset = options?.asset ?? 'USDT';
+  const decimals = asset === 'VFXT' ? VFXT_TOKEN_DECIMALS : USDT_DECIMALS;
+  const base = baseWeiForAsset(amountMinor, asset);
+  const method = asset === 'VFXT' ? 'vfxt_bep20' : 'usdt_bep20';
 
   const open = await db
     .collection(Collections.deposits)
@@ -30,6 +52,9 @@ export async function allocateUniqueDepositWei(
   for (const doc of open.docs) {
     const data = doc.data();
     if (Number(data.amountMinor) !== amountMinor) continue;
+    const docMethod = String(data.method || '');
+    if (docMethod && docMethod !== method && docMethod !== 'manual') continue;
+    if (data.tokenSymbol && data.tokenSymbol !== asset) continue;
     if (!data.expectedWei) {
       usedTags.add(0);
       continue;
@@ -51,7 +76,7 @@ export async function allocateUniqueDepositWei(
     const wei = base + BigInt(tag);
     return {
       expectedWei: wei.toString(),
-      amountUsdt: formatUnits(wei, USDT_DECIMALS),
+      amountDisplay: formatUnits(wei, decimals),
       paymentTag: tag,
     };
   }
@@ -65,9 +90,13 @@ export async function allocateUniqueDepositWei(
 export function resolveDepositExpectedWei(dep: {
   expectedWei?: string | null;
   amountMinor?: number;
+  method?: string | null;
+  tokenSymbol?: string | null;
 }): bigint {
   if (dep.expectedWei) {
     return BigInt(String(dep.expectedWei));
   }
-  return usdCentsToUsdtWei(Number(dep.amountMinor));
+  const asset: DepositAsset =
+    dep.method === 'vfxt_bep20' || dep.tokenSymbol === 'VFXT' ? 'VFXT' : 'USDT';
+  return baseWeiForAsset(Number(dep.amountMinor), asset);
 }

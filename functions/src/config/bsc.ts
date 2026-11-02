@@ -5,8 +5,14 @@ export const BSC_CHAIN_ID = 56;
 /** Binance-Peg USDT (BEP-20) on BSC mainnet. */
 export const USDT_BEP20_ADDRESS = '0x55d398326f99059fF775485246999027B3197955';
 
+/** VFXT BEP-20 on BSC mainnet (verified VFXTToken). */
+export const VFXT_BEP20_ADDRESS = '0x4A08EF10e6f4aa077A74496793467d2192061969';
+
 /** USDT on BSC uses 18 decimals. */
 export const USDT_DECIMALS = 18;
+
+/** VFXT on-chain token uses 18 decimals (ledger stores whole tokens). */
+export const VFXT_TOKEN_DECIMALS = 18;
 
 /** Default public RPC for reads. */
 export const DEFAULT_BSC_RPC_URL = 'https://bsc-dataseed1.binance.org';

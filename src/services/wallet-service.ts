@@ -93,17 +93,21 @@ export interface CreateDepositResult {
   paymentTag?: number | null
 }
 
+export type DepositPayMethod = 'usdt_bep20' | 'vfxt_bep20'
+
 export async function requestDeposit(input: {
   amountMinor: number
   currency?: 'USD' | 'VFXT'
   idempotencyKey: string
   note?: string
-  method?: string
+  method?: DepositPayMethod | string
 }) {
+  const method = input.method ?? 'usdt_bep20'
+  const currency = method === 'vfxt_bep20' ? 'VFXT' : 'USD'
   return callFunction<
     {
       amountMinor: number
-      currency: 'USD'
+      currency: 'USD' | 'VFXT'
       idempotencyKey: string
       note?: string
       method: string
@@ -111,10 +115,10 @@ export async function requestDeposit(input: {
     CreateDepositResult
   >('createDepositRequest', {
     amountMinor: input.amountMinor,
-    currency: 'USD',
+    currency: input.currency ?? currency,
     idempotencyKey: input.idempotencyKey,
     note: input.note,
-    method: input.method ?? 'usdt_bep20',
+    method,
   })
 }
 

@@ -36,6 +36,7 @@
 
                 <data android:scheme="wc" />
             </intent-filter>
+            <!-- Website deposit links: vfxtwallet://send?address=&amount=&token= -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
@@ -43,6 +44,7 @@
                 <category android:name="android.intent.category.BROWSABLE" />
 
                 <data android:scheme="vfxtwallet" />
+                <data android:scheme="vfxtwallet" android:host="send" />
             </intent-filter>
         </activity>
 

@@ -240,7 +240,18 @@ export function LoginPage() {
         </div>
       </div>
 
-      <form className="space-y-5" onSubmit={onSubmit} noValidate>
+      <form
+        className="space-y-5"
+        method="post"
+        action="#"
+        onSubmit={(event) => {
+          // Prevent native GET navigation which aborts the Auth XHR and
+          // surfaces as auth/network-request-failed on mobile Chrome.
+          event.preventDefault()
+          void onSubmit(event)
+        }}
+        noValidate
+      >
         <div className="space-y-2">
           <Label htmlFor="email">Email address</Label>
           <Input

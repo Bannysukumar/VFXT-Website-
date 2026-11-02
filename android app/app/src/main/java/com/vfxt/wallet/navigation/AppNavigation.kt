@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -61,6 +62,21 @@ fun AppNavigation(
         if (appState?.ready != true) return@LaunchedEffect
         if (hadWallet == true && !appState.hasWallet) navController.resetTo(RootRoute.WalletSetup)
         hadWallet = appState.hasWallet
+    }
+
+    // Website deposit deep link → Send screen once the wallet is unlocked.
+    val pendingPay by PendingPaymentLink.pending.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingPay, appState?.ready, appState?.hasWallet, appState?.showLockScreen) {
+        val pay = pendingPay ?: return@LaunchedEffect
+        if (appState?.ready != true || appState.hasWallet != true || appState.showLockScreen) return@LaunchedEffect
+        PendingPaymentLink.consume()
+        navController.navigate(
+            RootRoute.Send(
+                tokenKey = pay.tokenAddress?.lowercase(),
+                recipient = pay.recipient,
+                amount = pay.amount,
+            ),
+        )
     }
 
     val onWalletAdded: (WalletAddedNext) -> Unit = { next ->
