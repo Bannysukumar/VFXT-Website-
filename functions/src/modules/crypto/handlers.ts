@@ -381,8 +381,9 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       : null;
     const hot = bound ?? (await pickDepositHotWallet());
     const receiveAddress = savedDepositAddress || hot.address;
-    const { resolveDepositExpectedWei } = await import('./unique-amount');
+    const { depositWeiCandidates, resolveDepositExpectedWei } = await import('./unique-amount');
     const expectedWei = resolveDepositExpectedWei(dep);
+    const acceptedWeis = depositWeiCandidates(dep);
     const createdAt = dep.createdAt?.toMillis?.() ?? Date.now() - DEPOSIT_TTL_MS;
     if (Date.now() - createdAt > DEPOSIT_TTL_MS) {
       await snap.ref.update({
@@ -408,6 +409,7 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
         found = await verifyUsdtDepositTx({
           txHash: clientTxHash,
           expectedWei,
+          acceptedWeis,
           notBeforeMs: createdAt - 60_000,
           isTxUsed,
           toAddress: receiveAddress,
@@ -418,6 +420,7 @@ export const checkDepositPayment = onCall(CALLABLE_OPTS, async (request) => {
       } else {
         found = await findIncomingUsdtTransfer({
           expectedWei,
+          acceptedWeis,
           notBeforeMs: createdAt - 60_000,
           isTxUsed,
           toAddress: receiveAddress,
@@ -505,7 +508,7 @@ export const monitorCryptoDeposits = onSchedule(
       return;
     }
 
-    const { resolveDepositExpectedWei } = await import('./unique-amount');
+    const { depositWeiCandidates, resolveDepositExpectedWei } = await import('./unique-amount');
     const ordered = [...pending.docs].sort((a, b) => {
       const am = a.data().createdAt?.toMillis?.() ?? 0;
       const bm = b.data().createdAt?.toMillis?.() ?? 0;
@@ -524,9 +527,11 @@ export const monitorCryptoDeposits = onSchedule(
       }
       try {
         const expectedWei = resolveDepositExpectedWei(dep);
+        const acceptedWeis = depositWeiCandidates(dep);
         const token = depositTokenMeta(dep);
         const found = await findIncomingUsdtTransfer({
           expectedWei,
+          acceptedWeis,
           notBeforeMs: createdAt - 60_000,
           toAddress: (dep.depositAddress as string) || undefined,
           tokenAddress: token.address,

@@ -273,12 +273,23 @@ async function getLogsChunked(
   return out;
 }
 
+function acceptedWeiSet(params: {
+  expectedWei: bigint;
+  acceptedWeis?: bigint[];
+}): Set<string> {
+  const set = new Set<string>([(params.expectedWei ?? 0n).toString()]);
+  for (const wei of params.acceptedWeis ?? []) set.add(wei.toString());
+  return set;
+}
+
 async function parseMatchingTransferLog(
   provider: JsonRpcProvider,
   entry: Awaited<ReturnType<JsonRpcProvider['getLogs']>>[number],
   params: {
     hotAddress: string;
     expectedWei: bigint;
+    /** Also accept these wei amounts (e.g. whole-token base without payment tag). */
+    acceptedWeis?: bigint[];
     notBeforeMs: number;
     latest: number;
     isTxUsed: (txHash: string) => Promise<boolean>;
@@ -288,7 +299,7 @@ async function parseMatchingTransferLog(
   if (await params.isTxUsed(txHash)) return null;
 
   const amountWei = BigInt(entry.data);
-  if (amountWei !== params.expectedWei) return null;
+  if (!acceptedWeiSet(params).has(amountWei.toString())) return null;
 
   const receipt = await provider.getTransactionReceipt(txHash);
   if (!receipt || receipt.status !== 1) return null;
@@ -318,6 +329,8 @@ async function parseMatchingTransferLog(
 export async function verifyUsdtDepositTx(params: {
   txHash: string;
   expectedWei: bigint;
+  /** Also accept these wei amounts (e.g. whole-token base without payment tag). */
+  acceptedWeis?: bigint[];
   notBeforeMs: number;
   isTxUsed: (txHash: string) => Promise<boolean>;
   /** Deposit-assigned receive address (required for multi-wallet pools). */
@@ -371,7 +384,7 @@ export async function verifyUsdtDepositTx(params: {
     }
 
     const amountWei = BigInt(match.data);
-    if (amountWei !== params.expectedWei) {
+    if (!acceptedWeiSet(params).has(amountWei.toString())) {
       throw new AppError(
         'failed-precondition',
         `Amount mismatch: got ${formatUnits(amountWei, tokenDecimals)} ${tokenSymbol}`,
@@ -401,6 +414,8 @@ export async function verifyUsdtDepositTx(params: {
  */
 export async function findIncomingUsdtTransfer(params: {
   expectedWei: bigint;
+  /** Also accept these wei amounts (e.g. whole-token base without payment tag). */
+  acceptedWeis?: bigint[];
   notBeforeMs: number;
   isTxUsed: (txHash: string) => Promise<boolean>;
   /** Deposit-assigned receive address (required for multi-wallet pools). */
@@ -433,6 +448,7 @@ export async function findIncomingUsdtTransfer(params: {
       const found = await parseMatchingTransferLog(provider, entry, {
         hotAddress: receiveAddress,
         expectedWei: params.expectedWei,
+        acceptedWeis: params.acceptedWeis,
         notBeforeMs: params.notBeforeMs,
         latest,
         isTxUsed: params.isTxUsed,

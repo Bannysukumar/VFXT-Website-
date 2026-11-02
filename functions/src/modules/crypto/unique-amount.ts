@@ -87,6 +87,13 @@ export async function allocateUniqueDepositWei(
   );
 }
 
+export function resolveDepositAsset(dep: {
+  method?: string | null;
+  tokenSymbol?: string | null;
+}): DepositAsset {
+  return dep.method === 'vfxt_bep20' || dep.tokenSymbol === 'VFXT' ? 'VFXT' : 'USDT';
+}
+
 export function resolveDepositExpectedWei(dep: {
   expectedWei?: string | null;
   amountMinor?: number;
@@ -96,7 +103,29 @@ export function resolveDepositExpectedWei(dep: {
   if (dep.expectedWei) {
     return BigInt(String(dep.expectedWei));
   }
-  const asset: DepositAsset =
-    dep.method === 'vfxt_bep20' || dep.tokenSymbol === 'VFXT' ? 'VFXT' : 'USDT';
-  return baseWeiForAsset(Number(dep.amountMinor), asset);
+  return baseWeiForAsset(Number(dep.amountMinor), resolveDepositAsset(dep));
+}
+
+/** Whole-token / whole-cent base wei before the unique payment tag. */
+export function resolveDepositBaseWei(dep: {
+  amountMinor?: number;
+  method?: string | null;
+  tokenSymbol?: string | null;
+}): bigint {
+  return baseWeiForAsset(Number(dep.amountMinor), resolveDepositAsset(dep));
+}
+
+/**
+ * Wallets often send the round amount (10 VFXT) instead of the tagged unique
+ * amount (10.000000000000524707). Accept both the exact tag and the base amount.
+ */
+export function depositWeiCandidates(dep: {
+  expectedWei?: string | null;
+  amountMinor?: number;
+  method?: string | null;
+  tokenSymbol?: string | null;
+}): bigint[] {
+  const expected = resolveDepositExpectedWei(dep);
+  const base = resolveDepositBaseWei(dep);
+  return expected === base ? [expected] : [expected, base];
 }

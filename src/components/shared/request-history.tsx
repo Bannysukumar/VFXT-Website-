@@ -15,6 +15,13 @@ type Row = (DepositRequest | WithdrawalRequest) & {
 }
 
 function amountLabel(row: Row) {
+  const isVfxt =
+    row.currency === 'VFXT' ||
+    (row as { method?: string }).method === 'vfxt_bep20' ||
+    (row as { tokenSymbol?: string }).tokenSymbol === 'VFXT'
+  if (isVfxt) {
+    return `${Number(row.amountMinor).toLocaleString()} VFXT`
+  }
   return formatMinor(row.amountMinor, {
     scale: 2,
     currency: row.currency === 'USD' ? 'USD' : undefined,
