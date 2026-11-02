@@ -13,3 +13,13 @@ createRoot(root).render(
     <App />
   </StrictMode>,
 )
+
+// Hide the static HTML splash once React has painted.
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    const splash = document.getElementById('boot-splash')
+    if (!splash) return
+    splash.classList.add('is-done')
+    window.setTimeout(() => splash.remove(), 300)
+  })
+})

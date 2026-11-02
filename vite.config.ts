@@ -17,6 +17,24 @@ export default defineConfig({
   build: {
     sourcemap: true,
     target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('firebase')) return 'firebase'
+          if (id.includes('framer-motion')) return 'motion'
+          if (id.includes('@tanstack')) return 'query'
+          if (
+            id.includes('@walletconnect') ||
+            id.includes('@reown') ||
+            id.includes('/ox/') ||
+            id.includes('\\ox\\')
+          ) {
+            return 'wallet'
+          }
+        },
+      },
+    },
   },
   test: {
     globals: true,
