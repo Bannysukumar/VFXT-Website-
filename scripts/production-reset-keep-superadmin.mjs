@@ -198,7 +198,7 @@ async function main() {
           maxDays: 200,
           nonWorkingCapX: 2,
           workingCapX: 3,
-          levelCommissionBps: [50, 50, 25, 25, 20, 20, 10],
+          levelCommissionBps: [25, 20, 15, 10, 5, 5, 5],
           directReferralBonusBps: 500,
           lockedPackages: [
             {

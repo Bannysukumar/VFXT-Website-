@@ -638,34 +638,34 @@ export function AdminUsersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
-                <THead>
-                  <tr>
-                    <TH>User</TH>
+            <Table>
+              <THead>
+                <tr>
+                  <TH>User</TH>
                     <TH>Mobile</TH>
                     <TH>Referral code</TH>
                     <TH>Referred by</TH>
-                    <TH>KYC</TH>
+                  <TH>KYC</TH>
                     <TH className="w-28">Actions</TH>
-                  </tr>
-                </THead>
-                <TBody>
-                  {users.map((u) => {
-                    const name = u.displayName || u.email || 'Unnamed user'
-                    return (
-                      <TR key={u.uid}>
-                        <TD>
-                          <div className="flex items-center gap-3">
-                            <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent-bright to-highlight text-xs font-bold text-brand">
-                              {name.slice(0, 2).toUpperCase()}
-                            </span>
-                            <div className="min-w-0">
-                              <p className="truncate font-medium">{u.displayName || '—'}</p>
-                              <p className="truncate text-xs text-ink-muted">{u.email || 'No email'}</p>
-                            </div>
+                </tr>
+              </THead>
+              <TBody>
+                {users.map((u) => {
+                  const name = u.displayName || u.email || 'Unnamed user'
+                  return (
+                    <TR key={u.uid}>
+                      <TD>
+                        <div className="flex items-center gap-3">
+                          <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-accent-bright to-highlight text-xs font-bold text-brand">
+                            {name.slice(0, 2).toUpperCase()}
+                          </span>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{u.displayName || '—'}</p>
+                            <p className="truncate text-xs text-ink-muted">{u.email || 'No email'}</p>
                           </div>
-                        </TD>
-                        <TD>
+                        </div>
+                      </TD>
+                      <TD>
                           {u.mobile ? (
                             <button
                               type="button"
@@ -678,8 +678,8 @@ export function AdminUsersPage() {
                           ) : (
                             <span className="text-ink-subtle">None</span>
                           )}
-                        </TD>
-                        <TD>
+                      </TD>
+                      <TD>
                           {u.referralCode ? (
                             <button
                               type="button"
@@ -688,10 +688,10 @@ export function AdminUsersPage() {
                             >
                               {u.referralCode}
                             </button>
-                          ) : (
-                            '—'
-                          )}
-                        </TD>
+                        ) : (
+                          '—'
+                        )}
+                      </TD>
                         <TD>
                           {u.referredBy ? (
                             <div className="min-w-0">
@@ -716,12 +716,12 @@ export function AdminUsersPage() {
                             <Eye className="size-4" />
                             Manage
                           </Button>
-                        </TD>
-                      </TR>
-                    )
-                  })}
-                </TBody>
-              </Table>
+                      </TD>
+                    </TR>
+                  )
+                })}
+              </TBody>
+            </Table>
             </div>
           )}
         </CardContent>

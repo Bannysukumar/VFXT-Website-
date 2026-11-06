@@ -50,6 +50,13 @@ export async function payLevelCommissions(
 ): Promise<void> {
   if (!FeatureFlags.referralBonuses) return;
 
+  const { getPlanSettings } = await import('../platform/store');
+  const plan = await getPlanSettings();
+  const ratesBps =
+    Array.isArray(plan.levelCommissionBps) && plan.levelCommissionBps.length > 0
+      ? plan.levelCommissionBps
+      : [...LEVEL_COMMISSION_BPS];
+
   const stakerSnap = await db
     .collection(Collections.users)
     .doc(params.stakerId)
@@ -57,7 +64,7 @@ export async function payLevelCommissions(
   if (!stakerSnap.exists) return;
   let uplineId: string | null = (stakerSnap.data() as UserProfile).referredBy;
 
-  for (let level = 1; level <= LEVEL_COMMISSION_BPS.length; level += 1) {
+  for (let level = 1; level <= ratesBps.length; level += 1) {
     if (!uplineId) break;
 
     const uplineSnap = await db
@@ -86,7 +93,7 @@ export async function payLevelCommissions(
       continue;
     }
 
-    const amount = levelCommissionCents(params.stakeCents, level);
+    const amount = levelCommissionCents(params.stakeCents, level, ratesBps);
     if (amount <= 0) {
       uplineId = nextUpline;
       continue;

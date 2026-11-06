@@ -41,6 +41,7 @@ import {
   CircleDollarSign,
   Pickaxe,
   Smartphone,
+  Mail,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -134,6 +135,7 @@ const adminNav: NavSection[] = [
       { to: '/admin/settings', label: 'Platform', icon: Settings },
       { to: '/admin/plan', label: 'Plan', icon: SlidersHorizontal },
       { to: '/admin/withdraw', label: 'Withdraw rules', icon: BadgePercent },
+      { to: '/admin/smtp', label: 'SMTP email', icon: Mail },
     ],
   },
   {

@@ -118,7 +118,7 @@ export async function transferBetweenWallets(input: {
 
 export async function transferToUser(input: {
   toUserId: string
-  walletKind: 'vfxt' | 'withdrawal'
+  walletKind: 'fund' | 'vfxt' | 'withdrawal'
   amountMinor: number
   note?: string
   idempotencyKey: string

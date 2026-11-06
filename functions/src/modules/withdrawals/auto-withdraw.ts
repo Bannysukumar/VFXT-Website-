@@ -182,6 +182,15 @@ export const processAutoWithdrawals = onSchedule(
                 : 'Your withdrawal wallet reached the minimum and was paid out automatically.',
             data: { withdrawalId, txHash, commissionMinor, netMinor, amountMinor },
           });
+          void import('../mail/notify').then(({ sendWithdrawalStatusEmail }) =>
+            sendWithdrawalStatusEmail({
+              userId: uid,
+              status: 'completed',
+              amountMinor,
+              destination: toAddress,
+              txHash,
+            }),
+          );
           log.info('auto_withdrawal_sent', {
             uid,
             withdrawalId,
@@ -220,6 +229,15 @@ export const processAutoWithdrawals = onSchedule(
               updatedAt: FieldValue.serverTimestamp(),
             });
           });
+          void import('../mail/notify').then(({ sendWithdrawalStatusEmail }) =>
+            sendWithdrawalStatusEmail({
+              userId: uid,
+              status: 'failed',
+              amountMinor,
+              destination: toAddress,
+              reason: publicMessage,
+            }),
+          );
           log.warn('auto_withdrawal_failed', { uid, withdrawalId, error: message });
         }
       } catch (err) {

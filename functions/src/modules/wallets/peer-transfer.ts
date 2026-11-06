@@ -15,7 +15,7 @@ import { normalizeUserId } from '../../lib/user-id';
 import { ensureUserWallets } from './handlers';
 import { walletDocId } from './types';
 
-const PEER_WALLET_KINDS = ['vfxt', 'withdrawal'] as const;
+const PEER_WALLET_KINDS = ['fund', 'vfxt', 'withdrawal'] as const;
 
 const transferToUserSchema = z
   .object({
@@ -61,7 +61,7 @@ async function findUserByPublicId(
 
 /**
  * P2P transfer by public user id (referralCode, e.g. VFXT2533).
- * Allowed wallets: vfxt (tokens) and withdrawal (USD).
+ * Allowed wallets: fund, vfxt, and withdrawal (all VFXT, same-kind credit).
  */
 export const transferToUser = onCall(CALLABLE_OPTS, async (request) => {
   try {

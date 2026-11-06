@@ -266,6 +266,37 @@ export async function updatePlatformSettings(patch: PlatformSettingsPatch) {
   return callFunction<PlatformSettingsPatch, Record<string, unknown>>('updatePlatformSettings', patch)
 }
 
+export interface SmtpAdminSettings {
+  enabled: boolean
+  host: string
+  port: number
+  secure: boolean
+  username: string
+  fromEmail: string
+  fromName: string
+  replyTo: string
+  sendWelcome: boolean
+  sendWithdrawalStatus: boolean
+  sendPasswordReset: boolean
+  passwordSet: boolean
+}
+
+export async function getAdminSmtpSettings() {
+  return callFunction<undefined, SmtpAdminSettings>('getAdminSmtpSettings')
+}
+
+export async function updateSmtpSettings(
+  patch: Partial<Omit<SmtpAdminSettings, 'passwordSet'>> & { password?: string },
+) {
+  return callFunction<typeof patch, SmtpAdminSettings>('updateSmtpSettings', patch)
+}
+
+export async function testSmtpSettings(to?: string) {
+  return callFunction<{ to?: string }, { ok: true; to: string }>('testSmtpSettings', {
+    ...(to ? { to } : {}),
+  })
+}
+
 export interface CryptoHotWalletPoolEntry {
   id: string
   label: string

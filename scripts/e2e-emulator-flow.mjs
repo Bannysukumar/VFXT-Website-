@@ -278,8 +278,8 @@ async function main() {
   await new Promise((r) => setTimeout(r, 2000))
 
   console.log('6) Verify level commissions L1–L7 + direct bonus')
-  // Expected bps: [50,50,25,25,20,20,10] of 1_000_000 VFXT
-  const expectedLevelTokens = [5_000, 5_000, 2_500, 2_500, 2_000, 2_000, 1_000]
+  // Expected bps: [25,20,15,10,5,5,5] of 1_000_000 VFXT (0.85% total)
+  const expectedLevelTokens = [2_500, 2_000, 1_500, 1_000, 500, 500, 500]
   for (let level = 1; level <= 7; level += 1) {
     const payee = chain[7 - level] // L1→U6, L7→root
     const bal = await walletBal(payee.uid, 'level_income')

@@ -249,7 +249,7 @@ async function main() {
   await new Promise((r) => setTimeout(r, 2000))
 
   const incomes = []
-  const expected = [50, 50, 25, 25, 20, 20, 10]
+  const expected = [25, 20, 15, 10, 5, 5, 5]
   for (let level = 1; level <= 7; level += 1) {
     const payee = chain[7 - level]
     const bal = await walletBal(payee.uid, 'level_income')

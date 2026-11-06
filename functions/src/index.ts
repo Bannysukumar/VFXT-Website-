@@ -112,6 +112,14 @@ export {
   updatePlatformSettings,
 } from './modules/platform/handlers';
 
+// SMTP / transactional email
+export {
+  getAdminSmtpSettings,
+  updateSmtpSettings,
+  testSmtpSettings,
+  requestPasswordReset,
+} from './modules/mail/handlers';
+
 export {
   getWalletApkRelease,
   publishWalletApk,

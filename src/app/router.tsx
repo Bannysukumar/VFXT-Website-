@@ -221,6 +221,10 @@ const AdminWithdrawSettingsPage = lazyNamed(
   () => import('@/features/admin/pages/admin-withdraw-settings-page'),
   'AdminWithdrawSettingsPage',
 )
+const AdminSmtpPage = lazyNamed(
+  () => import('@/features/admin/pages/admin-smtp-page'),
+  'AdminSmtpPage',
+)
 
 export const router = createBrowserRouter([
   {
@@ -303,6 +307,7 @@ export const router = createBrowserRouter([
           { path: 'settings', element: <AdminSettingsPage /> },
           { path: 'plan', element: <AdminPlanPage /> },
           { path: 'withdraw', element: <AdminWithdrawSettingsPage /> },
+          { path: 'smtp', element: <AdminSmtpPage /> },
         ],
       },
     ],

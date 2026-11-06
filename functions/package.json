@@ -23,12 +23,14 @@
     "ethers": "^6.17.0",
     "firebase-admin": "^13.0.2",
     "firebase-functions": "^6.3.0",
+    "nodemailer": "^10.3.1",
     "uuid": "^11.0.5",
     "zod": "^3.24.1"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
     "@types/node": "^22.10.5",
+    "@types/nodemailer": "^8.0.2",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.18.0",
     "firebase": "^11.1.0",

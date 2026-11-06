@@ -134,8 +134,18 @@ export async function logout(): Promise<void> {
 }
 
 export async function resetPassword(email: string): Promise<void> {
+  const { callFunction } = await import('@/services/api')
+  try {
+    const result = await callFunction<{ email: string }, { ok: true; via: 'smtp' | 'client_fallback' }>(
+      'requestPasswordReset',
+      { email: email.trim().toLowerCase() },
+    )
+    if (result.via === 'smtp') return
+  } catch {
+    // Fall through to Firebase Auth email if the callable is unavailable.
+  }
   const auth = requireAuth()
-  await sendPasswordResetEmail(auth, email)
+  await sendPasswordResetEmail(auth, email.trim().toLowerCase())
 }
 
 export async function resendVerification(): Promise<void> {

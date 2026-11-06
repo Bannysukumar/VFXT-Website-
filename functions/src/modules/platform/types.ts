@@ -180,7 +180,7 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
     maxDays: 200,
     nonWorkingCapX: 2,
     workingCapX: 3,
-    levelCommissionBps: [50, 50, 25, 25, 20, 20, 10],
+    levelCommissionBps: [25, 20, 15, 10, 5, 5, 5],
     directReferralBonusBps: 500,
     lockedPackages: [
       { id: 'locked_300', days: 300, multiplier: 3, bonusTokenPct: 50, label: '300-day · 3X', enabled: true },

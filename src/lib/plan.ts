@@ -19,7 +19,7 @@ export const LOCKED_PACKAGES = [
   { id: 'locked_700' as const, days: 700, multiplier: 7, bonusTokenPct: 150, label: '700-day · 7X' },
 ]
 
-export const LEVEL_COMMISSION_BPS = [50, 50, 25, 25, 20, 20, 10] as const // 0.50% … 0.10%
+export const LEVEL_COMMISSION_BPS = [25, 20, 15, 10, 5, 5, 5] as const // 0.25% … 0.05% = 0.85%
 
 export const DIRECT_REFERRAL_BONUS_BPS = 500 // 5%
 

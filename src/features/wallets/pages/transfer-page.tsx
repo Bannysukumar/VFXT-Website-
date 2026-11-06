@@ -68,10 +68,15 @@ const INTERNAL_ROUTES: Array<{
 ]
 
 const PEER_WALLETS: Array<{
-  kind: 'vfxt' | 'withdrawal'
+  kind: 'fund' | 'vfxt' | 'withdrawal'
   title: string
   hint: string
 }> = [
+  {
+    kind: 'fund',
+    title: 'Fund Wallet',
+    hint: 'Send VFXT from your Fund Wallet to another member',
+  },
   {
     kind: 'vfxt',
     title: 'VFXT tokens',
@@ -79,8 +84,8 @@ const PEER_WALLETS: Array<{
   },
   {
     kind: 'withdrawal',
-    title: 'Withdrawal (USD)',
-    hint: 'Send USD from your Withdrawal Wallet',
+    title: 'Withdrawal Wallet',
+    hint: 'Send VFXT from your Withdrawal Wallet',
   },
 ]
 
@@ -91,7 +96,7 @@ const internalSchema = z.object({
 
 const peerSchema = z.object({
   toUserId: z.string().min(4, 'Enter a user ID like VFXT2533'),
-  walletKind: z.enum(['vfxt', 'withdrawal']),
+  walletKind: z.enum(['fund', 'vfxt', 'withdrawal']),
   amount: z.string().min(1, 'Enter an amount'),
   note: z.string().max(200).optional(),
 })
@@ -151,7 +156,7 @@ export function TransferPage() {
 
   const peerForm = useForm<PeerValues>({
     resolver: zodResolver(peerSchema),
-    defaultValues: { toUserId: '', walletKind: 'vfxt', amount: '', note: '' },
+    defaultValues: { toUserId: '', walletKind: 'fund', amount: '', note: '' },
   })
 
   const peerWalletKind = peerForm.watch('walletKind')
@@ -236,7 +241,7 @@ export function TransferPage() {
         throw new Error('Cannot transfer to yourself')
       }
       await lookupUserId(toUserId)
-      const scale = values.walletKind === 'vfxt' ? 0 : 2
+      const scale = WALLET_META[values.walletKind].currency === 'VFXT' ? 0 : 2
       const amountMinor = Number(parseToMinor(values.amount, scale))
       if (amountMinor <= 0) throw new Error('Amount must be positive')
       const available = walletAvailable(wallets.data, values.walletKind)
@@ -281,7 +286,7 @@ export function TransferPage() {
 
   function peerExceeds(): boolean {
     try {
-      const scale = peerWalletKind === 'vfxt' ? 0 : 2
+      const scale = WALLET_META[peerWalletKind].currency === 'VFXT' ? 0 : 2
       const minor = Number(parseToMinor(peerAmount || '0', scale))
       return minor > peerBalance
     } catch {
@@ -320,7 +325,7 @@ export function TransferPage() {
             <p className="text-sm text-ink-muted">Your User ID</p>
             <p className="mt-0.5 font-mono text-lg font-semibold tracking-wide">{myId}</p>
             <p className="mt-1 text-xs text-ink-muted">
-              Share this so others can send you VFXT or withdrawal funds.
+              Share this so others can send Fund, VFXT, or Withdrawal balances to you.
             </p>
           </div>
           <Button type="button" variant="secondary" size="sm" onClick={copyMyId}>
@@ -407,7 +412,7 @@ export function TransferPage() {
 
               <div className="space-y-3">
                 <Label>What do you want to send?</Label>
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid gap-3 sm:grid-cols-3">
                   {PEER_WALLETS.map((option) => {
                     const active = peerWalletKind === option.kind
                     const bal = walletAvailable(wallets.data, option.kind)
@@ -446,7 +451,9 @@ export function TransferPage() {
                   <Input
                     id="peer-amount"
                     inputMode="decimal"
-                    placeholder={peerWalletKind === 'vfxt' ? '0' : '0.00'}
+                    placeholder={
+                      WALLET_META[peerWalletKind].currency === 'VFXT' ? '0' : '0.00'
+                    }
                     autoComplete="off"
                     className="tabular h-14 pr-24 text-xl font-semibold"
                     aria-invalid={Boolean(peerForm.formState.errors.amount) || peerExceeds()}
@@ -467,9 +474,7 @@ export function TransferPage() {
                 </div>
                 <FieldError message={peerForm.formState.errors.amount?.message} />
                 <p className="text-xs text-ink-muted">
-                  {peerWalletKind === 'vfxt'
-                    ? 'Enter whole VFXT tokens'
-                    : 'Enter USD amount from your Withdrawal Wallet'}
+                  Enter whole VFXT tokens from {WALLET_META[peerWalletKind].label}
                 </p>
                 {peerExceeds() ? (
                   <p className="text-xs font-medium text-warning">

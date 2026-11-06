@@ -309,6 +309,17 @@ async function handleCreateWithdrawalRequest(
       data: { withdrawalId, txHash, commissionMinor, netMinor },
     });
 
+    void import('../mail/notify').then(({ sendWithdrawalStatusEmail }) =>
+      sendWithdrawalStatusEmail({
+        userId: ctx.uid,
+        status: 'completed',
+        amountMinor,
+        currency,
+        destination: toAddress,
+        txHash,
+      }),
+    );
+
     log.info('withdrawal_auto_sent', {
       withdrawalId,
       txHash,
@@ -351,6 +362,16 @@ async function handleCreateWithdrawalRequest(
         updatedAt: FieldValue.serverTimestamp(),
       });
     });
+    void import('../mail/notify').then(({ sendWithdrawalStatusEmail }) =>
+      sendWithdrawalStatusEmail({
+        userId: ctx.uid,
+        status: 'failed',
+        amountMinor,
+        currency,
+        destination: toAddress,
+        reason: publicMessage,
+      }),
+    );
     throw new AppError('failed-precondition', publicMessage);
   }
 }
@@ -527,6 +548,16 @@ async function handleCompleteWithdrawal(
     data: { withdrawalId },
   });
 
+  void import('../mail/notify').then(({ sendWithdrawalStatusEmail }) =>
+    sendWithdrawalStatusEmail({
+      userId: w.userId,
+      status: 'completed',
+      amountMinor: w.amountMinor,
+      currency: w.currency,
+      destination: typeof w.destination === 'string' ? w.destination : null,
+    }),
+  );
+
   log.info('withdrawal_completed', {
     withdrawalId,
     entryId,
@@ -607,6 +638,17 @@ async function handleRejectWithdrawal(
     body: reason,
     data: { withdrawalId },
   });
+
+  void import('../mail/notify').then(({ sendWithdrawalStatusEmail }) =>
+    sendWithdrawalStatusEmail({
+      userId: w.userId,
+      status: 'rejected',
+      amountMinor: w.amountMinor,
+      currency: w.currency,
+      destination: typeof w.destination === 'string' ? w.destination : null,
+      reason,
+    }),
+  );
 
   log.info('withdrawal_rejected', { withdrawalId, actorId: ctx.uid });
   return { withdrawalId };

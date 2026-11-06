@@ -6,7 +6,7 @@ const MIN = 10_000
 const daily = Math.floor((MIN * 100) / 10_000) // 1%
 const cap2 = MIN * 2
 const cap3 = MIN * 3
-const levels = [50, 50, 25, 25, 20, 20, 10]
+const levels = [25, 20, 15, 10, 5, 5, 5]
 const levelTotalBps = levels.reduce((a, b) => a + b, 0)
 const levelPayout = levels.map((bps) => Math.floor((MIN * bps) / 10_000))
 const directBonusCents = Math.floor((MIN * 500) / 10_000)

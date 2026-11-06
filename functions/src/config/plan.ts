@@ -88,8 +88,8 @@ export const LOCKED_PACKAGES = [
 
 export type StakingPlanId = 'daily_yield' | LockedPackageId;
 
-/** L1…L7 commission on stake capital, in basis points (0.50% … 0.10%). */
-export const LEVEL_COMMISSION_BPS = [50, 50, 25, 25, 20, 20, 10] as const;
+/** L1…L7 commission on stake capital, in basis points (0.25% … 0.05% = 0.85% total). */
+export const LEVEL_COMMISSION_BPS = [25, 20, 15, 10, 5, 5, 5] as const;
 
 /** Direct referral bonus: 5% of stake as VFXT tokens. */
 export const DIRECT_REFERRAL_BONUS_BPS = 500;
@@ -276,9 +276,10 @@ export function nextDailyYieldCents(params: {
 export function levelCommissionCents(
   stakeTokens: number,
   level: number,
+  ratesBps: readonly number[] = LEVEL_COMMISSION_BPS,
 ): number {
-  if (level < 1 || level > LEVEL_COMMISSION_BPS.length) return 0;
-  const bps = LEVEL_COMMISSION_BPS[level - 1]!;
+  if (level < 1 || level > ratesBps.length) return 0;
+  const bps = ratesBps[level - 1]!;
   return Math.floor((stakeTokens * bps) / 10_000);
 }
 
