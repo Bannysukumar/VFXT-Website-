@@ -55,7 +55,7 @@ async function handleCreateDepositRequest(
   const ctx = requireAuth(request);
   assertRateLimit(rateLimitKey(request, 'deposit.create'), 8, 60_000);
   await requireActiveMember(ctx.uid);
-  gateEmailVerifiedForFinance(ctx);
+  await gateEmailVerifiedForFinance(ctx);
 
   const parsed = createDepositRequestSchema.safeParse(request.data);
   if (!parsed.success) {

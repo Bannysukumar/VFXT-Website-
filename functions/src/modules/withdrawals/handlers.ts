@@ -86,7 +86,7 @@ async function handleCreateWithdrawalRequest(
 }> {
   const ctx = requireAuth(request);
   await requireActiveMember(ctx.uid);
-  gateEmailVerifiedForFinance(ctx);
+  await gateEmailVerifiedForFinance(ctx);
 
   const parsed = createWithdrawalRequestSchema.safeParse(request.data);
   if (!parsed.success) {

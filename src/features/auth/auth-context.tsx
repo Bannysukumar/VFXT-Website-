@@ -45,6 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let unsub: (() => void) | undefined
     let cancelled = false
+    let onFocus: (() => void) | undefined
+    let onVisibility: (() => void) | undefined
+
     ;(async () => {
       try {
         await connectEmulatorsIfNeeded()
@@ -54,21 +57,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         unsub = onAuthStateChanged(auth, async (next) => {
           setUser(next)
           if (next) {
+            try {
+              // Pick up emailVerified after the user clicks the verify link.
+              await next.reload()
+            } catch {
+              /* ignore */
+            }
             const token = await next.getIdTokenResult(true)
             const role = token.claims.adminRole
             setAdminRole(typeof role === 'string' ? (role as AdminRole) : null)
+            setUser(auth.currentUser)
           } else {
             setAdminRole(null)
           }
           setLoading(false)
         })
+
+        onFocus = () => {
+          const current = auth.currentUser
+          if (!current) return
+          void (async () => {
+            try {
+              await current.reload()
+              await current.getIdToken(true)
+              if (!cancelled) setUser(auth.currentUser)
+            } catch {
+              /* ignore */
+            }
+          })()
+        }
+        onVisibility = () => {
+          if (document.visibilityState === 'visible') onFocus?.()
+        }
+        window.addEventListener('focus', onFocus)
+        document.addEventListener('visibilitychange', onVisibility)
       } catch {
         if (!cancelled) setLoading(false)
       }
     })()
+
     return () => {
       cancelled = true
       unsub?.()
+      if (onFocus) window.removeEventListener('focus', onFocus)
+      if (onVisibility) document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [firebaseConfigured])
 

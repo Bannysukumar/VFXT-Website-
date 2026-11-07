@@ -1,15 +1,38 @@
-import { AuthContext, requireEmailVerified } from '../../lib/permissions';
+import { getAuth } from 'firebase-admin/auth';
+import { AuthContext } from '../../lib/permissions';
 import { FeatureFlags } from '../../config/features';
 import { AppError } from '../../lib/errors';
 import { Collections, getDb } from '../../lib/firebase';
+import { log } from '../../lib/logger';
 
-/** Optionally gate finance ops behind email verification. */
-export function gateEmailVerifiedForFinance(ctx: AuthContext): void {
+/**
+ * Gate finance ops behind email verification.
+ * Token claims can stay stale after the user clicks the verify link, so we
+ * fall back to Admin Auth when the JWT still says unverified.
+ */
+export async function gateEmailVerifiedForFinance(ctx: AuthContext): Promise<void> {
   // Wallet-only accounts (no email) skip this gate.
   if (!ctx.email) return;
-  if (FeatureFlags.requireEmailVerifiedForFinance) {
-    requireEmailVerified(ctx);
+  if (!FeatureFlags.requireEmailVerifiedForFinance) return;
+  if (ctx.emailVerified) return;
+
+  try {
+    const record = await getAuth().getUser(ctx.uid);
+    if (record.emailVerified) {
+      log.info('email_verified_via_admin_auth', { uid: ctx.uid });
+      return;
+    }
+  } catch (err) {
+    log.warn('email_verified_admin_lookup_failed', {
+      uid: ctx.uid,
+      error: err instanceof Error ? err.message : String(err),
+    });
   }
+
+  throw new AppError(
+    'failed-precondition',
+    'Email verification required. Open the link in your inbox, then refresh this page and try again.',
+  );
 }
 
 export function isEmailVerified(ctx: AuthContext): boolean {
