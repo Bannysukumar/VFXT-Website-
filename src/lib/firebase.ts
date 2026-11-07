@@ -18,7 +18,7 @@ import { connectFunctionsEmulator, getFunctions, type Functions } from 'firebase
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from 'firebase/storage'
 import {
   initializeAppCheck,
-  ReCaptchaV3Provider,
+  ReCaptchaEnterpriseProvider,
   type AppCheck,
 } from 'firebase/app-check'
 import { env, hasFirebaseConfig } from '@/lib/env'
@@ -130,7 +130,7 @@ export function initAppCheck(): AppCheck | null {
   }
 
   appCheck = initializeAppCheck(getFirebaseApp(), {
-    provider: new ReCaptchaV3Provider(env.VITE_FIREBASE_APPCHECK_SITE_KEY),
+    provider: new ReCaptchaEnterpriseProvider(env.VITE_FIREBASE_APPCHECK_SITE_KEY),
     isTokenAutoRefreshEnabled: true,
   })
 

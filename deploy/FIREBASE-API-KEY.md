@@ -16,5 +16,6 @@ The web `apiKey` is public by design, but it should be locked down:
    - (optional) Cloud Storage for Firebase API
 5. Save, wait a few minutes, then smoke-test login + deposit.
 
-Also enable **Firebase App Check** (reCAPTCHA v3) in the Firebase console and set  
-`VITE_FIREBASE_APPCHECK_SITE_KEY` before rebuilding the site. Enforce App Check on callables once the client ships the token.
+Also enable **Firebase App Check** with **Fraud Defense (reCAPTCHA Enterprise)** in the Firebase console and set  
+`VITE_FIREBASE_APPCHECK_SITE_KEY` to the Enterprise site key before rebuilding the site.  
+The web client uses `ReCaptchaEnterpriseProvider`. Leave APIs **Unenforced** until the client ships tokens in production; then enforce callables.
