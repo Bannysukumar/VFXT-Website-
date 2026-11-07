@@ -13,26 +13,8 @@ import { assertPositiveMinor } from '../../lib/money';
 import { requireAuth } from '../../lib/permissions';
 import { normalizeUserId } from '../../lib/user-id';
 import { ensureUserWallets } from './handlers';
+import { transferToUserSchema } from './peer-transfer.schemas';
 import { walletDocId } from './types';
-
-/** Schema accepts any wallet kind; admin transfer settings decide what is allowed. */
-const transferToUserSchema = z
-  .object({
-    toUserId: z.string().min(4).max(32),
-    walletKind: z.enum([
-      'fund',
-      'staking',
-      'daily_roi',
-      'level_income',
-      'direct_referral',
-      'withdrawal',
-      'vfxt',
-    ]),
-    amountMinor: z.number().int().positive(),
-    note: z.string().max(200).optional(),
-    idempotencyKey: z.string().min(8).max(128),
-  })
-  .strict();
 
 async function findUserByPublicId(
   db: Firestore,

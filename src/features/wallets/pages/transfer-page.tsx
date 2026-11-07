@@ -283,11 +283,12 @@ export function TransferPage() {
       if (amountMinor <= 0) throw new Error('Amount must be positive')
       const available = walletAvailable(wallets.data, kind)
       if (amountMinor > available) throw new Error('Not enough balance in that wallet')
+      const note = values.note?.trim()
       return transferToUser({
         toUserId,
         walletKind: kind,
         amountMinor,
-        note: values.note?.trim() || undefined,
+        ...(note ? { note } : {}),
         idempotencyKey: crypto.randomUUID(),
       })
     },
