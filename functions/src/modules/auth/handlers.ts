@@ -32,7 +32,8 @@ export const onUserCreated = functionsV1
       timezone: null,
       locale: null,
       preferences: {},
-      status: 'active',
+      // Inactive until finalizeRegistration attaches a sponsor.
+      status: 'pending_registration',
       kycStatus: 'none',
       referralCode,
       referredBy: null,
@@ -70,21 +71,6 @@ export const onUserCreated = functionsV1
       });
     }
 
-    log.info('user_provisioned', { uid, referralCode });
-
-    if (user.email) {
-      try {
-        const { sendWelcomeEmailForUser } = await import('../mail/notify');
-        await sendWelcomeEmailForUser({
-          userId: uid,
-          email: user.email,
-          displayName: user.displayName ?? null,
-        });
-      } catch (err) {
-        log.warn('welcome_email_on_create_failed', {
-          uid,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    }
+    log.info('user_provisioned', { uid, referralCode, status: 'pending_registration' });
+    // Welcome email is sent after finalizeRegistration (sponsor attached).
   });

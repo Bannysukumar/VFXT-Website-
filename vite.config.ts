@@ -15,7 +15,8 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
-    sourcemap: true,
+    // Do not ship public source maps in production builds.
+    sourcemap: false,
     target: 'es2022',
     rollupOptions: {
       output: {

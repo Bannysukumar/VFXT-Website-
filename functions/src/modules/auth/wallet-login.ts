@@ -33,6 +33,8 @@ function buildLoginMessage(address: string, nonce: string): string {
 
 export const getWalletLoginNonce = onCall(CALLABLE_OPTS, async (request) => {
   try {
+    const { assertRateLimit, rateLimitKey } = await import('../../lib/rate-limit');
+    assertRateLimit(rateLimitKey(request, 'wallet.nonce'), 30, 60_000);
     const parsed = z
       .object({ address: z.string().regex(/^0x[a-fA-F0-9]{40}$/) })
       .safeParse(request.data ?? {});
@@ -360,7 +362,7 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
         timezone: null,
         locale: null,
         preferences: {},
-        status: 'active',
+        status: 'pending_registration',
         kycStatus: 'none',
         referralCode: ownReferralCode,
         referredBy: null,
@@ -394,6 +396,10 @@ export const completeWalletSignup = onCall(CALLABLE_OPTS, async (request) => {
 
     try {
       await applyCodeForUserExport(uid, referralCode);
+      await userRef.set(
+        { status: 'active', updatedAt: FieldValue.serverTimestamp() },
+        { merge: true },
+      );
     } catch (err) {
       // Do not leave a usable session without a sponsor.
       try {

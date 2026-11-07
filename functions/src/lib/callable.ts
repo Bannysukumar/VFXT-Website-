@@ -5,6 +5,8 @@ import { log } from './logger'
 /** Default options for all HTTPS callables. */
 export const CALLABLE_OPTS: CallableOptions = {
   region: 'us-central1',
+  // Required so browsers can preflight/call; Firebase Auth is still enforced in-handler.
+  invoker: 'public',
   // Explicit origins so browser preflight from production/staging always succeeds.
   cors: [
     'https://virtualfxtrades.com',

@@ -126,6 +126,15 @@ export {
   unpublishWalletApk,
 } from './modules/platform/wallet-apk';
 
+// Dashboard campaign banner + reward-trip tracking
+export {
+  getMyCampaign,
+  getAdminCampaign,
+  updateAdminCampaign,
+  getAdminCampaignStats,
+  seedAdminCampaignDefaults,
+} from './modules/campaign/handlers';
+
 // Crypto USDT BEP-20 (deposits QR / auto-credit, withdrawals, admin hot wallet)
 export {
   getCryptoWalletInfo,

@@ -140,6 +140,8 @@ async function handleCreateStakingPosition(
   request: CallableRequest,
 ): Promise<{ positionId: string }> {
   const ctx = requireAuth(request);
+  const { requireActiveMember } = await import('../auth/helpers');
+  await requireActiveMember(ctx.uid);
   requireStakingEnabled();
 
   const parsed = createSchema.safeParse(request.data);

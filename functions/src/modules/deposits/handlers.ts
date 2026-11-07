@@ -13,6 +13,7 @@ import { parseAmountToMinor, assertPositiveMinor } from '../../lib/money';
 import {
   buildIdempotencyKey,
   claimIdempotencyKey,
+  getIdempotencyRecord,
 } from '../../lib/idempotency';
 import { log } from '../../lib/logger';
 import { DepositRequest } from '../../types/models';
@@ -20,7 +21,11 @@ import { walletDocId } from '../wallets/types';
 import { ensureUserWallets } from '../wallets/handlers';
 import { createNotification } from '../notifications/handlers';
 import { writeAuditLog } from '../audit/handlers';
-import { gateEmailVerifiedForFinance } from '../auth/helpers';
+import {
+  gateEmailVerifiedForFinance,
+  requireActiveMember,
+} from '../auth/helpers';
+import { assertRateLimit, rateLimitKey } from '../../lib/rate-limit';
 import {
   approveDepositSchema,
   createDepositRequestSchema,
@@ -48,6 +53,8 @@ async function handleCreateDepositRequest(
   ttlMs: number;
 }> {
   const ctx = requireAuth(request);
+  assertRateLimit(rateLimitKey(request, 'deposit.create'), 8, 60_000);
+  await requireActiveMember(ctx.uid);
   gateEmailVerifiedForFinance(ctx);
 
   const parsed = createDepositRequestSchema.safeParse(request.data);
@@ -55,8 +62,14 @@ async function handleCreateDepositRequest(
     throw new AppError('invalid-argument', parsed.error.message);
   }
 
-  const { amount, amountMinor: amountMinorInput, method, reference, note } =
-    parsed.data;
+  const {
+    amount,
+    amountMinor: amountMinorInput,
+    method,
+    reference,
+    note,
+    idempotencyKey,
+  } = parsed.data;
   const wantVfxt = method === 'vfxt_bep20';
   // USDT deposits: amountMinor = USD cents. VFXT deposits: amountMinor = whole tokens.
   const currency = wantVfxt ? ('VFXT' as const) : ('USD' as const);
@@ -107,48 +120,81 @@ async function handleCreateDepositRequest(
     throw new AppError('not-found', 'Fund wallet not found');
   }
 
-  // Close prior open crypto deposits so users don't stack conflicting awaiting payments.
-  try {
-    const prior = await db
-      .collection(Collections.deposits)
-      .where('userId', '==', ctx.uid)
-      .orderBy('createdAt', 'desc')
-      .limit(25)
-      .get();
-    const batch = db.batch();
-    let cancelled = 0;
-    for (const doc of prior.docs) {
-      const st = String(doc.data().status || '');
-      if (st !== 'awaiting_payment' && st !== 'pending') continue;
-      const m = String(doc.data().method || '');
-      if (m !== 'usdt_bep20' && m !== 'vfxt_bep20') continue;
-      batch.update(doc.ref, {
-        status: 'cancelled',
-        rejectionReason: 'Superseded by a newer deposit request',
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      cancelled += 1;
+  // Idempotent create — same key returns the original deposit (never a new one).
+  // Different payload with the same key is rejected.
+  const idemDocId = buildIdempotencyKey('deposit.create', idempotencyKey, ctx.uid);
+  const fingerprint = `${method}|${amountMinor}|${currency}`;
+  const existingIdem = await getIdempotencyRecord(db, idemDocId);
+  if (existingIdem) {
+    const priorFp = (existingIdem as { fingerprint?: string }).fingerprint;
+    if (priorFp && priorFp !== fingerprint) {
+      throw new AppError(
+        'already-exists',
+        'This idempotency key was already used with a different deposit request',
+      );
     }
-    if (cancelled > 0) await batch.commit();
-  } catch (err) {
-    log.warn('deposit_prior_cancel_failed', {
-      uid: ctx.uid,
-      error: err instanceof Error ? err.message : String(err),
-    });
+    if (existingIdem.resultRef) {
+      const existingSnap = await db
+        .collection(Collections.deposits)
+        .doc(String(existingIdem.resultRef))
+        .get();
+      if (existingSnap.exists) {
+        const d = existingSnap.data() as DepositRequest;
+        const { DEPOSIT_TTL_MS } = await import('../../config/bsc');
+        const exp = d.expiresAt as { toMillis?: () => number } | null;
+        const expiresAtMs =
+          exp && typeof exp.toMillis === 'function' ? exp.toMillis() : null;
+        return {
+          depositId: d.depositId,
+          status: d.status,
+          method: d.method,
+          depositAddress: d.depositAddress ?? null,
+          amountUsdt:
+            d.currency === 'VFXT'
+              ? String(d.amountMinor)
+              : (d.amountMinor / 100).toFixed(2),
+          amountMinor: d.amountMinor,
+          network: d.depositAddress ? 'BSC (BEP-20)' : null,
+          token: d.tokenSymbol ?? null,
+          tokenAddress: d.tokenAddress ?? null,
+          qrPayload:
+            d.tokenAddress && d.depositAddress && d.expectedWei && d.chainId
+              ? `ethereum:${d.tokenAddress}@${d.chainId}/transfer?address=${d.depositAddress}&uint256=${d.expectedWei}`
+              : null,
+          chainId: d.chainId ?? null,
+          expectedWei: d.expectedWei ?? null,
+          paymentTag: d.paymentTag ?? null,
+          expiresAt: expiresAtMs != null ? new Date(expiresAtMs).toISOString() : null,
+          expiresAtMs,
+          ttlMs: DEPOSIT_TTL_MS,
+        };
+      }
+    }
+  }
+
+  // Do NOT auto-cancel prior awaiting_payment deposits — chain payments to an
+  // older intent must still be matchable until TTL expiry.
+  const openCrypto = await db
+    .collection(Collections.deposits)
+    .where('userId', '==', ctx.uid)
+    .where('status', 'in', ['awaiting_payment'])
+    .limit(5)
+    .get();
+  if (openCrypto.size >= 3) {
+    throw new AppError(
+      'failed-precondition',
+      'You already have open deposit payments. Wait for them to expire or complete before creating another.',
+    );
   }
 
   const depositId = uuidv4();
-  const useCrypto =
-    method === 'usdt_bep20' ||
-    method === 'vfxt_bep20' ||
-    method === 'manual' ||
-    !method;
+  const useCrypto = method === 'usdt_bep20' || method === 'vfxt_bep20';
 
   let depositAddress: string | null = null;
   let expectedWei: string | null = null;
   let chainId: number | null = null;
   let status: DepositRequest['status'] = 'pending';
-  let resolvedMethod = method || 'manual';
+  let resolvedMethod: string = method;
   let tokenSymbol: string | null = null;
   let tokenAddress: string | null = null;
   let tokensPerUsdUsed: number | null = wantVfxt ? tokenFx.tokensPerUsd : null;
@@ -194,7 +240,7 @@ async function handleCreateDepositRequest(
   const expiresAtMs =
     status === 'awaiting_payment' ? Date.now() + DEPOSIT_TTL_MS : null;
 
-  const doc: DepositRequest = {
+  const doc: DepositRequest & { idempotencyKey?: string } = {
     depositId,
     userId: ctx.uid,
     walletId,
@@ -218,9 +264,59 @@ async function handleCreateDepositRequest(
     expiresAt: expiresAtMs != null ? Timestamp.fromMillis(expiresAtMs) : null,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
+    idempotencyKey,
   };
 
   await db.collection(Collections.deposits).doc(depositId).set(doc);
+  const idemRef = db.collection(Collections.idempotencyKeys).doc(idemDocId);
+  try {
+    await idemRef.create({
+      key: idemDocId,
+      operation: 'deposit.create',
+      actorId: ctx.uid,
+      fingerprint,
+      resultRef: depositId,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+  } catch {
+    // Concurrent create with the same key — keep the winner, drop this orphan.
+    await db.collection(Collections.deposits).doc(depositId).delete().catch(() => undefined);
+    const winner = await getIdempotencyRecord(db, idemDocId);
+    if (winner?.resultRef) {
+      const snap = await db.collection(Collections.deposits).doc(String(winner.resultRef)).get();
+      if (snap.exists) {
+        const d = snap.data() as DepositRequest;
+        const exp = d.expiresAt as { toMillis?: () => number } | null;
+        const expiresAtMs =
+          exp && typeof exp.toMillis === 'function' ? exp.toMillis() : null;
+        return {
+          depositId: d.depositId,
+          status: d.status,
+          method: d.method,
+          depositAddress: d.depositAddress ?? null,
+          amountUsdt:
+            d.currency === 'VFXT'
+              ? String(d.amountMinor)
+              : (d.amountMinor / 100).toFixed(2),
+          amountMinor: d.amountMinor,
+          network: d.depositAddress ? 'BSC (BEP-20)' : null,
+          token: d.tokenSymbol ?? null,
+          tokenAddress: d.tokenAddress ?? null,
+          qrPayload:
+            d.tokenAddress && d.depositAddress && d.expectedWei && d.chainId
+              ? `ethereum:${d.tokenAddress}@${d.chainId}/transfer?address=${d.depositAddress}&uint256=${d.expectedWei}`
+              : null,
+          chainId: d.chainId ?? null,
+          expectedWei: d.expectedWei ?? null,
+          paymentTag: d.paymentTag ?? null,
+          expiresAt: expiresAtMs != null ? new Date(expiresAtMs).toISOString() : null,
+          expiresAtMs,
+          ttlMs: DEPOSIT_TTL_MS,
+        };
+      }
+    }
+    throw new AppError('aborted', 'Deposit create raced — retry with the same idempotency key');
+  }
   log.info('deposit_requested', {
     depositId,
     uid: ctx.uid,
@@ -231,6 +327,7 @@ async function handleCreateDepositRequest(
     expectedWei,
     tokenSymbol,
     expiresAtMs,
+    idempotencyKey,
   });
 
   return {

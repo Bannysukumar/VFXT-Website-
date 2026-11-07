@@ -42,6 +42,7 @@ import {
   Pickaxe,
   Smartphone,
   Mail,
+  Plane,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -136,6 +137,7 @@ const adminNav: NavSection[] = [
       { to: '/admin/plan', label: 'Plan', icon: SlidersHorizontal },
       { to: '/admin/withdraw', label: 'Withdraw rules', icon: BadgePercent },
       { to: '/admin/smtp', label: 'SMTP email', icon: Mail },
+      { to: '/admin/campaign', label: 'Campaign banner', icon: Plane },
     ],
   },
   {
@@ -240,6 +242,7 @@ const titles: Record<string, string> = {
   '/admin/crypto-wallet': 'Hot wallet',
   '/admin/swap': 'VFXT Swap',
   '/admin/wallet-apk': 'Wallet APK',
+  '/admin/campaign': 'Campaign banner',
   '/admin/users': 'Users',
   '/admin/affiliates': 'Affiliates',
   '/admin/tickets': 'Tickets',

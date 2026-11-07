@@ -75,11 +75,7 @@ export function requireAdminRole(
 ): AuthContext {
   const ctx = requireAuth(request);
   if (!ctx.adminRole || !allowed.includes(ctx.adminRole)) {
-    throw new AppError(
-      'permission-denied',
-      'Insufficient admin privileges',
-      { required: allowed, actual: ctx.adminRole },
-    );
+    throw new AppError('permission-denied', 'Insufficient admin privileges');
   }
   return ctx;
 }

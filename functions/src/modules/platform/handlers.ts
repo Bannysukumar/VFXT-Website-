@@ -161,10 +161,16 @@ export const getPublicPlatformSettings = onCall(CALLABLE_OPTS, async () => {
       },
       withdraw: {
         minWithdrawUsdCents: s.withdraw.minWithdrawUsdCents,
+        // Needed by withdraw UI fee preview; level/rank tables stay admin-only.
         commissionBps: s.withdraw.commissionBps,
-        autoWithdrawEnabled: s.withdraw.autoWithdrawEnabled,
       },
-      plan: s.plan,
+      // Public plan surface: mins/rates needed by the app UI only.
+      // Level / direct commission tables stay admin-only.
+      plan: {
+        minStakeUsdCents: s.plan.minStakeUsdCents,
+        dailyRateBps: s.plan.dailyRateBps,
+        maxDays: s.plan.maxDays,
+      },
       hotWalletPool: { multiWalletEnabled: s.hotWalletPool.multiWalletEnabled },
     };
   } catch (err) {

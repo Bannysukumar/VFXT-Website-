@@ -1,15 +1,26 @@
+import { randomBytes } from 'node:crypto';
 import type { Firestore } from 'firebase-admin/firestore';
 import { Collections } from './firebase';
 import { AppError } from './errors';
 
 const COUNTER_DOC = 'userIdCounter';
-/** First allocated id is VFXT2500 (matches product examples like VFXT2533). */
+/** First allocated counter value (legacy sequential prefix). */
 const START_AT = 2500;
 const MAX_ATTEMPTS = 25;
+const SUFFIX_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function randomSuffix(len = 3): string {
+  const bytes = randomBytes(len);
+  let out = '';
+  for (let i = 0; i < len; i += 1) {
+    out += SUFFIX_ALPHABET[bytes[i]! % SUFFIX_ALPHABET.length]!;
+  }
+  return out;
+}
 
 /**
- * Allocate a short unique public user id: VFXT2500, VFXT2501, …
- * Used as referral code and for P2P transfers.
+ * Allocate a unique public user id: VFXT2500 + random suffix (e.g. VFXT2500K7M).
+ * Used as referral code and for P2P transfers. Random suffix resists enumeration.
  */
 export async function allocateUniqueUserId(db: Firestore): Promise<string> {
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -22,7 +33,7 @@ export async function allocateUniqueUserId(db: Firestore): Promise<string> {
       if (!Number.isFinite(next) || next < START_AT) {
         throw new AppError('internal', 'User id counter is corrupted');
       }
-      const candidate = `VFXT${next}`;
+      const candidate = `VFXT${next}${randomSuffix(3)}`;
       tx.set(ref, { next: next + 1, updatedAt: new Date().toISOString() }, { merge: true });
       return candidate;
     });

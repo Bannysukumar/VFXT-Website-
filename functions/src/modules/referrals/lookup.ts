@@ -4,14 +4,20 @@ import { CALLABLE_OPTS, toHttpsError } from '../../lib/callable';
 import { Collections, getDb } from '../../lib/firebase';
 import { AppError } from '../../lib/errors';
 import type { UserProfile } from '../../types/models';
+import { assertRateLimit, rateLimitKey } from '../../lib/rate-limit';
 
 const schema = z.object({
   code: z.string().min(3).max(32),
 });
 
-/** Public: resolve a referral code to the upliner's display name (for register UI). */
+/**
+ * Public: validate a referral code for the register UI.
+ * Returns the code only (no display name) to reduce user enumeration.
+ */
 export const lookupReferralCode = onCall(CALLABLE_OPTS, async (request) => {
   try {
+    assertRateLimit(rateLimitKey(request, 'referral.lookup'), 20, 60_000);
+
     const parsed = schema.safeParse(request.data ?? {});
     if (!parsed.success) {
       throw new AppError('invalid-argument', 'Referral code required');
@@ -38,15 +44,15 @@ export const lookupReferralCode = onCall(CALLABLE_OPTS, async (request) => {
     }
 
     const user = snap.docs[0]!.data() as UserProfile;
-    const name =
-      (user.displayName && user.displayName.trim()) ||
-      (user.email ? user.email.split('@')[0] : null) ||
-      'VFXT Member';
+    // Only fully activated accounts can sponsor (blocks pending_registration stubs).
+    if (user.status !== 'active') {
+      throw new AppError('not-found', 'Referral code not found');
+    }
 
     return {
       ok: true as const,
       referralCode: user.referralCode,
-      displayName: name,
+      valid: true as const,
     };
   } catch (err) {
     throw toHttpsError(err);

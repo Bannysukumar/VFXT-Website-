@@ -4,8 +4,7 @@ module.exports = {
     {
       name: 'vfxt-website',
       cwd: __dirname,
-      script: 'npx',
-      args: 'serve -s dist -l 3029',
+      script: 'scripts/serve-spa.mjs',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,

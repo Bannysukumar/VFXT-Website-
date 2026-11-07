@@ -102,6 +102,8 @@ export async function getUserWallet(
 export const ensureWallets = onCall(CALLABLE_OPTS, async (request) => {
   try {
     const ctx = requireAuth(request);
+    const { requireActiveMember } = await import('../auth/helpers');
+    await requireActiveMember(ctx.uid);
     const db = getDb();
     const { created } = await ensureUserWallets(db, ctx.uid);
     return { created };
@@ -145,6 +147,8 @@ export const transferBetweenWallets = onCall(
   async (request) => {
     try {
       const ctx = requireAuth(request);
+      const { requireActiveMember } = await import('../auth/helpers');
+      await requireActiveMember(ctx.uid);
       const parsed = transferSchema.safeParse(request.data);
       if (!parsed.success) {
         throw new AppError('invalid-argument', parsed.error.message);

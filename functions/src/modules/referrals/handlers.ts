@@ -295,6 +295,8 @@ async function handleGetAffiliateDashboard(
   request: CallableRequest,
 ): Promise<Record<string, unknown>> {
   const ctx = requireAuth(request);
+  const { requireActiveMember } = await import('../auth/helpers');
+  await requireActiveMember(ctx.uid);
   const db = getDb();
 
   const userSnap = await db.collection(Collections.users).doc(ctx.uid).get();

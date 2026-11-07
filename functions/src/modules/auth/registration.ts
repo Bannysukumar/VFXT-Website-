@@ -7,6 +7,10 @@ import { AppError } from '../../lib/errors';
 import { requireAuth } from '../../lib/permissions';
 import { log } from '../../lib/logger';
 import { applyCodeForUserExport } from '../referrals/handlers';
+import {
+  assertMobileAvailable,
+  waitForUserProfile,
+} from './helpers';
 
 const bep20 = z
   .string()
@@ -30,6 +34,7 @@ const finalizeSchema = z.object({
 
 /**
  * After email/password or wallet signup: mandatory referral; mobile/wallet optional.
+ * Activates the account (status → active) only after a sponsor is attached.
  */
 export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
   try {
@@ -46,13 +51,8 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
 
     const db = getDb();
     const ref = db.collection(Collections.users).doc(ctx.uid);
-    const snap = await ref.get();
-    if (!snap.exists) {
-      throw new AppError(
-        'failed-precondition',
-        'Profile not ready yet — wait a moment and try again',
-      );
-    }
+    // Wait for onUserCreated instead of failing immediately on cold starts.
+    await waitForUserProfile(ctx.uid);
 
     if (walletAddress) {
       const { findWalletClaim } = await import('./wallet-ownership');
@@ -65,10 +65,15 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
       }
     }
 
+    const mobileNormalized = mobileRaw ? mobileRaw.replace(/\s+/g, ' ').trim() : '';
+    if (mobileNormalized) {
+      await assertMobileAvailable(mobileNormalized, ctx.uid);
+    }
+
     const patch: Record<string, unknown> = {
       updatedAt: FieldValue.serverTimestamp(),
     };
-    if (mobileRaw) patch.mobile = mobileRaw.replace(/\s+/g, ' ').trim();
+    if (mobileNormalized) patch.mobile = mobileNormalized;
     if (displayName?.trim()) patch.displayName = displayName.trim();
     if (walletAddress) {
       patch.walletAddress = walletAddress;
@@ -88,10 +93,36 @@ export const finalizeRegistration = onCall(CALLABLE_OPTS, async (request) => {
       referrerId = profile.referredBy as string;
     }
 
+    // Activate only after sponsor is attached.
+    await ref.update({
+      status: 'active',
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+
+    if (ctx.email || profile.email) {
+      try {
+        const { sendWelcomeEmailForUser } = await import('../mail/notify');
+        await sendWelcomeEmailForUser({
+          userId: ctx.uid,
+          email: (ctx.email ?? profile.email) as string,
+          displayName:
+            (patch.displayName as string | undefined) ??
+            (profile.displayName as string | null) ??
+            null,
+        });
+      } catch (err) {
+        log.warn('welcome_email_on_finalize_failed', {
+          uid: ctx.uid,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     log.info('registration_finalized', {
       uid: ctx.uid,
       referrerId,
       hasWallet: Boolean(walletAddress),
+      status: 'active',
     });
 
     return {

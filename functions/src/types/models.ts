@@ -8,7 +8,8 @@ import {
 
 export type ServerTimestamp = Timestamp | FieldValue;
 
-export type UserStatus = 'active' | 'suspended' | 'closed';
+/** pending_registration = signed up but sponsor not finalized yet. */
+export type UserStatus = 'pending_registration' | 'active' | 'suspended' | 'closed';
 export type KycStatus = 'none' | 'pending' | 'verified' | 'rejected';
 export type BinarySide = 'left' | 'right';
 

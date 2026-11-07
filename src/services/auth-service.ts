@@ -20,7 +20,7 @@ function requireAuth() {
 export async function lookupReferralCode(code: string) {
   return callFunction<
     { code: string },
-    { ok: true; referralCode: string; displayName: string }
+    { ok: true; referralCode: string; valid: true }
   >('lookupReferralCode', { code })
 }
 

@@ -36,8 +36,7 @@ const publishSchema = z.object({
   notes: z.string().max(2000).default(''),
   sha256: z
     .string()
-    .regex(/^[a-f0-9]{64}$/i)
-    .optional(),
+    .regex(/^[a-f0-9]{64}$/i, 'sha256 must be a 64-char hex digest'),
 });
 
 export async function readWalletApkRelease(): Promise<WalletApkRelease | null> {

@@ -14,7 +14,7 @@ export const FeatureFlags: Record<
   /** Staking products — VFXT daily yield + locked packages. */
   staking: true,
   /** Require verified email before deposits/withdrawals. */
-  requireEmailVerifiedForFinance: false,
+  requireEmailVerifiedForFinance: true,
   /** Referral bonuses auto-credit on stake. */
   referralBonuses: true,
 };

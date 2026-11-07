@@ -94,16 +94,12 @@ service cloud.firestore {
           'withdrawalAddress',
           'walletAddress',
           'lastWithdrawalAddress',
-          'firstWithdrawalCompletedAt'
+          'firstWithdrawalCompletedAt',
+          'mobile',
+          'email'
         ])
-        && request.resource.data.keys().hasOnly([
-          'displayName',
-          'photoURL',
-          'timezone',
-          'locale',
-          'preferences',
-          'updatedAt'
-        ].concat(resource.data.keys()));
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['displayName', 'photoURL', 'timezone', 'locale', 'preferences', 'updatedAt']);
       allow delete: if false;
 
       match /notifications/{notificationId} {
@@ -183,11 +179,9 @@ service cloud.firestore {
         && request.resource.data.body is string
         && request.resource.data.body.size() > 0
         && request.resource.data.body.size() <= 5000;
-      allow update: if isSignedIn()
-        && resource.data.userId == request.auth.uid
-        && request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['body', 'updatedAt'])
-        && unchanged(['status', 'userId', 'assigneeId', 'priority']);
+      // Owners cannot edit subject/body after create; status changes are admin-only.
+      allow update: if isAdmin()
+        && unchanged(['userId', 'createdAt']);
       allow delete: if false;
 
       match /messages/{messageId} {
@@ -270,6 +264,16 @@ service cloud.firestore {
     match /mining_user_boosters/{userBoosterId} {
       allow read: if isSignedIn()
         && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false;
+    }
+
+    // Dashboard campaign progress / view counters — server writes only
+    match /campaignProgress/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false;
+    }
+    match /campaignViews/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
       allow write: if false;
     }
 

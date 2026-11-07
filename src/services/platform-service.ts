@@ -66,9 +66,13 @@ export interface PublicPlatformSettings {
   withdraw: {
     minWithdrawUsdCents: number
     commissionBps: number
-    autoWithdrawEnabled: boolean
+    autoWithdrawEnabled?: boolean
   }
-  plan: Record<string, unknown>
+  plan: {
+    minStakeUsdCents?: number
+    dailyRateBps?: number
+    maxDays?: number
+  }
   hotWalletPool: { multiWalletEnabled: boolean }
 }
 

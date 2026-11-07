@@ -25,7 +25,10 @@ import {
 } from '../wallets/ledger';
 import { createNotification } from '../notifications/handlers';
 import { writeAuditLog } from '../audit/handlers';
-import { gateEmailVerifiedForFinance } from '../auth/helpers';
+import {
+  gateEmailVerifiedForFinance,
+  requireActiveMember,
+} from '../auth/helpers';
 import {
   approveWithdrawalSchema,
   completeWithdrawalSchema,
@@ -82,6 +85,7 @@ async function handleCreateWithdrawalRequest(
   netAmountMinor: number;
 }> {
   const ctx = requireAuth(request);
+  await requireActiveMember(ctx.uid);
   gateEmailVerifiedForFinance(ctx);
 
   const parsed = createWithdrawalRequestSchema.safeParse(request.data);

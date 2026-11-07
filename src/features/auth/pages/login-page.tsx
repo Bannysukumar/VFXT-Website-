@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { doc, getDoc } from 'firebase/firestore'
 import { useForm } from 'react-hook-form'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -19,7 +20,16 @@ import { loginWithWallet, walletConnectConfigured } from '@/lib/wallet-auth'
 import { useAuth } from '@/features/auth/auth-context'
 import { AuthLayout, PasswordInput } from '@/features/auth/components/auth-layout'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { getFirebaseAuth } from '@/lib/firebase'
+import { getDb, getFirebaseAuth } from '@/lib/firebase'
+
+async function isPendingRegistration(uid: string): Promise<boolean> {
+  try {
+    const snap = await getDoc(doc(getDb(), 'users', uid))
+    return String(snap.data()?.status ?? '') === 'pending_registration'
+  } catch {
+    return false
+  }
+}
 
 async function resolvePostLoginPath(fallback: string): Promise<string> {
   // Prefer returning to an explicit deep-link (e.g. /admin/users), otherwise
@@ -43,11 +53,16 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { firebaseConfigured } = useAuth()
-  const from = (location.state as { from?: string } | null)?.from ?? '/app'
+  const locState = location.state as { from?: string; needsProfile?: boolean } | null
+  const from = locState?.from ?? '/app'
   const [walletBusy, setWalletBusy] = useState(false)
-  const [needsProfile, setNeedsProfile] = useState(false)
+  const [needsProfile, setNeedsProfile] = useState(Boolean(locState?.needsProfile))
   const [uplinerId, setUplinerId] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
+
+  useEffect(() => {
+    if (locState?.needsProfile) setNeedsProfile(true)
+  }, [locState?.needsProfile])
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -80,7 +95,12 @@ export function LoginPage() {
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {
-      await loginWithEmail(values.email, values.password)
+      const user = await loginWithEmail(values.email, values.password)
+      if (await isPendingRegistration(user.uid)) {
+        setNeedsProfile(true)
+        toast.message('Complete registration with a referral code to continue')
+        return
+      }
       toast.success('Welcome back')
       navigate(await resolvePostLoginPath(from), { replace: true })
     } catch (error) {

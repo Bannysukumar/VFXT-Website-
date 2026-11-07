@@ -120,7 +120,12 @@ function HomeScreen() {
         <span className="rounded-full bg-white/8 px-2 py-0.5 text-[9px] text-accent-bright">BSC</span>
       </div>
       <div className="px-4 pt-5">
-        <p className="text-[10px] text-white/45">Total balance</p>
+        <div className="mb-1.5 flex items-center gap-2">
+          <p className="text-[10px] text-white/45">Total balance</p>
+          <span className="rounded bg-white/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-white/55">
+            Demo
+          </span>
+        </div>
         <p className="font-display text-[28px] font-bold tracking-tight">$12,480.50</p>
         <p className="mt-1 text-[10px] text-accent-bright">+2.4% today</p>
       </div>

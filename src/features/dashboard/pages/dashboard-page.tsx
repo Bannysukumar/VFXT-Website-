@@ -37,6 +37,7 @@ import { fetchMyDeposits, fetchMyWithdrawals } from '@/services/records-service'
 import { getAffiliateDashboard } from '@/services/plan-service'
 import { CountUp } from '@/components/motion/reveal'
 import { TypeText } from '@/components/motion/typing'
+import { CampaignPanel } from '@/features/dashboard/components/campaign-panel'
 
 const outgoing = new Set(['withdrawal_debit', 'withdrawal_reserve', 'transfer_out', 'fee'])
 const ranges = [
@@ -132,6 +133,8 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      <CampaignPanel />
+
       {/* Welcome banner */}
       <motion.section
         initial={{ opacity: 0, y: 12 }}

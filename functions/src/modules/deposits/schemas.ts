@@ -9,10 +9,10 @@ export const createDepositRequestSchema = z
     amountMinor: z.number().int().positive().optional(),
     /** Legacy: human-readable amount string. */
     amount: z.string().min(1).max(32).optional(),
-    method: z.string().trim().min(1).max(64).default('manual'),
+    method: z.enum(['usdt_bep20', 'vfxt_bep20']).default('usdt_bep20'),
     reference: z.string().trim().max(128).nullable().optional(),
     note: z.string().trim().max(500).nullable().optional(),
-    idempotencyKey: z.string().min(8).max(128).optional(),
+    idempotencyKey: z.string().min(8).max(128),
   })
   .strict()
   .refine((v) => v.amountMinor != null || (v.amount != null && v.amount.length > 0), {

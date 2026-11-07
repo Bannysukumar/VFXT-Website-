@@ -42,24 +42,30 @@ async function handleListUsers(
   }
 
   const snap = await query.get();
-  let users = snap.docs.map((d) => {
-    const data = d.data();
-    return {
-      uid: (data.uid as string) ?? d.id,
-      email: (data.email as string | null) ?? null,
-      displayName: (data.displayName as string | null) ?? null,
-      mobile: (data.mobile as string | null) ?? null,
-      referralCode: (data.referralCode as string | null) ?? null,
-      referredBy: (data.referredBy as string | null) ?? null,
-      walletAddress: (data.walletAddress as string | null) ?? null,
-      status: data.status as string | undefined,
-      kycStatus: data.kycStatus as string | undefined,
-      adminRole: (data.adminRole as string | null) ?? null,
-      createdAt: tsToIso(data.createdAt),
-      referredByName: null as string | null,
-      referredByCode: null as string | null,
-    };
-  });
+  let users = snap.docs
+    .map((d) => {
+      const data = d.data();
+      return {
+        uid: (data.uid as string) ?? d.id,
+        email: (data.email as string | null) ?? null,
+        displayName: (data.displayName as string | null) ?? null,
+        mobile: (data.mobile as string | null) ?? null,
+        referralCode: (data.referralCode as string | null) ?? null,
+        referredBy: (data.referredBy as string | null) ?? null,
+        walletAddress: (data.walletAddress as string | null) ?? null,
+        status: data.status as string | undefined,
+        kycStatus: data.kycStatus as string | undefined,
+        adminRole: (data.adminRole as string | null) ?? null,
+        createdAt: tsToIso(data.createdAt),
+        referredByName: null as string | null,
+        referredByCode: null as string | null,
+      };
+    })
+    // Hide unfinished wallet-login stubs (no email/name/mobile) from the admin list.
+    .filter((u) => {
+      if (!u.uid.startsWith('w_')) return true;
+      return Boolean(u.email || u.displayName || u.mobile || u.walletAddress);
+    });
 
   const referrerIds = [
     ...new Set(users.map((u) => u.referredBy).filter((id): id is string => Boolean(id))),

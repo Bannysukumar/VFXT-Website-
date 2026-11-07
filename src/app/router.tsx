@@ -193,6 +193,10 @@ const AdminWalletApkPage = lazyNamed(
   () => import('@/features/admin/pages/admin-wallet-apk-page'),
   'AdminWalletApkPage',
 )
+const AdminCampaignPage = lazyNamed(
+  () => import('@/features/admin/pages/admin-campaign-page'),
+  'AdminCampaignPage',
+)
 const AdminUsersPage = lazyNamed(
   () => import('@/features/admin/pages/admin-users-page'),
   'AdminUsersPage',
@@ -300,6 +304,7 @@ export const router = createBrowserRouter([
           { path: 'crypto-wallet', element: <AdminCryptoWalletPage /> },
           { path: 'swap', element: <AdminSwapPage /> },
           { path: 'wallet-apk', element: <AdminWalletApkPage /> },
+          { path: 'campaign', element: <AdminCampaignPage /> },
           { path: 'users', element: <AdminUsersPage /> },
           { path: 'affiliates', element: <AdminAffiliatesPage /> },
           { path: 'tickets', element: <AdminTicketsPage /> },

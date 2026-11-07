@@ -11,6 +11,8 @@ export interface IdempotencyRecord {
   operation: string;
   actorId: string;
   resultRef?: string;
+  /** Hash of the original request payload (reject same key + different body). */
+  fingerprint?: string;
   createdAt: FirebaseFirestore.Timestamp | FieldValue;
 }
 

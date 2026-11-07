@@ -30,7 +30,12 @@ const transferToUserSchema = z
 async function findUserByPublicId(
   db: Firestore,
   publicId: string,
-): Promise<{ uid: string; referralCode: string; displayName: string | null }> {
+): Promise<{
+  uid: string;
+  referralCode: string;
+  displayName: string | null;
+  status: string;
+}> {
   const code = normalizeUserId(publicId);
   let snap = await db
     .collection(Collections.users)
@@ -56,6 +61,7 @@ async function findUserByPublicId(
     uid: doc.id,
     referralCode: String(data.referralCode ?? code),
     displayName: typeof data.displayName === 'string' ? data.displayName : null,
+    status: String(data.status ?? ''),
   };
 }
 
@@ -66,6 +72,8 @@ async function findUserByPublicId(
 export const transferToUser = onCall(CALLABLE_OPTS, async (request) => {
   try {
     const ctx = requireAuth(request);
+    const { requireActiveMember } = await import('../auth/helpers');
+    await requireActiveMember(ctx.uid);
     const parsed = transferToUserSchema.safeParse(request.data ?? {});
     if (!parsed.success) {
       throw new AppError(
@@ -174,16 +182,27 @@ export const transferToUser = onCall(CALLABLE_OPTS, async (request) => {
   }
 });
 
-/** Resolve a public user id for transfer UI (display name only). */
+/** Resolve a public user id for transfer UI (minimal leakage). */
 export const lookupUserId = onCall(CALLABLE_OPTS, async (request) => {
   try {
-    requireAuth(request);
+    const ctx = requireAuth(request);
+    const { assertRateLimit, rateLimitKey } = await import('../../lib/rate-limit');
+    const { requireActiveMember } = await import('../auth/helpers');
+    assertRateLimit(rateLimitKey(request, 'user.lookup'), 20, 60_000);
+    await requireActiveMember(ctx.uid);
     const raw = z.string().min(4).max(32).parse((request.data as { userId?: string })?.userId);
     const db = getDb();
     const user = await findUserByPublicId(db, raw);
+    if (user.status !== 'active') {
+      throw new AppError('not-found', 'User not found');
+    }
+    const name = String(user.displayName ?? '').trim();
+    const masked =
+      name.length <= 1 ? 'Member' : `${name.slice(0, 1)}${'*'.repeat(Math.min(6, name.length - 1))}`;
     return {
       userId: user.referralCode,
-      displayName: user.displayName,
+      valid: true as const,
+      displayName: masked,
     };
   } catch (err) {
     throw toHttpsError(err);
