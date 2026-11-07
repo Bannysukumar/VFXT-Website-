@@ -107,6 +107,7 @@ export {
   adminUpdateUser,
   adminAdjustWallet,
   adminSetUserCredentials,
+  adminMarkEmailVerified,
   impersonateUser,
 } from './modules/admin/user-mgmt';
 

@@ -348,6 +348,36 @@ export const adminSetUserCredentials = onCall(CALLABLE_OPTS, async (request) => 
   }
 });
 
+/** Admin: mark Auth emailVerified=true so finance gates unlock for stuck members. */
+export const adminMarkEmailVerified = onCall(CALLABLE_OPTS, async (request) => {
+  try {
+    const ctx = requireAdminRole(request, [
+      AdminRole.SuperAdmin,
+      AdminRole.OperationsAdmin,
+      AdminRole.SupportAdmin,
+    ]);
+    const uid = z.string().min(1).max(128).parse((request.data as { uid?: string })?.uid);
+    const auth = getAdminAuth();
+    const user = await auth.getUser(uid);
+    if (!user.email) {
+      throw new AppError('failed-precondition', 'This account has no email to verify');
+    }
+    if (!user.emailVerified) {
+      await auth.updateUser(uid, { emailVerified: true });
+    }
+    await writeAuditLog({
+      actorId: ctx.uid,
+      action: 'admin.user.email_verified',
+      resourceType: 'user',
+      resourceId: uid,
+      metadata: { email: user.email },
+    });
+    return { ok: true as const, email: user.email, emailVerified: true };
+  } catch (err) {
+    throw toHttpsError(err);
+  }
+});
+
 /** Super admin: mint a custom token to view the app as that user. */
 export const impersonateUser = onCall(CALLABLE_OPTS, async (request) => {
   try {

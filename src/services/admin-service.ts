@@ -249,6 +249,13 @@ export async function adminSetUserCredentials(input: {
   >('adminSetUserCredentials', input)
 }
 
+export async function adminMarkEmailVerified(uid: string) {
+  return callFunction<{ uid: string }, { ok: true; email: string; emailVerified: true }>(
+    'adminMarkEmailVerified',
+    { uid },
+  )
+}
+
 export async function impersonateUser(uid: string) {
   return callFunction<
     { uid: string },

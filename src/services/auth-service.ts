@@ -57,7 +57,10 @@ export async function registerWithEmail(input: {
   const auth = requireAuth()
   const credential = await createUserWithEmailAndPassword(auth, input.email, input.password)
   await updateProfile(credential.user, { displayName: input.displayName })
-  await sendEmailVerification(credential.user)
+  await sendEmailVerification(credential.user, {
+    url: `${typeof window !== 'undefined' ? window.location.origin : 'https://virtualfxtrades.com'}/auth/action`,
+    handleCodeInApp: false,
+  })
 
   // Wait briefly for onUserCreated to provision Firestore profile
   let lastErr: unknown
@@ -153,5 +156,18 @@ export async function resendVerification(): Promise<void> {
   if (!auth.currentUser) {
     throw new ApiError('Not signed in', 'auth/unauthenticated')
   }
-  await sendEmailVerification(auth.currentUser)
+  await sendEmailVerification(auth.currentUser, {
+    url: `${typeof window !== 'undefined' ? window.location.origin : 'https://virtualfxtrades.com'}/auth/action`,
+    handleCodeInApp: false,
+  })
+}
+
+/** Reload Auth user + force ID token so emailVerified updates after the inbox link. */
+export async function refreshEmailVerificationState(): Promise<boolean> {
+  const auth = requireAuth()
+  const user = auth.currentUser
+  if (!user) return false
+  await user.reload()
+  await user.getIdToken(true)
+  return Boolean(auth.currentUser?.emailVerified)
 }

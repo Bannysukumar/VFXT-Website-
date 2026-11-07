@@ -18,6 +18,10 @@ import { AmountInputPrefix, ProcessSteps } from '@/components/shared/process-ste
 import { RequestHistory } from '@/components/shared/request-history'
 import { SuccessReceipt } from '@/components/shared/success-receipt'
 import { useAuth } from '@/features/auth/auth-context'
+import {
+  refreshEmailVerificationState,
+  resendVerification,
+} from '@/services/auth-service'
 import { parseToMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 import { images } from '@/lib/media'
@@ -138,6 +142,31 @@ function toPayParams(active: CreateDepositResult): CryptoPayParams | null {
 
 export function DepositsPage() {
   const { user } = useAuth()
+  const [emailVerified, setEmailVerified] = useState(() => Boolean(user?.emailVerified))
+  const [resendBusy, setResendBusy] = useState(false)
+
+  useEffect(() => {
+    setEmailVerified(Boolean(user?.emailVerified))
+  }, [user?.emailVerified])
+
+  useEffect(() => {
+    if (!user?.email || emailVerified) return
+    let cancelled = false
+    const tick = async () => {
+      try {
+        const ok = await refreshEmailVerificationState()
+        if (!cancelled) setEmailVerified(ok)
+      } catch {
+        /* ignore */
+      }
+    }
+    void tick()
+    const id = window.setInterval(tick, 4000)
+    return () => {
+      cancelled = true
+      window.clearInterval(id)
+    }
+  }, [user?.email, emailVerified])
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const previewSuccess = import.meta.env.DEV && searchParams.get('previewSuccess') === '1'
@@ -298,7 +327,17 @@ export function DepositsPage() {
       form.reset()
       await queryClient.invalidateQueries({ queryKey: ['my-deposits'] })
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error) => {
+      const msg = error.message || 'Deposit failed'
+      if (/email verification required/i.test(msg)) {
+        toast.error('Verify your email first — check your inbox, then tap “I’ve verified”.', {
+          duration: 8000,
+        })
+        setEmailVerified(false)
+        return
+      }
+      toast.error(msg)
+    },
   })
 
   const dismissActive = useCallback(() => {
@@ -945,6 +984,56 @@ export function DepositsPage() {
             </CardContent>
           </Card>
         </div>
+      ) : null}
+
+      {!active?.depositAddress && user?.email && !emailVerified ? (
+        <Alert className="border-accent/40 bg-accent-soft/30">
+          <AlertTitle>Verify your email (recommended)</AlertTitle>
+          <AlertDescription className="mt-2 space-y-3">
+            <p>
+              We sent a link to <span className="font-medium text-ink">{user.email}</span>. Open it,
+              then tap below so this device refreshes. Deposits still work if you skip for now.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={resendBusy}
+                onClick={() => {
+                  void (async () => {
+                    setResendBusy(true)
+                    try {
+                      await resendVerification()
+                      toast.success('Verification email sent — check inbox and spam')
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : 'Could not resend')
+                    } finally {
+                      setResendBusy(false)
+                    }
+                  })()
+                }}
+              >
+                {resendBusy ? 'Sending…' : 'Resend email'}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => {
+                  void (async () => {
+                    const ok = await refreshEmailVerificationState()
+                    setEmailVerified(ok)
+                    toast[ok ? 'success' : 'message'](
+                      ok ? 'Email verified' : 'Not verified yet — open the link from your inbox first',
+                    )
+                  })()
+                }}
+              >
+                I’ve verified
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
       ) : null}
 
       {!active?.depositAddress ? (

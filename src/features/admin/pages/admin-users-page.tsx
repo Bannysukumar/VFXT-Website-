@@ -23,6 +23,7 @@ import { EmptyState } from '@/components/shared/empty-state'
 import { AdminFiltersBar } from '@/features/admin/components/admin-filters'
 import {
   adminAdjustWallet,
+  adminMarkEmailVerified,
   adminSetUserCredentials,
   adminUpdateUser,
   getAdminUserDetail,
@@ -245,6 +246,15 @@ function UserDetailDialog({
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const markVerified = useMutation({
+    mutationFn: () => adminMarkEmailVerified(uid),
+    onSuccess: async () => {
+      toast.success('Email marked verified')
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'user', uid] })
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   const title = user?.displayName || user?.email || 'User'
   const referralCode = String(profile?.referralCode ?? user?.referralCode ?? '')
   const referredByLabel =
@@ -414,14 +424,28 @@ function UserDetailDialog({
                   />
                 </div>
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => saveCredentials.mutate()}
-                disabled={saveCredentials.isPending}
-              >
-                {saveCredentials.isPending ? 'Updating…' : 'Update email / password'}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => saveCredentials.mutate()}
+                  disabled={saveCredentials.isPending}
+                >
+                  {saveCredentials.isPending ? 'Updating…' : 'Update email / password'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => markVerified.mutate()}
+                  disabled={markVerified.isPending || detail.data?.auth?.emailVerified === true}
+                >
+                  {detail.data?.auth?.emailVerified
+                    ? 'Email already verified'
+                    : markVerified.isPending
+                      ? 'Marking…'
+                      : 'Mark email verified'}
+                </Button>
+              </div>
             </div>
 
             <div>

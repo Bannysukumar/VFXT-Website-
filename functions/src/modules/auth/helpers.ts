@@ -1,8 +1,7 @@
-import { getAuth } from 'firebase-admin/auth';
 import { AuthContext } from '../../lib/permissions';
 import { FeatureFlags } from '../../config/features';
 import { AppError } from '../../lib/errors';
-import { Collections, getDb } from '../../lib/firebase';
+import { Collections, getAdminAuth, getDb } from '../../lib/firebase';
 import { log } from '../../lib/logger';
 
 /**
@@ -17,7 +16,7 @@ export async function gateEmailVerifiedForFinance(ctx: AuthContext): Promise<voi
   if (ctx.emailVerified) return;
 
   try {
-    const record = await getAuth().getUser(ctx.uid);
+    const record = await getAdminAuth().getUser(ctx.uid);
     if (record.emailVerified) {
       log.info('email_verified_via_admin_auth', { uid: ctx.uid });
       return;

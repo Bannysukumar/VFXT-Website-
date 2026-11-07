@@ -90,6 +90,10 @@ const ResetPasswordPage = lazyNamed(
   () => import('@/features/auth/pages/reset-password-page'),
   'ResetPasswordPage',
 )
+const AuthActionPage = lazyNamed(
+  () => import('@/features/auth/pages/auth-action-page'),
+  'AuthActionPage',
+)
 
 const DashboardPage = lazyNamed(
   () => import('@/features/dashboard/pages/dashboard-page'),
@@ -256,6 +260,8 @@ export const router = createBrowserRouter([
       { path: 'auth/register', element: <RegisterPage /> },
       { path: 'auth/wallet-register', element: <WalletRegisterPage /> },
       { path: 'auth/reset', element: <ResetPasswordPage /> },
+      // Firebase email links (verify / reset) when action URL is this site.
+      { path: 'auth/action', element: <AuthActionPage /> },
     ],
   },
   {

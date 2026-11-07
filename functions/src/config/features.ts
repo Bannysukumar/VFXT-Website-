@@ -13,8 +13,13 @@ export const FeatureFlags: Record<
   blockchain: false,
   /** Staking products — VFXT daily yield + locked packages. */
   staking: true,
-  /** Require verified email before deposits/withdrawals. */
-  requireEmailVerifiedForFinance: true,
+  /**
+   * Require verified email before deposits/withdrawals.
+   * Off by default: many members never complete Firebase email links (custom-domain
+   * action URLs without /auth/action handler left emailVerified=false forever).
+   * Soft verify prompts remain in the app; turn this on after action links work.
+   */
+  requireEmailVerifiedForFinance: false,
   /** Referral bonuses auto-credit on stake. */
   referralBonuses: true,
 };
