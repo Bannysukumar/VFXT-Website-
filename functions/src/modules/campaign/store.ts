@@ -9,7 +9,6 @@ import {
   type CampaignUserProgress,
   type DashboardCampaignConfig,
 } from './types';
-import { countDirectReferrals } from '../staking/commissions';
 
 function toMillis(value: unknown): number | null {
   if (value == null) return null;
@@ -113,6 +112,42 @@ export function serializeCampaign(cfg: DashboardCampaignConfig) {
   };
 }
 
+function inCampaignWindow(
+  createdMs: number | null,
+  startMs: number | null,
+  endMs: number | null,
+): boolean {
+  // Strict: if a campaign window is set, only count events with a known timestamp inside it.
+  // Pre-campaign history (and undated docs) never count.
+  if (startMs == null && endMs == null) return true;
+  if (createdMs == null) return false;
+  if (startMs != null && createdMs < startMs) return false;
+  if (endMs != null && createdMs > endMs) return false;
+  return true;
+}
+
+/** Direct referrals created during the campaign window only (ignores older downline). */
+export async function countCampaignDirectReferrals(
+  userId: string,
+  cfg: DashboardCampaignConfig,
+): Promise<number> {
+  const db = getDb();
+  const startMs = toMillis(cfg.startsAt);
+  const endMs = toMillis(cfg.endsAt);
+  const snap = await db
+    .collection(Collections.referrals)
+    .where('referrerId', '==', userId)
+    .where('status', '==', 'active')
+    .limit(500)
+    .get();
+  let n = 0;
+  for (const doc of snap.docs) {
+    const created = toMillis(doc.data().createdAt);
+    if (inCampaignWindow(created, startMs, endMs)) n += 1;
+  }
+  return n;
+}
+
 async function sumDepositVolumeUsdCents(
   userId: string,
   startMs: number | null,
@@ -129,8 +164,7 @@ async function sumDepositVolumeUsdCents(
   for (const doc of snap.docs) {
     const d = doc.data();
     const created = toMillis(d.createdAt) ?? toMillis(d.reviewedAt) ?? null;
-    if (startMs != null && created != null && created < startMs) continue;
-    if (endMs != null && created != null && created > endMs) continue;
+    if (!inCampaignWindow(created, startMs, endMs)) continue;
     const currency = String(d.currency || 'USD');
     const amount = Math.floor(Number(d.amountMinor) || 0);
     if (currency === 'VFXT') {
@@ -163,8 +197,7 @@ async function sumStakingVolumeUsdCents(
     const status = String(d.status || '');
     if (status === 'cancelled') continue;
     const created = toMillis(d.createdAt);
-    if (startMs != null && created != null && created < startMs) continue;
-    if (endMs != null && created != null && created > endMs) continue;
+    if (!inCampaignWindow(created, startMs, endMs)) continue;
     total += Math.floor(Number(d.principalMinor ?? d.amountMinor) || 0);
   }
   return total;
@@ -256,7 +289,8 @@ export async function buildUserProgress(
   const db = getDb();
   const [volumeUsdCents, directReferrals, viewsBefore] = await Promise.all([
     computeUserVolumeUsdCents(userId, cfg),
-    countDirectReferrals(db, userId),
+    // Only referrals joined after campaign start count toward the trip offer.
+    countCampaignDirectReferrals(userId, cfg),
     getUserViews(userId),
   ]);
 

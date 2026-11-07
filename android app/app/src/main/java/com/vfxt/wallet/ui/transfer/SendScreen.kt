@@ -215,15 +215,33 @@ private fun EditStep(state: SendUiState, viewModel: SendViewModel) {
                     Row {
                         IconButton(onClick = {
                             scope.launch {
-                                val text = clipboard.getClipEntry()?.clipData?.getItemAt(0)?.text?.toString()
-                                text?.let { QrCodes.extractAddress(it) ?: it.trim() }?.let(viewModel::onRecipientChange)
+                                val text = clipboard.getClipEntry()?.clipData?.getItemAt(0)?.text?.toString() ?: return@launch
+                                val payment = QrCodes.extractPayment(text)
+                                when {
+                                    payment != null -> {
+                                        viewModel.onRecipientChange(payment.recipient)
+                                        payment.tokenAddress?.let { contract ->
+                                            state.tokens.firstOrNull { it.contractAddress.equals(contract, ignoreCase = true) }
+                                                ?.let(viewModel::selectToken)
+                                        }
+                                    }
+                                    else -> viewModel.onRecipientChange(text.trim())
+                                }
                             }
                         }) { Icon(Icons.Outlined.ContentPaste, contentDescription = "Paste address", tint = colors.textSecondary) }
                         IconButton(onClick = {
                             QrCodes.scan(context) { raw ->
-                                val address = raw?.let(QrCodes::extractAddress)
-                                if (address != null) viewModel.onRecipientChange(address)
-                                else if (raw != null) scanError = "That QR code doesn't contain a valid address."
+                                val payment = raw?.let(QrCodes::extractPayment)
+                                if (payment != null) {
+                                    viewModel.onRecipientChange(payment.recipient)
+                                    payment.tokenAddress?.let { contract ->
+                                        state.tokens.firstOrNull { it.contractAddress.equals(contract, ignoreCase = true) }
+                                            ?.let(viewModel::selectToken)
+                                    }
+                                    scanError = null
+                                } else if (raw != null) {
+                                    scanError = "That QR code doesn't contain a valid address."
+                                }
                             }
                         }) { Icon(Icons.Outlined.QrCodeScanner, contentDescription = "Scan QR code", tint = colors.textSecondary) }
                     }

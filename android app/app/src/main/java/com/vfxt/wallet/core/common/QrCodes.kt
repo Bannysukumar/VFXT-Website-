@@ -28,19 +28,64 @@ object QrCodes {
     }
 
     /**
-     * Extracts an EVM address from scanned text: a bare 0x address or an EIP-681 URI such as
-     * `ethereum:0xabc...@56`. Returns null for anything else (never guesses).
+     * Parsed payment / send target from a QR or pasted URI.
+     * For EIP-681 ERC-20 transfers (`…/transfer?address=0x…`) [recipient] is the `address`
+     * query param — never the token contract in the path.
      */
-    fun extractAddress(text: String): String? {
+    data class PaymentTarget(
+        val recipient: String,
+        /** BEP-20 contract when the URI names one; null for native / bare addresses. */
+        val tokenAddress: String? = null,
+    )
+
+    /**
+     * Extracts an EVM **recipient** address from scanned text: a bare 0x address or an EIP-681 URI.
+     * For token-transfer URIs like `ethereum:0xToken@56/transfer?address=0xTo&uint256=…`,
+     * returns `0xTo` (not the token contract). Returns null when nothing valid is found.
+     */
+    fun extractAddress(text: String): String? = extractPayment(text)?.recipient
+
+    /** Like [extractAddress] but also returns the token contract when present in an EIP-681 URI. */
+    fun extractPayment(text: String): PaymentTarget? {
         val trimmed = text.trim()
-        val candidate = trimmed
-            .removePrefix("ethereum:")
-            .removePrefix("bnb:")
-            .removePrefix("pay-")
-            .substringBefore('@')
-            .substringBefore('?')
-            .substringBefore('/')
-        return candidate.takeIf { WalletKeyService.isValidAddress(it) }
+        if (trimmed.isEmpty()) return null
+
+        val uriLike = trimmed.startsWith("ethereum:", ignoreCase = true) ||
+            trimmed.startsWith("bnb:", ignoreCase = true) ||
+            trimmed.startsWith("pay-", ignoreCase = true) ||
+            trimmed.contains("/transfer", ignoreCase = true)
+
+        if (uriLike) {
+            // ERC-20 transfer: recipient lives in ?address= / &address=
+            val transferRecipient = queryParam(trimmed, "address")
+                ?.takeIf { WalletKeyService.isValidAddress(it) }
+            val pathContract = trimmed
+                .removePrefix("ethereum:")
+                .removePrefix("bnb:")
+                .removePrefix("pay-")
+                .substringBefore('@')
+                .substringBefore('?')
+                .substringBefore('/')
+                .takeIf { WalletKeyService.isValidAddress(it) }
+
+            // ERC-20 transfer URIs put the token contract in the path and the wallet in ?address=.
+            if (trimmed.contains("/transfer", ignoreCase = true)) {
+                val recipient = transferRecipient ?: return null
+                val token = pathContract?.takeUnless { it.equals(recipient, ignoreCase = true) }
+                return PaymentTarget(recipient = recipient, tokenAddress = token)
+            }
+
+            // Native / contract-interaction: path address is the destination.
+            pathContract?.let { return PaymentTarget(recipient = it) }
+        }
+
+        return trimmed.takeIf { WalletKeyService.isValidAddress(it) }?.let { PaymentTarget(recipient = it) }
+    }
+
+    private fun queryParam(text: String, name: String): String? {
+        val match = Regex("""[?&]$name=([^&]+)""", RegexOption.IGNORE_CASE).find(text) ?: return null
+        // Addresses are unescaped 0x… hex; avoid android.net.Uri so unit tests stay pure-JVM.
+        return match.groupValues[1].trim().takeIf { it.isNotEmpty() }
     }
 
     /**

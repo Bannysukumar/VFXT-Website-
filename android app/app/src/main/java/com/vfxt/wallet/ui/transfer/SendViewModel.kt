@@ -60,9 +60,17 @@ class SendViewModel @Inject constructor(
 
     private val initialTokenKey: String? = savedStateHandle.get<String>("tokenKey")?.lowercase()
     private val initialAmount: String = savedStateHandle.get<String>("amount").orEmpty()
+    /**
+     * Nav / deep-link recipient. Stripped when it is the selected token's own contract
+     * (tokenKey for BEP-20 is the contract — that must never prefill "To").
+     */
+    private val initialRecipient: String = sanitizeRecipient(
+        savedStateHandle.get<String>("recipient").orEmpty(),
+        tokenContractHint = initialTokenKey,
+    )
     private val _state = MutableStateFlow(
         SendUiState(
-            recipient = savedStateHandle.get<String>("recipient").orEmpty(),
+            recipient = initialRecipient,
             amountInput = initialAmount,
         ),
     )
@@ -77,12 +85,16 @@ class SendViewModel @Inject constructor(
                         val keep = s.token?.takeIf { cur -> sendable.any { it.key == cur.key && it.networkId == network.id } }
                         val fromDeepLink = initialTokenKey
                             ?.let { key -> sendable.firstOrNull { it.key.equals(key, ignoreCase = true) } }
+                        val nextToken = keep ?: fromDeepLink ?: sendable.firstOrNull { it.key == initialTokenKey }
+                            ?: sendable.firstOrNull()
+                        // Drop a recipient that is any known token contract (funds would be burned).
+                        val recipient = sanitizeRecipient(s.recipient, tokenContractHint = nextToken?.contractAddress, knownTokens = sendable)
                         s.copy(
                             network = network,
                             account = account,
                             tokens = sendable,
-                            token = keep ?: fromDeepLink ?: sendable.firstOrNull { it.key == initialTokenKey }
-                                ?: sendable.firstOrNull(),
+                            token = nextToken,
+                            recipient = recipient,
                             // Keep deep-link amount until the user edits or picks another token.
                             amountInput = s.amountInput.ifBlank { initialAmount },
                         )
@@ -94,8 +106,33 @@ class SendViewModel @Inject constructor(
     }
 
     fun selectToken(token: TokenInfo) {
-        _state.update { it.copy(token = token, amountInput = "", balance = null, error = null) }
+        _state.update { s ->
+            val recipient = sanitizeRecipient(
+                s.recipient,
+                tokenContractHint = token.contractAddress,
+                knownTokens = s.tokens,
+            )
+            s.copy(token = token, recipient = recipient, amountInput = "", balance = null, error = null, recipientWarning = null)
+        }
+        val recipient = _state.value.recipient
+        if (recipient.isNotBlank()) onRecipientChange(recipient)
         refreshBalance()
+    }
+
+    /**
+     * Never prefill / keep a token contract as the send destination.
+     * [tokenContractHint] covers the nav `tokenKey` (contract lowercase) before tokens load.
+     */
+    private fun sanitizeRecipient(
+        raw: String,
+        tokenContractHint: String? = null,
+        knownTokens: List<TokenInfo> = emptyList(),
+    ): String {
+        val trimmed = raw.trim()
+        if (trimmed.isEmpty()) return ""
+        if (tokenContractHint != null && trimmed.equals(tokenContractHint, ignoreCase = true)) return ""
+        if (knownTokens.any { it.contractAddress.equals(trimmed, ignoreCase = true) }) return ""
+        return trimmed
     }
 
     fun onRecipientChange(value: String) {

@@ -122,12 +122,12 @@ fun HomeScreen(
         onNetwork = onNetwork,
         onScan = {
             QrCodes.scan(context) { raw ->
-                val address = raw?.let(QrCodes::extractAddress)
+                val payment = raw?.let(QrCodes::extractPayment)
                 when {
                     raw?.startsWith("wc:", ignoreCase = true) == true -> viewModel.pairWalletConnect(raw).let { error ->
                         onNotify(error ?: "Connecting to dApp…")
                     }
-                    address != null -> onSend(null, address)
+                    payment != null -> onSend(payment.tokenAddress?.lowercase(), payment.recipient)
                     raw != null -> onNotify("That QR code doesn't contain a wallet address or WalletConnect link.")
                 }
             }

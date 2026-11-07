@@ -50,13 +50,14 @@ service cloud.firestore {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(keys);
     }
 
-    // Public platform config (feature flags, branding) — read-only for clients
+    // Platform config — Admin SDK / Cloud Functions only.
+    // NEVER world-readable: config/smtp previously leaked the SMTP password when
+    // the whole collection was `allow read: if true`.
     match /config/{docId} {
-      allow read: if true;
-      allow write: if false;
+      allow read, write: if false;
     }
 
-    // Feature flags (server-managed)
+    // Feature flags (non-secret product toggles; server-managed)
     match /featureFlags/{flagId} {
       allow read: if true;
       allow write: if false;

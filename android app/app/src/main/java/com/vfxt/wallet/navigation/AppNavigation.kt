@@ -225,7 +225,8 @@ fun AppNavigation(
         composable<RootRoute.TokenDetails> {
             TokenDetailsScreen(
                 onBack = { navController.popBackStack() },
-                onSend = { key -> navController.navigate(RootRoute.Send(tokenKey = key)) },
+                // tokenKey is the contract for BEP-20 — never pass it as recipient.
+                onSend = { key -> navController.navigate(RootRoute.Send(tokenKey = key, recipient = null)) },
                 onReceive = { navController.navigate(RootRoute.Receive) },
                 // VFXT pairs are routed to the VFXT swap contract inside the main Swap screen.
                 onSwap = { key -> navController.navigate(RootRoute.Swap(fromTokenKey = key)) },

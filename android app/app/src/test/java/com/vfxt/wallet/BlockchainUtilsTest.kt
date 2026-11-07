@@ -56,6 +56,17 @@ class BlockchainUtilsTest {
     }
 
     @Test
+    fun extractsRecipientFromEip681TokenTransferNotContract() {
+        val token = "0x4A08EF10e6f4aa077A74496793467d2192061969"
+        val to = "0x76b16F59Cfab5DdaE5D149BE98E5d755F939572A"
+        val uri = "ethereum:$token@56/transfer?address=$to&uint256=1000000000000000000"
+        assertEquals(to, QrCodes.extractAddress(uri))
+        val payment = QrCodes.extractPayment(uri)!!
+        assertEquals(to, payment.recipient)
+        assertEquals(token, payment.tokenAddress)
+    }
+
+    @Test
     fun parsesAmountsExactly() {
         assertEquals(BigInteger("1500000000000000000"), TransactionService.parseAmount("1.5", 18))
         assertEquals(BigInteger("1"), TransactionService.parseAmount("0.000000000000000001", 18))
