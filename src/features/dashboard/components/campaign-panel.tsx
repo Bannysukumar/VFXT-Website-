@@ -7,30 +7,13 @@ import { getMyCampaign } from '@/services/campaign-service'
 import { formatMinor } from '@/lib/money'
 import { cn } from '@/lib/utils'
 
-const SKIP_KEY = 'vfxt_campaign_banner_skipped'
-
 function moneyUsd(cents: number) {
   return formatMinor(cents, { scale: 2, currency: 'USD' })
 }
 
-function readSkipped(): boolean {
-  try {
-    return sessionStorage.getItem(SKIP_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function writeSkipped() {
-  try {
-    sessionStorage.setItem(SKIP_KEY, '1')
-  } catch {
-    /* ignore */
-  }
-}
-
 export function CampaignPanel() {
-  const [skipped, setSkipped] = useState(readSkipped)
+  // In-memory only — refresh / new visit shows the banner again.
+  const [skipped, setSkipped] = useState(false)
   const [progressOpen, setProgressOpen] = useState(true)
 
   const query = useQuery({
@@ -62,7 +45,6 @@ export function CampaignPanel() {
   }, [progress?.nextTierId, tiers])
 
   function skipBanner() {
-    writeSkipped()
     setSkipped(true)
   }
 
@@ -74,45 +56,44 @@ export function CampaignPanel() {
     <>
       {showModal ? (
         <div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:p-6"
+          className="fixed inset-0 z-[80] flex items-start justify-center bg-black/60 p-3 backdrop-blur-sm sm:items-center sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-label={campaign.title}
         >
-          <div className="relative w-full max-w-3xl overflow-hidden rounded-3xl bg-ink shadow-2xl">
-            <button
-              type="button"
-              onClick={skipBanner}
-              className="absolute right-3 top-3 z-10 grid size-9 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
-              aria-label="Skip campaign banner"
-            >
-              <X className="size-4" />
-            </button>
+          <div className="relative mt-2 w-full max-w-3xl overflow-hidden rounded-3xl bg-ink shadow-2xl sm:mt-0">
+            {/* Top bar — Skip always easy to reach */}
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-black/70 px-3 py-2.5 text-white">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold">{campaign.title}</p>
+                <p className="truncate text-xs text-white/65">{campaign.subtitle}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="bg-white/15 text-white hover:bg-white/25"
+                  onClick={skipBanner}
+                >
+                  Skip
+                </Button>
+                <button
+                  type="button"
+                  onClick={skipBanner}
+                  className="grid size-9 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25"
+                  aria-label="Close campaign banner"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            </div>
+
             <img
               src={campaign.bannerUrl!}
               alt={campaign.title}
               className="block max-h-[70vh] w-full object-contain object-top"
             />
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-black/40 px-4 py-3 text-white">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold">{campaign.title}</p>
-                <p className="truncate text-xs text-white/65">{campaign.subtitle}</p>
-              </div>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  className="bg-white/10 text-white hover:bg-white/20"
-                  onClick={skipBanner}
-                >
-                  Skip
-                </Button>
-                <Button type="button" size="sm" onClick={skipBanner}>
-                  Continue
-                </Button>
-              </div>
-            </div>
           </div>
         </div>
       ) : null}
@@ -133,20 +114,8 @@ export function CampaignPanel() {
             </p>
           </div>
           <div className="flex gap-2">
-            {campaign.bannerUrl ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  try {
-                    sessionStorage.removeItem(SKIP_KEY)
-                  } catch {
-                    /* ignore */
-                  }
-                  setSkipped(false)
-                }}
-              >
+            {campaign.bannerUrl && skipped ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setSkipped(false)}>
                 View banner
               </Button>
             ) : null}
