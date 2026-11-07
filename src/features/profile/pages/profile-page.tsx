@@ -9,7 +9,6 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword,
-  updateProfile as updateAuthProfile,
 } from 'firebase/auth'
 import { KeyRound, UserCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -95,10 +94,6 @@ export function ProfilePage() {
       await updateProfile({
         displayName: values.displayName.trim(),
       })
-      const auth = getFirebaseAuth()
-      if (auth.currentUser) {
-        await updateAuthProfile(auth.currentUser, { displayName: values.displayName.trim() })
-      }
     },
     onSuccess: async () => {
       toast.success('Profile saved')

@@ -16,7 +16,9 @@ const schema = z.object({
  */
 export const lookupReferralCode = onCall(CALLABLE_OPTS, async (request) => {
   try {
-    assertRateLimit(rateLimitKey(request, 'referral.lookup'), 20, 60_000);
+    // Tight limit: unauthenticated callers can probe sequential VFXT#### codes.
+    assertRateLimit(rateLimitKey(request, 'referral.lookup'), 8, 60_000);
+    assertRateLimit(rateLimitKey(request, 'referral.lookup.burst'), 3, 10_000);
 
     const parsed = schema.safeParse(request.data ?? {});
     if (!parsed.success) {

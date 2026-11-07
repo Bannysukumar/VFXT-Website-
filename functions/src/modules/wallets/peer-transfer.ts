@@ -198,7 +198,8 @@ export const lookupUserId = onCall(CALLABLE_OPTS, async (request) => {
     const ctx = requireAuth(request);
     const { assertRateLimit, rateLimitKey } = await import('../../lib/rate-limit');
     const { requireActiveMember } = await import('../auth/helpers');
-    assertRateLimit(rateLimitKey(request, 'user.lookup'), 20, 60_000);
+    assertRateLimit(rateLimitKey(request, 'user.lookup'), 10, 60_000);
+    assertRateLimit(rateLimitKey(request, 'user.lookup.burst'), 4, 10_000);
     await requireActiveMember(ctx.uid);
     const raw = z.string().min(4).max(32).parse((request.data as { userId?: string })?.userId);
     const db = getDb();
