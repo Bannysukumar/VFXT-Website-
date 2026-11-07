@@ -8,6 +8,7 @@ import { writeAuditLog } from '../audit/handlers';
 import { sendPlatformMail, verifySmtpConnection } from './mailer';
 import { sendPasswordResetViaSmtp } from './notify';
 import { getSmtpAdminView, saveSmtpSettings } from './store';
+import { smtpTestEmail } from './templates';
 
 const smtpPatchSchema = z
   .object({
@@ -89,11 +90,12 @@ export const testSmtpSettings = onCall(CALLABLE_OPTS, async (request) => {
       throw new AppError('invalid-argument', 'Provide a destination email for the test message');
     }
 
+    const mail = smtpTestEmail();
     await sendPlatformMail({
       to,
-      subject: 'VFXT SMTP test — Virtual FX Trades',
-      text: 'This is a test email from the Virtual FX Trades admin SMTP settings page.',
-      html: '<p>This is a test email from the <strong>Virtual FX Trades</strong> admin SMTP settings page.</p><p>If you received this, outbound mail is working.</p>',
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
     });
 
     await writeAuditLog({
