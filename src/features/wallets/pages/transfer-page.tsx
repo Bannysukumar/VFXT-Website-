@@ -68,7 +68,7 @@ const INTERNAL_ROUTES: Array<{
 ]
 
 const PEER_WALLETS: Array<{
-  kind: 'fund' | 'vfxt' | 'withdrawal'
+  kind: 'fund' | 'vfxt' | 'withdrawal' | 'direct_referral'
   title: string
   hint: string
 }> = [
@@ -87,6 +87,11 @@ const PEER_WALLETS: Array<{
     title: 'Withdrawal Wallet',
     hint: 'Send VFXT from your Withdrawal Wallet',
   },
+  {
+    kind: 'direct_referral',
+    title: 'Direct Referral Wallet',
+    hint: 'Send VFXT from your Direct Referral bonus to another member',
+  },
 ]
 
 const internalSchema = z.object({
@@ -96,7 +101,7 @@ const internalSchema = z.object({
 
 const peerSchema = z.object({
   toUserId: z.string().min(4, 'Enter a user ID like VFXT2533'),
-  walletKind: z.enum(['fund', 'vfxt', 'withdrawal']),
+  walletKind: z.enum(['fund', 'vfxt', 'withdrawal', 'direct_referral']),
   amount: z.string().min(1, 'Enter an amount'),
   note: z.string().max(200).optional(),
 })
