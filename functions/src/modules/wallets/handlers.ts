@@ -2,8 +2,6 @@ import { FieldValue, Firestore } from 'firebase-admin/firestore';
 import { onCall } from 'firebase-functions/v2/https';
 import { z } from 'zod';
 import {
-  ALLOWED_TRANSFERS,
-  isTransferAllowed,
   WalletKind,
   WALLET_CURRENCY,
 } from '../../config/plan';
@@ -18,6 +16,7 @@ import { assertPositiveMinor } from '../../lib/money';
 import { requireAuth } from '../../lib/permissions';
 import { WalletDoc } from '../../types/models';
 import { DEFAULT_WALLETS, walletDocId } from './types';
+import { assertInternalTransferAllowed } from './transfer-settings';
 
 /**
  * Create any missing plan wallets for a user (idempotent).
@@ -155,13 +154,7 @@ export const transferBetweenWallets = onCall(
       }
 
       const { fromKind, toKind, amountMinor, idempotencyKey } = parsed.data;
-      if (!isTransferAllowed(fromKind, toKind)) {
-        throw new AppError(
-          'failed-precondition',
-          `Transfer ${fromKind} → ${toKind} is not allowed`,
-          { allowed: ALLOWED_TRANSFERS },
-        );
-      }
+      await assertInternalTransferAllowed(fromKind, toKind);
       assertPositiveMinor(amountMinor);
 
       const db = getDb();

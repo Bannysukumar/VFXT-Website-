@@ -15,12 +15,19 @@ import { normalizeUserId } from '../../lib/user-id';
 import { ensureUserWallets } from './handlers';
 import { walletDocId } from './types';
 
-const PEER_WALLET_KINDS = ['fund', 'vfxt', 'withdrawal', 'direct_referral'] as const;
-
+/** Schema accepts any wallet kind; admin transfer settings decide what is allowed. */
 const transferToUserSchema = z
   .object({
     toUserId: z.string().min(4).max(32),
-    walletKind: z.enum(PEER_WALLET_KINDS),
+    walletKind: z.enum([
+      'fund',
+      'staking',
+      'daily_roi',
+      'level_income',
+      'direct_referral',
+      'withdrawal',
+      'vfxt',
+    ]),
     amountMinor: z.number().int().positive(),
     note: z.string().max(200).optional(),
     idempotencyKey: z.string().min(8).max(128),
@@ -84,6 +91,9 @@ export const transferToUser = onCall(CALLABLE_OPTS, async (request) => {
 
     const { toUserId, walletKind, amountMinor, note, idempotencyKey } = parsed.data;
     assertPositiveMinor(amountMinor);
+
+    const { assertPeerTransferAllowed } = await import('./transfer-settings');
+    await assertPeerTransferAllowed(walletKind);
 
     const db = getDb();
     const recipient = await findUserByPublicId(db, toUserId);

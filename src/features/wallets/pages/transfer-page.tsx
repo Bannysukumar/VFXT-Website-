@@ -30,12 +30,13 @@ import {
   transferBetweenWallets,
   transferToUser,
 } from '@/services/plan-service'
+import { getMyTransferSettings } from '@/services/transfer-settings-service'
 import { fetchUserWallets } from '@/services/wallet-service'
 import { useAuth } from '@/features/auth/auth-context'
 
 type Mode = 'peer' | 'internal'
 
-const INTERNAL_ROUTES: Array<{
+const DEFAULT_INTERNAL_ROUTES: Array<{
   from: WalletKind
   to: WalletKind
   title: string
@@ -67,32 +68,7 @@ const INTERNAL_ROUTES: Array<{
   },
 ]
 
-const PEER_WALLETS: Array<{
-  kind: 'fund' | 'vfxt' | 'withdrawal' | 'direct_referral'
-  title: string
-  hint: string
-}> = [
-  {
-    kind: 'fund',
-    title: 'Fund Wallet',
-    hint: 'Send VFXT from your Fund Wallet to another member',
-  },
-  {
-    kind: 'vfxt',
-    title: 'VFXT tokens',
-    hint: 'Send whole VFXT tokens to another member',
-  },
-  {
-    kind: 'withdrawal',
-    title: 'Withdrawal Wallet',
-    hint: 'Send VFXT from your Withdrawal Wallet',
-  },
-  {
-    kind: 'direct_referral',
-    title: 'Direct Referral Wallet',
-    hint: 'Send VFXT from your Direct Referral bonus to another member',
-  },
-]
+const DEFAULT_PEER_KINDS: WalletKind[] = ['fund', 'vfxt', 'withdrawal', 'direct_referral']
 
 const internalSchema = z.object({
   route: z.string().min(1),
@@ -101,7 +77,7 @@ const internalSchema = z.object({
 
 const peerSchema = z.object({
   toUserId: z.string().min(4, 'Enter a user ID like VFXT2533'),
-  walletKind: z.enum(['fund', 'vfxt', 'withdrawal', 'direct_referral']),
+  walletKind: z.string().min(1),
   amount: z.string().min(1, 'Enter an amount'),
   note: z.string().max(200).optional(),
 })
@@ -154,6 +130,41 @@ export function TransferPage() {
     enabled: Boolean(user?.uid),
   })
 
+  const transferSettings = useQuery({
+    queryKey: ['my-transfer-settings'],
+    queryFn: getMyTransferSettings,
+    staleTime: 30_000,
+  })
+
+  const internalRoutes = useMemo(() => {
+    const live = transferSettings.data?.internalRoutes
+    if (!live?.length) return DEFAULT_INTERNAL_ROUTES
+    return live.map((r) => {
+      const fallback = DEFAULT_INTERNAL_ROUTES.find((d) => d.from === r.from && d.to === r.to)
+      return {
+        from: r.from as WalletKind,
+        to: r.to as WalletKind,
+        title: fallback?.title ?? `${WALLET_META[r.from as WalletKind]?.label ?? r.from} → ${WALLET_META[r.to as WalletKind]?.label ?? r.to}`,
+        hint: fallback?.hint ?? 'Move balance between your wallets',
+      }
+    })
+  }, [transferSettings.data])
+
+  const peerWallets = useMemo(() => {
+    const kinds = (transferSettings.data?.peerWallets?.length
+      ? transferSettings.data.peerWallets
+      : DEFAULT_PEER_KINDS) as WalletKind[]
+    return kinds.map((kind) => ({
+      kind,
+      title: WALLET_META[kind]?.label ?? kind,
+      hint: `Send VFXT from your ${WALLET_META[kind]?.label ?? kind} to another member`,
+    }))
+  }, [transferSettings.data])
+
+  const transfersMasterOn = transferSettings.data?.enabled !== false
+  const peerAllowed = transfersMasterOn && transferSettings.data?.peerEnabled !== false
+  const internalAllowed = transfersMasterOn && transferSettings.data?.internalEnabled !== false
+
   const internalForm = useForm<InternalValues>({
     resolver: zodResolver(internalSchema),
     defaultValues: { route: 'daily_roi:withdrawal', amount: '' },
@@ -164,19 +175,37 @@ export function TransferPage() {
     defaultValues: { toUserId: '', walletKind: 'fund', amount: '', note: '' },
   })
 
-  const peerWalletKind = peerForm.watch('walletKind')
+  useEffect(() => {
+    if (!internalRoutes.length) return
+    const current = internalForm.getValues('route')
+    if (!internalRoutes.some((r) => `${r.from}:${r.to}` === current)) {
+      internalForm.setValue('route', `${internalRoutes[0]!.from}:${internalRoutes[0]!.to}`)
+    }
+  }, [internalRoutes, internalForm])
+
+  useEffect(() => {
+    if (!peerWallets.length) return
+    const current = peerForm.getValues('walletKind')
+    if (!peerWallets.some((w) => w.kind === current)) {
+      peerForm.setValue('walletKind', peerWallets[0]!.kind)
+    }
+  }, [peerWallets, peerForm])
+
+  const peerWalletKind = peerForm.watch('walletKind') as WalletKind
   const peerUserId = peerForm.watch('toUserId')
   const peerAmount = peerForm.watch('amount')
   const internalRoute = internalForm.watch('route')
   const internalAmount = internalForm.watch('amount')
 
   const selectedInternal = useMemo(
-    () => INTERNAL_ROUTES.find((r) => `${r.from}:${r.to}` === internalRoute) ?? INTERNAL_ROUTES[0],
-    [internalRoute],
+    () => internalRoutes.find((r) => `${r.from}:${r.to}` === internalRoute) ?? internalRoutes[0],
+    [internalRoute, internalRoutes],
   )
 
   const peerBalance = walletAvailable(wallets.data, peerWalletKind)
-  const internalFromBalance = walletAvailable(wallets.data, selectedInternal.from)
+  const internalFromBalance = selectedInternal
+    ? walletAvailable(wallets.data, selectedInternal.from)
+    : 0
 
   useEffect(() => {
     const raw = peerUserId.trim().toUpperCase()
@@ -217,6 +246,7 @@ export function TransferPage() {
 
   const internalMutation = useMutation({
     mutationFn: async (values: InternalValues) => {
+      if (!internalAllowed) throw new Error('Internal wallet transfers are disabled')
       const [fromKind, toKind] = values.route.split(':') as [WalletKind, WalletKind]
       const scale = WALLET_META[fromKind].currency === 'VFXT' ? 0 : 2
       const amountMinor = Number(parseToMinor(values.amount, scale))
@@ -246,14 +276,16 @@ export function TransferPage() {
         throw new Error('Cannot transfer to yourself')
       }
       await lookupUserId(toUserId)
-      const scale = WALLET_META[values.walletKind].currency === 'VFXT' ? 0 : 2
+      if (!peerAllowed) throw new Error('Peer transfers are disabled')
+      const kind = values.walletKind as WalletKind
+      const scale = WALLET_META[kind].currency === 'VFXT' ? 0 : 2
       const amountMinor = Number(parseToMinor(values.amount, scale))
       if (amountMinor <= 0) throw new Error('Amount must be positive')
-      const available = walletAvailable(wallets.data, values.walletKind)
+      const available = walletAvailable(wallets.data, kind)
       if (amountMinor > available) throw new Error('Not enough balance in that wallet')
       return transferToUser({
         toUserId,
-        walletKind: values.walletKind,
+        walletKind: kind,
         amountMinor,
         note: values.note?.trim() || undefined,
         idempotencyKey: crypto.randomUUID(),
@@ -301,6 +333,7 @@ export function TransferPage() {
 
   function internalExceeds(): boolean {
     try {
+      if (!selectedInternal) return false
       const scale = WALLET_META[selectedInternal.from].currency === 'VFXT' ? 0 : 2
       const minor = Number(parseToMinor(internalAmount || '0', scale))
       return minor > internalFromBalance
@@ -374,6 +407,22 @@ export function TransferPage() {
         })}
       </div>
 
+      {!transfersMasterOn ? (
+        <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          Transfers are temporarily disabled by admin.
+        </p>
+      ) : null}
+      {transfersMasterOn && mode === 'peer' && !peerAllowed ? (
+        <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          Peer transfers to other users are disabled.
+        </p>
+      ) : null}
+      {transfersMasterOn && mode === 'internal' && !internalAllowed ? (
+        <p className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          Internal wallet transfers are disabled.
+        </p>
+      ) : null}
+
       {mode === 'peer' ? (
         <Card>
           <CardHeader>
@@ -418,7 +467,7 @@ export function TransferPage() {
               <div className="space-y-3">
                 <Label>What do you want to send?</Label>
                 <div className="grid gap-3 sm:grid-cols-3">
-                  {PEER_WALLETS.map((option) => {
+                  {peerWallets.map((option) => {
                     const active = peerWalletKind === option.kind
                     const bal = walletAvailable(wallets.data, option.kind)
                     return (
@@ -501,7 +550,7 @@ export function TransferPage() {
               <Button
                 type="submit"
                 className="w-full sm:w-auto"
-                disabled={peerMutation.isPending || Boolean(lookupError)}
+                disabled={peerMutation.isPending || Boolean(lookupError) || !peerAllowed || peerWallets.length === 0}
               >
                 {peerMutation.isPending ? (
                   <>
@@ -535,7 +584,7 @@ export function TransferPage() {
               <div className="space-y-3">
                 <Label>Choose a move</Label>
                 <div className="grid gap-3">
-                  {INTERNAL_ROUTES.map((route) => {
+                  {internalRoutes.map((route) => {
                     const value = `${route.from}:${route.to}`
                     const active = internalRoute === value
                     const fromBal = walletAvailable(wallets.data, route.from)
@@ -576,7 +625,9 @@ export function TransferPage() {
                     id="amount"
                     inputMode="decimal"
                     placeholder={
-                      WALLET_META[selectedInternal.from].currency === 'VFXT' ? '0' : '0.00'
+                      selectedInternal && WALLET_META[selectedInternal.from].currency === 'VFXT'
+                        ? '0'
+                        : '0.00'
                     }
                     autoComplete="off"
                     className="tabular h-14 pr-24 text-xl font-semibold"
@@ -587,8 +638,9 @@ export function TransferPage() {
                   />
                   <button
                     type="button"
-                    disabled={internalFromBalance <= 0}
+                    disabled={internalFromBalance <= 0 || !selectedInternal}
                     onClick={() =>
+                      selectedInternal &&
                       internalForm.setValue(
                         'amount',
                         amountToInput(selectedInternal.from, internalFromBalance),
@@ -608,19 +660,27 @@ export function TransferPage() {
                 ) : null}
               </div>
 
-              <div className="rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-ink-muted">
-                Moving from{' '}
-                <span className="font-medium text-ink">
-                  {WALLET_META[selectedInternal.from].label}
-                </span>{' '}
-                to{' '}
-                <span className="font-medium text-ink">
-                  {WALLET_META[selectedInternal.to].label}
-                </span>
-                .
-              </div>
+              {selectedInternal ? (
+                <div className="rounded-xl border border-line bg-canvas px-4 py-3 text-sm text-ink-muted">
+                  Moving from{' '}
+                  <span className="font-medium text-ink">
+                    {WALLET_META[selectedInternal.from].label}
+                  </span>{' '}
+                  to{' '}
+                  <span className="font-medium text-ink">
+                    {WALLET_META[selectedInternal.to].label}
+                  </span>
+                  .
+                </div>
+              ) : null}
 
-              <Button type="submit" className="w-full sm:w-auto" disabled={internalMutation.isPending}>
+              <Button
+                type="submit"
+                className="w-full sm:w-auto"
+                disabled={
+                  internalMutation.isPending || !internalAllowed || internalRoutes.length === 0
+                }
+              >
                 {internalMutation.isPending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />

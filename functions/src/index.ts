@@ -48,6 +48,11 @@ export {
   transferToUser,
   lookupUserId,
 } from './modules/wallets/peer-transfer';
+export {
+  getMyTransferSettings,
+  getAdminTransferSettings,
+  updateAdminTransferSettings,
+} from './modules/wallets/transfer-settings';
 
 // Referrals / affiliate
 export {
